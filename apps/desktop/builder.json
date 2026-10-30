@@ -28,7 +28,8 @@
     ],
     "category": "public.app-category.developer-tools",
     "icon": "assets/DevTeleport.icns",
-    "notarize": false
+    "notarize": false,
+    "hardenedRuntime": false
   },
   "extraResources": [
     {

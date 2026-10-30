@@ -1,4 +1,4 @@
-import {boundedRead,publishNoReplace} from "./atomic.ts";
+import { boundedRead, publishNoReplace } from "./atomic.ts";
 import {
   execText,
   trackChild,
@@ -357,6 +357,7 @@ export async function enumerate(
       }
       if (
         p === ".git/objects/info" ||
+        p === ".git/modules" ||
         p === ".git/worktrees" ||
         p === ".git/config" ||
         p === ".git/config.worktree" ||
@@ -409,7 +410,7 @@ export async function enumerate(
         }
         if (st.size > LIMITS.file || (total += st.size) > LIMITS.archive)
           throw new Error("Capture exceeds size limits; configure exclusions.");
-        const data = await boundedRead(abs,LIMITS.file),
+        const data = await boundedRead(abs, LIMITS.file),
           after = await fs.stat(abs);
         if (
           st.size !== after.size ||
@@ -495,6 +496,14 @@ export async function capture(options: CaptureOptions = {}) {
     return (await import("./stream-v2.ts")).captureV2(options);
   options.onProgress?.("Analyzing workspace");
   const report = await inspect(options.root ?? ".");
+  if (
+    report.git?.indexEntries
+      .split("\0")
+      .some((entry) => entry.startsWith("160000 "))
+  )
+    throw new Error(
+      "Submodules require separate complete captures; partial submodule snapshots are refused.",
+    );
   const c = await config(report.root);
   for (const prefix of options.exclusions ?? []) {
     safePath(prefix);
@@ -647,7 +656,7 @@ export async function capture(options: CaptureOptions = {}) {
           report.root,
           { env },
         );
-        const data = await boundedRead(file,LIMITS.file);
+        const data = await boundedRead(file, LIMITS.file);
         if (data.length > LIMITS.file)
           throw new Error("Database dump exceeds size limit");
         await run("pg_restore", ["--list", file], report.root);
@@ -904,7 +913,7 @@ export async function readSnapshot(file: string, password: string | undefined) {
   const st = await fs.stat(file);
   if (st.size > LIMITS.archive + 48 || st.size < 48)
     throw new Error("Invalid snapshot size");
-  const bytes = await boundedRead(file,LIMITS.archive+48);
+  const bytes = await boundedRead(file, LIMITS.archive + 48);
   if (bytes.subarray(0, 4).toString() !== "DTP1")
     throw new Error("Unsupported snapshot format");
   if (typeof password !== "string")

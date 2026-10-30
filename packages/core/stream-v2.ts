@@ -1,4 +1,4 @@
-import {publishNoReplace} from "./atomic.ts";
+import { publishNoReplace } from "./atomic.ts";
 import { throwIfCancelled } from "./processes.ts";
 import fs from "node:fs/promises";
 import { createReadStream, createWriteStream, constants } from "node:fs";
@@ -241,6 +241,14 @@ export async function captureV2(options: CaptureOptions) {
   options.onProgress?.("Analyzing streaming capture");
   const report = await inspect(options.root ?? "."),
     c = await config(report.root);
+  if (
+    report.git?.indexEntries
+      .split("\0")
+      .some((entry) => entry.startsWith("160000 "))
+  )
+    throw new Error(
+      "Submodules require separate complete captures; partial snapshots are refused.",
+    );
   for (const prefix of options.exclusions ?? []) {
     safePath(prefix);
     c.exclude = [...(c.exclude ?? []), prefix];
