@@ -85,7 +85,10 @@ export async function recoveryPlan(directory: string) {
 export async function cleanupRecovery(directory: string, approved: boolean) {
   const plan = await recoveryPlan(directory);
   if (!approved) return plan;
-  for (const file of plan.artifacts)
-    await fs.rm(file, { recursive: true, force: false });
+  // Keep the journal until sibling partial cleanup succeeds so a failed
+  // filesystem operation can be inspected and retried through the same plan.
+  for (const file of plan.artifacts.slice(1))
+    await fs.rm(file, { force: true });
+  await fs.rm(plan.artifacts[0], { recursive: true, force: false });
   return { ...plan, approved: true, cleaned: true };
 }

@@ -71,7 +71,8 @@ function settingsValue() {
     name: $("name").value,
     target: $("target").value,
     toolDirectories: $("toolDirectories").value,
-    theme: $("theme").value,editor:$("editor").value,
+    theme: $("theme").value,
+    editor: $("editor").value,
     exclusions: $("exclusions").value,
     trustedPublicKey: $("trustedPublicKey").value,
     updateManifestUrl: $("updateManifestUrl").value,
@@ -111,7 +112,19 @@ function row(title, detail) {
 }
 async function refreshData() {
   lastData = await window.teleport.data();
-  const editor=$('editor');editor.replaceChildren();const automatic=document.createElement('option');automatic.value='';automatic.textContent='Automatic discovery / reveal in Finder';editor.append(automatic);for(const file of lastData.editors??[]){const option=document.createElement('option');option.value=file;option.textContent=file.split('/').pop();editor.append(option);}editor.value=preferences.editor||'';
+  const editor = $("editor");
+  editor.replaceChildren();
+  const automatic = document.createElement("option");
+  automatic.value = "";
+  automatic.textContent = "Automatic discovery / reveal in Finder";
+  editor.append(automatic);
+  for (const file of lastData.editors ?? []) {
+    const option = document.createElement("option");
+    option.value = file;
+    option.textContent = file.split("/").pop();
+    editor.append(option);
+  }
+  editor.value = preferences.editor || "";
   $("storage").textContent = size(lastData.storage.available);
   $("architecture").textContent =
     lastData.architecture === "arm64"
@@ -249,6 +262,27 @@ async function execute(input) {
       throw new Error(
         "Review the capture or restore plan first, after selecting your final options.",
       );
+    if (
+      input.action === "capture" &&
+      (input.includeDb || input.includeVolumes)
+    ) {
+      const configuration = await window.teleport.operation({
+        action: "inspect",
+        source: input.source,
+        toolDirectories: input.toolDirectories,
+      });
+      const missing = [];
+      if (input.includeDb && !configuration.databases?.length)
+        missing.push("PostgreSQL databases");
+      if (input.includeVolumes && !configuration.volumes?.length)
+        missing.push("Docker volumes");
+      if (missing.length)
+        throw new Error(
+          "No " +
+            missing.join(" or ") +
+            " configured for this project. Uncheck the corresponding Include options to capture files and Git, or configure them in the project's devteleport.json and review again. Nothing has been captured.",
+        );
+    }
     let result = await window.teleport.operation(input);
     if (input.action === "capture" && !input.dryRun) {
       $("status").textContent = "Authenticating created archive…";
@@ -262,7 +296,12 @@ async function execute(input) {
     }
     if (input.dryRun) reviews.set(input.action, reviewKey);
     else reviews.delete(input.action);
-    const rendered=JSON.stringify(result,null,2);$("result").textContent=rendered.length>1024*1024?rendered.slice(0,1024*1024)+"\n[Display truncated at 1 MiB; use the CLI for the complete report.]":rendered;
+    const rendered = JSON.stringify(result, null, 2);
+    $("result").textContent =
+      rendered.length > 1024 * 1024
+        ? rendered.slice(0, 1024 * 1024) +
+          "\n[Display truncated at 1 MiB; use the CLI for the complete report.]"
+        : rendered;
     $("status").textContent = "Completed";
     if (input.action === "inspect") {
       $("inspectorResult").textContent = JSON.stringify(result, null, 2);

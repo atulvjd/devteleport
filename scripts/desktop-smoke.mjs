@@ -52,6 +52,22 @@ try {
   await page.locator("#name").fill("desktop");
   await page.locator("#output").fill(temp);
   await page.locator("#capturePassword").fill("desktop passphrase for testing");
+  await page.locator("#includeDb").check();
+  await page.locator("#includeVolumes").check();
+  await page.locator('[data-action="capture"][data-dry="true"]').click();
+  await page.waitForFunction(
+    () => document.getElementById("status").textContent === "Needs attention",
+  );
+  const missingConfiguration = await page.locator("#result").textContent();
+  assert(
+    missingConfiguration.includes("PostgreSQL databases or Docker volumes"),
+  );
+  assert(missingConfiguration.includes("Uncheck"));
+  await assert.rejects(fs.stat(path.join(temp, "desktop.dtp")), {
+    code: "ENOENT",
+  });
+  await page.locator("#includeDb").uncheck();
+  await page.locator("#includeVolumes").uncheck();
   await page.locator('[data-action="capture"][data-dry="true"]').click();
   await done();
   await page.locator('[data-action="capture"].primary').click();

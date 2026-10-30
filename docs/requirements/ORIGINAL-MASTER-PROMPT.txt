@@ -1,0 +1,793 @@
+# MASTER BUILD PROMPT — DEVTELEPORT
+
+## ROLE
+
+You are an elite principal software engineer, systems architect, security engineer, DevOps engineer, QA automation engineer, and developer-tool product designer.
+
+You are responsible for designing, implementing, integrating, testing, documenting, and preparing a complete, fully functional open-source developer application called **DevTeleport**.
+
+Do not create a proof of concept, visual mockup, placeholder product, or incomplete scaffold.
+
+Build actual working software.
+
+Your goal is to allow a programmer to capture their current local development workspace on Computer A, transfer it to Computer B, and restore that workspace so they can continue working independently.
+
+The product slogan:
+
+**"Your development environment. Anywhere. Exactly where you left off."**
+
+The first release must prioritize correctness, reliability, security, and practical usability over exaggerated features.
+
+## 1. THE CORE PRODUCT
+
+DevTeleport is a local-first workspace migration and restoration platform.
+
+The intended experience:
+
+On Computer A:
+
+```bash
+devteleport capture --name my-workspace
+```
+
+On Computer B:
+
+```bash
+devteleport restore ./my-workspace.dtp
+```
+
+After successful restoration, the developer should be able to continue working with:
+
+- Project files.
+- Git repository metadata.
+- Uncommitted changes.
+- Untracked files.
+- Supported runtime dependencies.
+- Relevant editor state.
+- Development database contents.
+- Supported Docker services.
+- Development server startup configuration.
+- Working-directory context.
+- Selected development environment settings.
+
+DevTeleport must distinguish between reconstructing a workspace and migrating a running process.
+
+Do not claim to restore live process memory, open TCP connections, active debugging execution, or arbitrary unsaved application state unless that functionality is genuinely implemented and verified.
+
+## 2. TARGET PLATFORM
+
+Primary:
+
+- macOS Apple Silicon.
+- macOS Intel.
+- Node.js 22 LTS or another currently supported LTS version selected after verifying compatibility.
+- TypeScript.
+- PostgreSQL.
+- Docker Compose.
+- Visual Studio Code.
+
+Secondary, after core functionality works:
+
+- Linux.
+- Windows via a separately tested implementation.
+- Additional databases.
+- Additional programming languages.
+
+The initial system must work without requiring a cloud account or paid external API.
+
+## 3. REPOSITORY INSTRUCTIONS
+
+First inspect the existing repository.
+
+Identify:
+
+- Current files and directories.
+- Package management configuration.
+- Existing implementation.
+- Existing tests.
+- Existing build scripts.
+- Available dependencies.
+- Repository status.
+- Existing architectural decisions.
+
+Preserve functional existing code.
+
+Do not erase unrelated files.
+
+If the repository is empty, initialize a monorepo.
+
+Suggested architecture:
+
+```text
+devteleport/
+├── apps/
+│   ├── cli/
+│   ├── desktop/
+│   └── vscode-extension/
+├── packages/
+│   ├── core/
+│   ├── snapshot/
+│   ├── restore/
+│   ├── manifest/
+│   ├── encryption/
+│   ├── filesystem/
+│   ├── git/
+│   ├── runtime/
+│   ├── postgres/
+│   ├── docker/
+│   ├── transfer/
+│   └── shared/
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   └── fixtures/
+├── docs/
+├── examples/
+├── scripts/
+├── .github/
+├── package.json
+├── pnpm-workspace.yaml
+├── tsconfig.json
+└── README.md
+```
+
+You may adjust this structure where there is a strong technical reason.
+
+Use clean interfaces between platform-specific and platform-independent modules.
+
+## 4. FUNCTIONAL REQUIREMENTS
+
+### Feature A — Workspace Detection
+
+Create a workspace analyzer.
+
+Detect:
+
+- Git repository root.
+- Current Git branch.
+- Current Git commit.
+- Modified tracked files.
+- Untracked files.
+- Deleted files.
+- Selected ignored files when explicitly authorized.
+- Node.js version.
+- Package manager and lockfile.
+- Relevant package scripts.
+- Docker Compose configuration.
+- Supported PostgreSQL connections.
+- VS Code workspace configuration.
+
+Generate a structured workspace report.
+
+Command:
+
+```bash
+devteleport inspect
+```
+
+The report must identify which parts of the workspace can be captured, which require user configuration, and which are unsupported.
+
+### Feature B — Snapshot Creation
+
+Implement:
+
+```bash
+devteleport capture --name project-name
+```
+
+The capture process must:
+
+1. Analyze the project.
+2. Validate dependencies.
+3. Enumerate files to capture.
+4. Respect exclusion rules.
+5. Identify potentially sensitive data.
+6. Allow the developer to review capture contents.
+7. Capture selected project data.
+8. Record environment metadata.
+9. Produce a versioned snapshot manifest.
+10. Generate an integrity-checked snapshot archive.
+11. Encrypt the snapshot by default.
+12. Report the resulting snapshot location.
+
+Requirements:
+
+- Preserve file permissions where supported.
+- Preserve symlinks safely.
+- Include uncommitted source changes.
+- Include untracked project files unless excluded.
+- Do not accidentally include nested dependency directories.
+- Exclude `.git` internal secrets and credentials where appropriate without corrupting repository restoration.
+- Avoid copying `node_modules` by default.
+- Detect incomplete or inconsistent captures.
+- Never silently omit essential user data.
+- Provide a dry-run option.
+
+Example:
+
+```bash
+devteleport capture \
+  --name ecommerce \
+  --output ./snapshots \
+  --include-db
+```
+
+### Feature C — Snapshot Manifest
+
+Create a versioned, validated manifest.
+
+Example shape:
+
+```json
+{
+  "formatVersion": 1,
+  "name": "ecommerce",
+  "platform": {
+    "os": "darwin",
+    "architecture": "arm64"
+  },
+  "runtime": {
+    "node": "22.x",
+    "packageManager": "pnpm"
+  },
+  "git": {
+    "branch": "feature/authentication",
+    "commit": "example-commit-hash"
+  },
+  "services": [],
+  "databases": [],
+  "editor": {},
+  "files": [],
+  "createdAt": "ISO-8601"
+}
+```
+
+Extend the schema as required.
+
+Include:
+
+- Schema validation.
+- Content checksums.
+- Snapshot version compatibility.
+- Migration strategy for future manifest versions.
+- Optional integrity signatures.
+- Explicit support status for each captured component.
+
+Never fabricate manifest values.
+
+### Feature D — Workspace Restoration
+
+Implement:
+
+```bash
+devteleport restore ./workspace.dtp
+```
+
+Restoration must:
+
+1. Inspect the archive without executing its contents.
+2. Validate format and checksums.
+3. Decrypt using an authorized secret.
+4. Check operating system and architecture compatibility.
+5. Detect missing tools.
+6. Show the intended restoration actions.
+7. Require approval for potentially destructive operations.
+8. Restore the source files.
+9. Restore selected Git context safely.
+10. Install dependencies only after approval.
+11. Restore databases when requested.
+12. Recreate supported development services.
+13. Restore editor context when available.
+14. Verify the restored project.
+15. Produce a restoration report.
+
+Support:
+
+```bash
+devteleport restore project.dtp --dry-run
+```
+
+```bash
+devteleport restore project.dtp --target ./restored-project
+```
+
+```bash
+devteleport verify ./restored-project
+```
+
+Never overwrite existing directories or databases without explicit confirmation.
+
+Treat snapshots as untrusted input.
+
+Prevent archive path traversal, unsafe symlinks, arbitrary command execution, and malicious restoration instructions.
+
+### Feature E — Git Context Preservation
+
+Capture:
+
+- Current branch.
+- HEAD commit.
+- Uncommitted tracked changes.
+- Untracked files.
+- Relevant Git metadata.
+- Remote URLs with sensitive information redacted.
+- Staged versus unstaged state where feasible.
+
+Restore without silently losing changes.
+
+Handle:
+
+- Detached HEAD.
+- Missing remote repositories.
+- Unborn branches.
+- Submodules.
+- Git LFS references.
+- Repositories with nested Git projects.
+- Conflicting local paths.
+
+Design the restoration so that a captured working tree can be reconstructed without requiring the original computer to remain online.
+
+Do not assume the destination has GitHub access.
+
+### Feature F — PostgreSQL Integration
+
+Implement proper development database backup and restoration.
+
+Use supported PostgreSQL utilities:
+
+- `pg_dump`
+- `pg_restore`
+- Appropriate connection discovery and verification.
+
+Requirements:
+
+- Support explicitly configured local development databases.
+- Capture schema and data.
+- Handle PostgreSQL version compatibility.
+- Preserve suitable database metadata.
+- Provide configurable exclusions.
+- Detect connection failures.
+- Verify backup completion.
+- Never assume a database is safe to overwrite.
+- Reject suspected production databases by default.
+- Require additional explicit confirmation before potentially destructive operations.
+
+Never embed raw database credentials in the snapshot manifest.
+
+Use temporary secure credential handling and redact logs.
+
+Provide:
+
+```bash
+devteleport capture --include-db
+```
+
+And:
+
+```bash
+devteleport restore project.dtp --restore-db
+```
+
+Document consistency limitations for databases modified during capture.
+
+### Feature G — Docker Integration
+
+Detect Docker and Docker Compose configuration.
+
+Capture:
+
+- Compose file references.
+- Service names.
+- Configured ports.
+- Relevant volume metadata.
+- Required image identifiers.
+- Startup dependencies.
+
+Do not assume exporting a Docker configuration captures all volume data.
+
+For the MVP, support explicitly configured application volumes and documented backup adapters.
+
+After restoring, allow users to review service startup commands.
+
+Provide clear errors when Docker is unavailable.
+
+### Feature H — VS Code Extension
+
+Create an installable VS Code extension.
+
+Commands:
+
+- DevTeleport: Inspect Workspace
+- DevTeleport: Capture Workspace
+- DevTeleport: Restore Workspace
+- DevTeleport: Verify Workspace
+- DevTeleport: View Snapshot History
+
+Add a clean sidebar interface.
+
+Show:
+
+- Current workspace.
+- Supported components.
+- Snapshot history.
+- Captured file count.
+- Database backup status.
+- Environment compatibility.
+- Restore readiness.
+- Recent errors.
+
+Preserve supported editor state using public VS Code APIs.
+
+Do not claim to restore unsaved editor buffers, arbitrary extension state, or debugger execution when the APIs do not support it.
+
+Offer a graceful fallback for unsupported editor state.
+
+### Feature I — Desktop Application
+
+Create a desktop application using Tauri or Electron.
+
+Evaluate both and choose an appropriate stack.
+
+The desktop application should provide:
+
+- Dashboard.
+- Workspace discovery.
+- Capture configuration.
+- Snapshot history.
+- Restore wizard.
+- Compatibility warnings.
+- Database options.
+- Transfer status.
+- Verification results.
+- Settings.
+- Error diagnostics.
+
+The UI must operate on real backend functionality.
+
+No mock values presented as actual snapshots.
+
+No nonfunctional buttons.
+
+No placeholder pages labeled as completed features.
+
+Use a modern, minimal interface with excellent developer experience.
+
+### Feature J — Snapshot Transfer
+
+Implement local snapshot export and import first.
+
+Then add peer-to-peer transfer as a separate feature if technically feasible.
+
+Possible flow:
+
+```bash
+devteleport send project.dtp
+```
+
+```bash
+devteleport receive
+```
+
+Requirements:
+
+- Encrypted transfer.
+- Explicit pairing/approval.
+- Integrity verification.
+- Transfer interruption handling.
+- Clear destination selection.
+- No unauthenticated publicly exposed receiver.
+- No hardcoded secrets.
+
+If peer-to-peer transfer cannot be completed and tested reliably, ship working file-based transfer rather than a simulated network feature.
+
+### Feature K — Session Restoration
+
+Capture supported session context:
+
+- Open project files.
+- Active editor file.
+- Workspace directory.
+- Relevant npm scripts.
+- Explicitly configured startup tasks.
+- Docker Compose services.
+- Selected terminal layout metadata where supported.
+
+Do not blindly replay shell history.
+
+Do not automatically execute arbitrary commands found inside a snapshot.
+
+Require review before launching restored tasks.
+
+For unsupported state, accurately report limitations.
+
+## 5. SECURITY REQUIREMENTS
+
+Security is mandatory.
+
+Implement:
+
+- Strong authenticated encryption.
+- Secure key derivation.
+- Safe credential handling.
+- Sensitive-file detection.
+- Secret exclusion rules.
+- Archive extraction protection.
+- Path validation.
+- File size and archive expansion limits.
+- Safe temporary-file handling.
+- Cross-platform permission checks.
+- Destructive-operation confirmation.
+- Snapshot integrity checks.
+- Clear security warnings.
+
+Never upload local project data to external services without explicit permission.
+
+Keep the product local-first.
+
+Don't log encryption keys, credentials, tokens, or sensitive file contents.
+
+## 6. USER EXPERIENCE
+
+The experience should be straightforward.
+
+A new developer should be able to:
+
+1. Install DevTeleport.
+2. Open a project.
+3. Inspect what can be captured.
+4. Create an encrypted snapshot.
+5. Transfer the snapshot.
+6. Restore it on a second computer.
+7. Reopen the project and continue working.
+
+Use meaningful error messages.
+
+For example, avoid:
+
+"Error: EACCES"
+
+Prefer:
+
+"DevTeleport could not read the selected directory. Check permissions or choose another location."
+
+Provide clear recoverability instructions when operations fail.
+
+## 7. TESTING REQUIREMENTS
+
+Build a serious test suite.
+
+Unit tests:
+
+- Manifest validation.
+- Path normalization.
+- Exclusion rules.
+- Encryption and decryption.
+- Checksum verification.
+- Runtime detection.
+- Restore planning.
+- Archive extraction safety.
+
+Integration tests:
+
+- Git snapshot restoration.
+- PostgreSQL capture/restore.
+- Docker configuration analysis.
+- CLI lifecycle.
+- Corrupted snapshot handling.
+- Incorrect password handling.
+- Existing destination protection.
+
+End-to-end tests:
+
+1. Create a sample Node.js Express project.
+2. Initialize Git.
+3. Create a commit.
+4. Make uncommitted changes.
+5. Add an untracked file.
+6. Prepare a PostgreSQL test database.
+7. Capture the workspace.
+8. Restore it in an independent directory.
+9. Confirm the Git working state is equivalent.
+10. Confirm application behavior is preserved.
+11. Confirm database records are restored.
+12. Confirm the app starts successfully.
+13. Verify no original-machine dependency exists.
+
+Also test:
+
+- Large files.
+- Missing tools.
+- Interrupted snapshots.
+- Damaged archives.
+- Symlink attacks.
+- Unexpected file permissions.
+- Invalid manifest versions.
+
+A test passing must mean the functionality actually works.
+
+Do not weaken or skip tests merely to report success.
+
+## 8. DOCUMENTATION
+
+Generate:
+
+- Comprehensive README.
+- Architecture documentation.
+- CLI reference.
+- Installation instructions.
+- Supported-platform matrix.
+- Capture/restore guide.
+- Database backup instructions.
+- Security model.
+- Known limitations.
+- Troubleshooting guide.
+- Contributor guide.
+- Example project walkthrough.
+- Release instructions.
+
+Documentation must match actual implemented behavior.
+
+## 9. INSTALLATION AND DISTRIBUTION
+
+Prepare:
+
+- macOS Apple Silicon builds.
+- macOS Intel builds.
+- CLI installation.
+- VS Code extension packaging.
+- Desktop installer packaging.
+- GitHub Actions CI.
+- Automated unit tests.
+- Build verification.
+- Release artifact generation.
+
+Do not claim artifacts are signed, notarized, published, or uploaded unless those steps actually succeeded.
+
+## 10. PROJECT EXECUTION STRATEGY
+
+Work autonomously through the project.
+
+Follow this order:
+
+**Phase 1 — Repository audit and architecture**
+
+Inspect the repository, verify the toolchain, define clear interfaces, and establish the core implementation.
+
+**Phase 2 — Functional CLI**
+
+Implement snapshot capture, manifest generation, encryption, archive handling, restoration, and verification.
+
+**Phase 3 — Git and runtime support**
+
+Support complete working-tree recovery and project dependency discovery.
+
+**Phase 4 — PostgreSQL and Docker**
+
+Add safe database backup/restore and service configuration support.
+
+**Phase 5 — VS Code integration**
+
+Build real extension commands connected to the CLI.
+
+**Phase 6 — Desktop application**
+
+Build the full graphical workflow on top of the existing core.
+
+**Phase 7 — Transfer features**
+
+Implement secure portable-file transfer first, followed by peer-to-peer transfer when reliable.
+
+**Phase 8 — Testing and hardening**
+
+Run all available tests, inspect failures, fix underlying defects, and validate security.
+
+**Phase 9 — Packaging and documentation**
+
+Prepare installation, release artifacts, usage examples, and accurate documentation.
+
+At the end of every phase:
+
+- Run relevant tests.
+- Fix discovered failures.
+- Keep the repository buildable.
+- Record implementation progress.
+- Preserve a usable checkpoint.
+
+## 11. IMPORTANT ENGINEERING RULES
+
+1. Do not stop after creating the architecture.
+2. Do not stop after generating boilerplate.
+3. Do not build a fake frontend backed by sample responses.
+4. Do not call an unimplemented feature complete.
+5. Do not silently skip failures.
+6. Do not delete user data to resolve errors.
+7. Do not overwrite existing work without authorization.
+8. Do not assume a command succeeded without checking its result.
+9. Do not invent screenshots, logs, benchmarks, or test results.
+10. Do not introduce paid service dependencies unnecessarily.
+11. Do not bypass security for convenience.
+12. Do not claim to migrate live processes unless actually supported.
+13. Do not sacrifice working functionality for appearance.
+14. Do not unnecessarily rewrite functional code.
+15. Do not publish, push, or release externally without explicit authorization.
+
+If a feature is blocked by operating-system limitations, implement the best safe alternative and document the limitation.
+
+## 12. SUCCESS CRITERIA
+
+The MVP is successful only if the following real workflow works:
+
+**Machine A**
+
+- Developer has a working Express project.
+- Project has uncommitted code changes.
+- Project has untracked files.
+- Local PostgreSQL contains development records.
+- Docker Compose configuration is present.
+- Developer creates a DevTeleport snapshot.
+
+**Machine B**
+
+- Developer installs DevTeleport.
+- Developer imports the snapshot.
+- Project files are reconstructed.
+- Uncommitted changes remain intact.
+- Git working state is preserved.
+- PostgreSQL data is restored to an approved target database.
+- Required dependencies are installed after approval.
+- Supported development services can start.
+- VS Code reopens the relevant project context.
+- The application works independently of Machine A.
+
+Provide an automated end-to-end test that proves the independent restore scenario as far as the test environment permits.
+
+If actual two-machine hardware validation is unavailable, clearly distinguish simulated independent-directory testing from physical-device testing.
+
+## 13. FINAL DELIVERABLES
+
+Produce:
+
+1. Working DevTeleport CLI.
+2. Working workspace capture and restore engine.
+3. Versioned snapshot format.
+4. Encryption and integrity verification.
+5. Git context preservation.
+6. PostgreSQL adapter.
+7. Docker Compose integration.
+8. VS Code extension.
+9. Desktop application.
+10. Snapshot history.
+11. Verification command.
+12. Complete test suite.
+13. Documentation.
+14. Installation/build scripts.
+15. CI pipeline.
+16. Example application.
+17. Accurate support and limitations matrix.
+
+For every deliverable, indicate whether it is implemented, tested, partially supported, or blocked.
+
+## 14. EXECUTION INSTRUCTIONS
+
+Start by inspecting the actual repository and environment.
+
+Create a prioritized implementation plan based on what already exists.
+
+Then begin implementing the software immediately.
+
+Do not spend the entire execution cycle writing documentation or planning.
+
+Prioritize a completely functional capture-and-restore CLI over several partially functioning applications.
+
+Make reasonable technical decisions independently.
+
+Only request user intervention when genuine authorization, secrets, external credentials, destructive operations, or unavailable hardware are required.
+
+When the execution environment is limited, finish the highest-priority usable implementation and produce an explicit remaining-work checklist rather than claiming the whole product is finished.
+
+Continue through the planned phases as far as the available execution environment permits.
+
+**The final objective is not to describe DevTeleport. It is to implement DevTeleport.**
+
+BEGIN IMPLEMENTATION NOW.

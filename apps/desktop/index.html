@@ -153,9 +153,11 @@ Choose a project above, then select Inspect.</pre>
               stopped local Docker volumes</label
             >
             <p class="hint">
-              Files, offline Git context and saved editor files are included by
-              default. Secrets and dependencies are excluded with review
-              records.
+              Database and Docker options require entries in the project’s
+              devteleport.json. Leave them unchecked for a files-and-Git
+              snapshot. Files, offline Git context and saved editor files are
+              included by default. Secrets and dependencies are excluded with
+              review records.
             </p>
           </article>
           <article class="card">
@@ -366,7 +368,13 @@ Choose a project above, then select Inspect.</pre>
                 <option value="dark">Dark</option>
                 <option value="light">Light</option>
               </select></label
-            ><label>Default editor<select id="editor"><option value="">Automatic native installation discovery</option></select></label><label
+            ><label
+              >Default editor<select id="editor">
+                <option value="">
+                  Automatic native installation discovery
+                </option>
+              </select></label
+            ><label
               >Capture exclusions, one relative path prefix per line<textarea
                 id="exclusions"
                 rows="4"

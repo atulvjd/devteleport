@@ -29,3 +29,16 @@ Machine-readable local evidence lives in `dist/evidence/`. `apple-silicon-verifi
 5. Exhaustive interruption coverage across every external-tool phase and an independent security audit remain outstanding.
 
 See [continuation instructions](CONTINUATION.md), [format limits](FORMAT-2.md), [network transfer](NETWORK-TRANSFER.md) and [security model](SECURITY.md). Windows, arbitrary volume drivers/bind mounts, universal secret detection and live process migration are outside the certified scope.
+
+
+## Recovery follow-up — 2026-10-31
+
+Fixed approved cleanup ordering so failure to remove a partial archive preserves the staging journal needed for retry. Added two injected filesystem-failure regressions. Fresh strict checks and all 32 tests passed with zero skips. See [RECOVERY-VALIDATION.md](RECOVERY-VALIDATION.md) for exact scenarios and remaining coverage. Earlier 30-test results above describe the preceding checkpoint. The existing installed `/Applications/DevTeleport 0.2 RC.app` has not been replaced by this follow-up; use newly rebuilt artifacts for the fix.
+
+Fresh rebuilt ARM64 candidate verification completed at 2026-10-30T23:14:27.597Z: all 17 consolidated stages PASS, zero required skips/failures. CLI, VSIX, unsigned DMG/ZIP and `dist/SHA256SUMS` were regenerated. Signing, physical-device acceptance and remote CI remain separate unresolved release gates.
+
+## Desktop capture configuration guidance
+
+When optional PostgreSQL or Docker capture is selected, the renderer now inspects the chosen project's configuration before capture and explains which components are missing. The message offers two explicit choices: uncheck the optional component to capture files/Git, or configure it in the project's devteleport.json. No option is silently changed. Added persistent guidance beside those controls.
+
+Fresh `npm run check` and `npm run test:desktop` passed, including a real Electron regression selecting both unconfigured components, confirming no archive is created, then unchecking them and completing capture/source-removal/restore/verification. This UI follow-up is available through `npm run desktop`; previously generated installers and their full-gate evidence predate this UI change and have not been regenerated in this follow-up.
