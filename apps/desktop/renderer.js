@@ -262,7 +262,7 @@ async function execute(input) {
     }
     if (input.dryRun) reviews.set(input.action, reviewKey);
     else reviews.delete(input.action);
-    $("result").textContent = JSON.stringify(result, null, 2);
+    const rendered=JSON.stringify(result,null,2);$("result").textContent=rendered.length>1024*1024?rendered.slice(0,1024*1024)+"\n[Display truncated at 1 MiB; use the CLI for the complete report.]":rendered;
     $("status").textContent = "Completed";
     if (input.action === "inspect") {
       $("inspectorResult").textContent = JSON.stringify(result, null, 2);

@@ -407,6 +407,7 @@ ipcMain.handle("operation", async (event, input) => {
         const result = JSON.parse(stdout);
         if (input.action === "history")
           for (const item of result) libraryPaths.add(item.file);
+        if(!input.dryRun&&["capture","restore","receive"].includes(input.action))notifyCompletion(input.action);
         if (
           !input.dryRun &&
           ["inspect", "capture", "restore", "receive"].includes(input.action)
@@ -672,6 +673,7 @@ function awaitSummary(input, result) {
         ...data.workspaces.filter((w) => w.root !== result.root),
       ].slice(0, 12);
     }
+    if(input.action==="receive"){data.snapshots=[{file:result.target,bytes:result.bytes,receivedAt:timestamp,completedAt:timestamp},...data.snapshots.filter(s=>s.file!==result.target)].slice(0,30);}
     if (input.action === "capture") {
       data.lastCapture = {
         file: result.output,
@@ -744,3 +746,5 @@ app.on("open-file", async (event, file) => {
     }
   } catch {}
 });
+
+async function notifyCompletion(action){try{const settings=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'workspace-settings.json'),'utf8'));if(settings.notifications&&Notification.isSupported())new Notification({title:'DevTeleport',body:action==='capture'?'Encrypted snapshot captured.':action==='restore'?'Workspace restored and verified.':'Encrypted snapshot received; restore approval is still required.'}).show();}catch{}}

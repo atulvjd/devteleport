@@ -120,9 +120,7 @@ try {
       ] = valued.has(k) ? raw[++i] : true;
     } else positional.push(a);
   }
-  if (process.env.DEVTELEPORT_PROGRESS === "1")
-    options.onProgress = (phase) =>
-      process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ phase }) + "\n");
+  if(process.env.DEVTELEPORT_PROGRESS==="1"){let last=0;options.onProgress=phase=>{const now=Date.now();if(now-last<100&&(phase.startsWith("Staging ")||phase.startsWith("Restoring ")))return;last=now;process.stderr.write("DTP_PROGRESS:"+JSON.stringify({phase})+"\n");};}
   if (options.format !== undefined) {
     const format = Number(options.format);
     if (format !== 1 && format !== 2)
