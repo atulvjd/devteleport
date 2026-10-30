@@ -1,0 +1,33 @@
+{
+  "appId": "dev.devteleport.desktop",
+  "productName": "DevTeleport",
+  "directories": {
+    "output": "dist/desktop"
+  },
+  "files": [
+    "apps/desktop/**",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "apps/desktop/main.cjs"
+  },
+  "asar": true,
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64",
+          "x64"
+        ]
+      }
+    ],
+    "category": "public.app-category.developer-tools"
+  },
+  "extraResources": [
+    {
+      "from": "dist/backend",
+      "to": "backend"
+    }
+  ]
+}

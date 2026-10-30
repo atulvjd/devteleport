@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width" />
+    <title>DevTeleport</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <aside>
+      <div class="brand">◈ DevTeleport</div>
+      <p>LOCAL WORKSPACE TRANSPORT</p>
+      <nav>
+        <button data-action="inspect">Workspace report</button
+        ><button data-action="history">Snapshot history</button
+        ><button data-action="services">Compose services</button
+        ><button data-action="verify">Verify workspace</button>
+      </nav>
+      <small>Local-first · Encrypted<br />No cloud account required</small>
+    </aside>
+    <main>
+      <header>
+        <span class="eyebrow">YOUR NEXT WORKSPACE STARTS HERE</span>
+        <h1>Pick up where you left off.</h1>
+        <p>
+          Your development environment. Anywhere. Exactly where you left off.
+        </p>
+      </header>
+      <section>
+        <h2>Workspace</h2>
+        <div class="row">
+          <input
+            id="source"
+            aria-label="Workspace path"
+            placeholder="Choose a project folder"
+          /><button id="chooseWorkspace">Browse folder</button>
+        </div>
+        <p class="hint">
+          Inspect files, Git context, runtime requirements and supported
+          services.
+        </p>
+      </section>
+      <div class="columns">
+        <section>
+          <h2>Capture a workspace</h2>
+          <label
+            >Snapshot name<input
+              id="name"
+              value="my-workspace"
+              pattern="[a-zA-Z0-9._-]+" /></label
+          ><label
+            >Output directory
+            <div class="row">
+              <input id="output" placeholder="Choose output folder" /><button
+                id="chooseOutput"
+              >
+                Browse
+              </button>
+            </div></label
+          ><label
+            >Passphrase<input
+              id="capturePassword"
+              type="password"
+              autocomplete="new-password"
+              placeholder="At least 12 characters" /></label
+          ><label class="check"
+            ><input id="includeDb" type="checkbox" /> Include configured local
+            PostgreSQL databases</label
+          >
+          <div class="row">
+            <button data-action="capture" data-dry="true">Review capture</button
+            ><button data-action="capture" class="primary">
+              Create encrypted snapshot
+            </button>
+          </div>
+        </section>
+        <section>
+          <h2>Restore independently</h2>
+          <label
+            >Snapshot
+            <div class="row">
+              <input
+                id="snapshot"
+                placeholder="Select a .dtp snapshot"
+              /><button id="chooseSnapshot">Browse</button>
+            </div></label
+          ><label
+            >New destination path<input
+              id="target"
+              placeholder="/Users/you/Projects/restored-project" /></label
+          ><label
+            >Passphrase<input
+              id="restorePassword"
+              type="password"
+              autocomplete="current-password"
+          /></label>
+          <p class="hint">
+            Existing destinations are protected. Dependency scripts, databases
+            and services require separate CLI approval.
+          </p>
+          <div class="row">
+            <button data-action="restore" data-dry="true">Review restore</button
+            ><button data-action="restore" class="primary">
+              Restore files
+            </button>
+          </div>
+        </section>
+      </div>
+      <section aria-live="polite">
+        <div class="row">
+          <h2>Activity & diagnostics</h2>
+          <span id="status">Ready</span
+          ><button id="cancel" disabled>Cancel operation</button>
+        </div>
+        <pre id="result">
+Choose a workspace, then inspect or capture it. No snapshots have been loaded.</pre>
+      </section>
+      <footer>
+        Reconstructs saved files and supported context. Live processes and
+        unsaved buffers are not migrated.
+      </footer>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>

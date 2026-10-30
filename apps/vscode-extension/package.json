@@ -1,0 +1,83 @@
+{
+  "name": "devteleport",
+  "displayName": "DevTeleport",
+  "description": "Capture and restore encrypted local development workspaces",
+  "version": "0.1.0",
+  "publisher": "devteleport-local",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "main": "./extension.cjs",
+  "activationEvents": [
+    "onView:devteleport.workspace"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "devteleport.inspect",
+        "title": "DevTeleport: Inspect Workspace"
+      },
+      {
+        "command": "devteleport.capture",
+        "title": "DevTeleport: Capture Workspace"
+      },
+      {
+        "command": "devteleport.restore",
+        "title": "DevTeleport: Restore Workspace"
+      },
+      {
+        "command": "devteleport.verify",
+        "title": "DevTeleport: Verify Workspace"
+      },
+      {
+        "command": "devteleport.history",
+        "title": "DevTeleport: View Snapshot History"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devteleport",
+          "title": "DevTeleport",
+          "icon": "icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "devteleport": [
+        {
+          "id": "devteleport.workspace",
+          "name": "Workspace Transport"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "DevTeleport",
+      "properties": {
+        "devteleport.nodePath": {
+          "type": "string",
+          "default": "node",
+          "description": "Absolute path to a Node 24+ executable"
+        },
+        "devteleport.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to installed DevTeleport apps/cli/main.js (or main.ts in a source checkout)"
+        }
+      }
+    }
+  },
+  "license": "MIT",
+  "files": [
+    "extension.cjs",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Capture and saved editor restoration require workspace trust; inspection and explicit file restoration remain available."
+    }
+  }
+}

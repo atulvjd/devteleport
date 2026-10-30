@@ -1,0 +1,1 @@
+{"exclude":["coverage","dist"],"databases":[{"name":"app","connectionEnv":"DEV_DATABASE_URL"}]}

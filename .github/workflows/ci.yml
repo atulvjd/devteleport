@@ -1,0 +1,55 @@
+name: Verify DevTeleport
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  core:
+    strategy:
+      matrix:
+        os: [macos-14, macos-15-intel, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+      - run: npm run package:cli
+      - run: npm run test:package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.os }}
+          path: dist/*.tgz
+  integrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: sudo apt-get update && sudo apt-get install -y postgresql
+      - run: echo "/usr/lib/postgresql/$(ls /usr/lib/postgresql | sort -V | tail -1)/bin" >> "$GITHUB_PATH"
+      - run: npm run test:postgres
+      - run: npm run test:docker
+      - run: npm run test:e2e
+      - run: npm run test:full
+  applications:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: node node_modules/electron/install.js
+      - run: npm run test:desktop
+      - run: npm run package:extension
+      - run: npm run package:desktop -- --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-applications
+          path: |
+            apps/vscode-extension/*.vsix
+            dist/desktop/*.dmg
