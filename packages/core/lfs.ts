@@ -1,4 +1,5 @@
-import { execFile } from "node:child_process";
+import { trackChild, spawnBuffered } from "./processes.ts";
+
 import crypto from "node:crypto";
 import type { SnapshotEntry } from "./types.ts";
 async function git(
@@ -7,11 +8,12 @@ async function git(
   input?: string,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const child = execFile(
+    const child = spawnBuffered(
       "git",
       args,
       {
         cwd: root,
+        detached: process.platform !== "win32",
         env: {
           ...Object.fromEntries(
             Object.entries(process.env).filter(

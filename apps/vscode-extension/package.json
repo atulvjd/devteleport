@@ -2,7 +2,7 @@
   "name": "devteleport",
   "displayName": "DevTeleport",
   "description": "Capture and restore encrypted local development workspaces",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "devteleport-local",
   "engines": {
     "vscode": "^1.96.0"
@@ -33,6 +33,14 @@
       {
         "command": "devteleport.history",
         "title": "DevTeleport: View Snapshot History"
+      },
+      {
+        "command": "devteleport.openDesktop",
+        "title": "DevTeleport: Open Desktop Application"
+      },
+      {
+        "command": "devteleport.cancel",
+        "title": "DevTeleport: Cancel Current Operation"
       }
     ],
     "viewsContainers": {
@@ -58,12 +66,16 @@
         "devteleport.nodePath": {
           "type": "string",
           "default": "node",
-          "description": "Absolute path to a Node 24+ executable"
+          "description": "Absolute path to a Node 24+ executable",
+          "scope": "machine",
+          "restricted": true
         },
         "devteleport.cliPath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to installed DevTeleport apps/cli/main.js (or main.ts in a source checkout)"
+          "description": "Absolute path to installed DevTeleport apps/cli/main.js (or main.ts in a source checkout)",
+          "scope": "machine",
+          "restricted": true
         }
       }
     }

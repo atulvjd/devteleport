@@ -1,6 +1,7 @@
 /** Trusted caller options. Snapshot data is separately validated before extraction. */
 export interface CaptureOptions {
-  format?:1|2;
+  format?: 1 | 2;
+  exclusions?: string[];
   root?: string;
   onProgress?: (phase: string) => void;
   name?: string;
@@ -29,6 +30,7 @@ export interface PackageMetadata {
   scripts?: Record<string, string>;
 }
 export interface ComposeService {
+  platform?: string;
   image?: string;
   ports?: unknown[];
   depends_on?: Record<string, unknown>;
@@ -101,7 +103,17 @@ export interface Manifest {
 export type CliOptions = CaptureOptions &
   RestoreOptions & {
     start?: boolean;
-    pairing?:string;pairingOutput?:string;bind?:string;advertise?:string;port?:string;timeout?:string;approveReceive?:boolean;approvePeer?:boolean;resume?:boolean;
+    cleanup?: string;
+    approveCleanup?: boolean;
+    pairing?: string;
+    pairingOutput?: string;
+    bind?: string;
+    advertise?: string;
+    port?: string;
+    timeout?: string;
+    approveReceive?: boolean;
+    approvePeer?: boolean;
+    resume?: boolean;
     snapshot?: string;
     key?: string;
     verifyKey?: string;

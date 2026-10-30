@@ -1,6 +1,6 @@
 {
   "name": "devteleport",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,12 +10,12 @@
     "devteleport": "apps/cli/main.ts"
   },
   "scripts": {
-    "test": "node --test tests/core.test.ts tests/security.test.ts tests/diff.test.ts",
+    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts",
     "check": "tsc --noEmit && node --check apps/desktop/main.cjs && node --check apps/vscode-extension/extension.cjs",
     "desktop": "npm run build:backend && node scripts/launch-desktop.mjs",
     "package:cli": "node scripts/package.mjs",
     "package:extension": "cd apps/vscode-extension && ../../node_modules/.bin/vsce package --allow-missing-repository --no-dependencies",
-    "package:desktop": "npm run build:backend && electron-builder --config apps/desktop/builder.json",
+    "package:desktop": "node scripts/package-desktop.mjs",
     "test:postgres": "DEVTELEPORT_TEST_POSTGRES=1 node --test tests/postgres.test.ts",
     "test:docker": "DEVTELEPORT_TEST_DOCKER=1 node --test tests/docker.test.ts",
     "test:e2e": "node --test tests/express.e2e.ts",
@@ -25,7 +25,20 @@
     "build:backend": "node scripts/build-backend.mjs",
     "test:docker:live": "node --test tests/docker-live.test.ts",
     "test:vscode": "node scripts/vscode-test.mjs",
-    "test:pg-versions": "node --test tests/postgres-versions.test.ts"
+    "test:pg-versions": "node --test tests/postgres-versions.test.ts",
+    "test:transfer": "node --test tests/transfer.test.ts",
+    "benchmark": "npm run build:backend && node scripts/benchmark.mjs",
+    "verify:architecture": "node scripts/architecture.mjs",
+    "test:stream": "node --test tests/stream-v2.test.ts",
+    "generate:icon": "node scripts/generate-icon.mjs",
+    "package:desktop:signed": "node scripts/signed-release.mjs",
+    "test:processes": "node --test tests/processes.test.ts",
+    "verify:apple-silicon": "node scripts/verify-apple-silicon.mjs",
+    "test:desktop:transfer": "npm run build:backend && node scripts/desktop-transfer-test.mjs",
+    "test:updates": "node --test tests/updates-http.test.ts",
+    "checksums": "node scripts/artifact-checksums.mjs",
+    "verify:signing": "node scripts/verify-signing.mjs",
+    "benchmark:desktop": "npm run build:backend && node scripts/desktop-benchmark.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
