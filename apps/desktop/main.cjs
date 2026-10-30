@@ -60,6 +60,7 @@ ipcMain.handle("operation", async (event, input) => {
     throw new Error("Choose an absolute workspace or snapshot path");
   if (running) throw new Error("An operation is already running.");
   const args = [input.action];
+  if(input.action==="capture")args.push("--format","2");
   if (input.action === "capture") {
     args.push(
       "--root",

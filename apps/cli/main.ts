@@ -20,6 +20,8 @@ import {
   signSnapshot,
   verifySignature,
 } from "../../packages/core/signatures.ts";
+import {snapshotMetadata} from "../../packages/core/stream-v2.ts";
+import {receiveSnapshot,sendSnapshot,readPairing} from "../../packages/core/transfer.ts";
 import * as fs from "node:fs/promises";
 import readline from "node:readline";
 import { Writable } from "node:stream";
@@ -59,6 +61,8 @@ const valued = new Set([
   "snapshot",
   "key",
   "verify-key",
+  "format",
+  "pairing","pairing-output","bind","advertise","port","timeout",
 ]);
 const flags = new Set([
   "dry-run",
@@ -67,6 +71,7 @@ const flags = new Set([
   "restore-volumes",
   "approve-volumes",
   "start",
+  "approve-receive","approve-peer","resume",
   "restore-db",
   "install",
   "approve-execution",
@@ -89,6 +94,7 @@ try {
   if (process.env.DEVTELEPORT_PROGRESS === "1")
     options.onProgress = (phase) =>
       process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ phase }) + "\n");
+  if(options.format!==undefined){const format=Number(options.format);if(format!==1&&format!==2)throw new Error("--format must be 1 or 2");options.format=format;}
   let result;
   switch (command) {
     case "keygen":
@@ -109,10 +115,15 @@ try {
         throw new Error("Provide snapshot and --key trusted-public.pem");
       result = await verifySignature(positional[0], options["key"]);
       break;
+    case "snapshot-info":if(!positional[0])throw new Error("Provide a snapshot path");{const metadata=await snapshotMetadata(positional[0],await password());result={...metadata,files:metadata.files.map(({data,...f})=>f),databases:metadata.databases.map(({data,...d})=>d),volumes:(metadata.volumes??[]).map(({data,...v})=>v)};}break;
+    case "pairing-info":if(!options.pairing)throw new Error("Provide --pairing descriptor.json");{const pairing=await readPairing(options.pairing);result={receiver:pairing.receiver,host:pairing.host,port:pairing.port,fingerprint:pairing.fingerprint,expiresAt:pairing.expiresAt};}break;
+    case "receive":if(!options.target||!options.pairingOutput)throw new Error("Provide --target new-snapshot.dtp and --pairing-output descriptor.json");{const receiver=await receiveSnapshot({target:options.target,pairingFile:options.pairingOutput,approve:Boolean(options.approveReceive),bind:options.bind,advertise:options.advertise,port:options.port?Number(options.port):undefined,timeoutMs:options.timeout?Number(options.timeout)*1000:undefined,resume:options.resume,onReady:ready=>process.stderr.write("DTP_PROGRESS:"+JSON.stringify({phase:"Receiver ready; share the protected pairing descriptor out of band",ready})+"\n")});try{result=await receiver.completion;}finally{await receiver.close();}}break;
+    case "send":if(!positional[0]||!options.pairing)throw new Error("Provide a snapshot and --pairing descriptor.json");{let last=0;result=await sendSnapshot(positional[0],options.pairing,{approve:Boolean(options.approvePeer),password:await password(),onProgress:bytes=>{if(Date.now()-last>200){options.onProgress?.("Transferred "+bytes+" bytes");last=Date.now();}}});}break;
     case "inspect":
       result = await inspect(options.root ?? positional[0] ?? ".");
       break;
     case "capture":
+      options.format??=2;
       if (!options.dryRun) {
         const review = await capture({ ...options, dryRun: true });
         process.stderr.write(
@@ -168,7 +179,7 @@ try {
       if (!positional[0] || !options.target)
         throw new Error("Provide a snapshot and --target destination.dtp");
       const { readSnapshot } = await import("../../packages/core/index.ts");
-      await readSnapshot(positional[0], await password());
+      await snapshotMetadata(positional[0], await password());
       await fs.copyFile(
         positional[0],
         options.target,

@@ -1,5 +1,6 @@
 /** Trusted caller options. Snapshot data is separately validated before extraction. */
 export interface CaptureOptions {
+  format?:1|2;
   root?: string;
   onProgress?: (phase: string) => void;
   name?: string;
@@ -100,6 +101,7 @@ export interface Manifest {
 export type CliOptions = CaptureOptions &
   RestoreOptions & {
     start?: boolean;
+    pairing?:string;pairingOutput?:string;bind?:string;advertise?:string;port?:string;timeout?:string;approveReceive?:boolean;approvePeer?:boolean;resume?:boolean;
     snapshot?: string;
     key?: string;
     verifyKey?: string;

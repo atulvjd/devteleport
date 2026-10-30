@@ -37,7 +37,7 @@ export const LIMITS = {
 };
 const sha = (data: string | Uint8Array) =>
   crypto.createHash("sha256").update(data).digest("hex");
-const excluded = new Set([
+export const excluded = new Set([
   "node_modules",
   ".devteleport",
   ".DS_Store",
@@ -56,7 +56,7 @@ const excluded = new Set([
   ".yarnrc",
   ".yarnrc.yml",
 ]);
-const sensitive = (p: string) =>
+export const sensitive = (p: string) =>
   /(^|\/)(\.env(?:\..*)?|.*\.(?:pem|key|p12|pfx)|credentials(?:\.json)?|id_rsa|id_ed25519|\.npmrc|\.netrc|\.pypirc)$/i.test(
     p,
   );
@@ -86,7 +86,7 @@ async function exists(p: string) {
     throw e;
   }
 }
-async function run(
+export async function run(
   tool: string,
   args: string[],
   cwd: string,
@@ -131,14 +131,14 @@ async function run(
     );
   }
 }
-async function optional(tool: string, args: string[], cwd: string) {
+export async function optional(tool: string, args: string[], cwd: string) {
   try {
     return await run(tool, args, cwd);
   } catch {
     return null;
   }
 }
-async function config(root: string): Promise<WorkspaceConfig> {
+export async function config(root: string): Promise<WorkspaceConfig> {
   const p = path.join(root, "devteleport.json");
   if (!(await exists(p))) return {};
   const c = JSON.parse(await fs.readFile(p, "utf8"));
@@ -322,7 +322,7 @@ export async function inspect(directory = ".") {
     },
   };
 }
-async function enumerate(root: string, c: WorkspaceConfig) {
+export async function enumerate(root: string, c: WorkspaceConfig, metadataOnly=false) {
   const files: SnapshotEntry[] = [],
     omitted: string[] = [];
   let total = 0;
@@ -383,6 +383,7 @@ async function enumerate(root: string, c: WorkspaceConfig) {
           throw new Error(`Symlink escapes workspace: ${p}`);
         files.push({ path: p, type: "symlink", target, mode: st.mode & 0o777 });
       } else if (st.isFile()) {
+        if(metadataOnly){files.push({path:p,type:"file",mode:st.mode&0o777,size:st.size,data:"",checksum:""});if(files.length>50000)throw new Error("Too many workspace entries");continue;}
         if (st.size > LIMITS.file || (total += st.size) > LIMITS.archive)
           throw new Error("Capture exceeds size limits; configure exclusions.");
         const data = await fs.readFile(abs),
@@ -460,13 +461,14 @@ function localConnection(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
     PGSSLMODE: u.searchParams.get("sslmode") || "prefer",
   };
 }
-async function dbEnv(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
+export async function dbEnv(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
   const cleanEnv = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("PG")),
   );
   return { ...cleanEnv, ...localConnection(c, d) };
 }
 export async function capture(options: CaptureOptions = {}) {
+  if(options.format===2)return (await import("./stream-v2.ts")).captureV2(options);
   options.onProgress?.("Analyzing workspace");
   const report = await inspect(options.root ?? ".");
   const c = await config(report.root);
@@ -911,6 +913,7 @@ export async function readSnapshot(file: string, password: string | undefined) {
   );
 }
 export async function restore(file: string, options: RestoreOptions = {}) {
+  if(await (await import("./stream-v2.ts")).isV2(file))return (await import("./stream-v2.ts")).restoreV2(file,options);
   options.onProgress?.("Authenticating and validating snapshot");
   const m = await readSnapshot(file, options.password);
   const target = path.resolve(options.target ?? m.name);
@@ -1199,7 +1202,7 @@ export async function verify(
         ),
       );
   const problems = [];
-  if (m.formatVersion !== 1 || !Array.isArray(m.files))
+  if (![1,2].includes(m.formatVersion) || !Array.isArray(m.files))
     throw new Error("Invalid verification inventory");
   for (const f of m.files) {
     safePath(f.path);
@@ -1213,7 +1216,7 @@ export async function verify(
       }
       const st = await fs.lstat(p);
       if (f.type === "file") {
-        let matches = st.isFile() && sha(await fs.readFile(p)) === f.checksum;
+        let matches = st.isFile() && await (await import("./stream-v2.ts")).hashFile(p) === f.checksum;
         // Git refreshes inode/timestamp caches after an independent restore.
         // Compare actual staged entries, never ignore staged content changes.
         if (
@@ -1332,6 +1335,6 @@ export async function verifyFromSnapshot(
   snapshot: string,
   password: string,
 ) {
-  const manifest = await readSnapshot(snapshot, password);
+  const manifest = await (await import("./stream-v2.ts")).snapshotMetadata(snapshot,password);
   return verify(directory, manifest);
 }

@@ -86,10 +86,7 @@ export async function verifyLfsCompleteness(
         !object ||
         object.type !== "file" ||
         object.size !== Number(pointer[2]) ||
-        crypto
-          .createHash("sha256")
-          .update(Buffer.from(object.data, "base64"))
-          .digest("hex") !== hash
+        object.checksum !== hash
       )
         throw new Error(
           `Git LFS object ${hash} is missing or corrupt. Fetch all LFS objects before capture; an incomplete archive was refused.`,
