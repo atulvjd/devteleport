@@ -54,10 +54,10 @@ jobs:
       - run: npm run package:extension
       - run: npm run test:vscode
         env:
-          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.1.0.vsix
+          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.2.0.vsix
       - run: npm run test:vscode
         env:
-          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.1.0.vsix
+          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.2.0.vsix
           DTP_TEST_UNTRUSTED: '1' 
       - run: npm run package:desktop -- --publish never
         env:

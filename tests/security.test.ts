@@ -151,7 +151,8 @@ test("missing Git LFS objects are refused; complete objects survive capture and 
 test("abrupt capture interruption never publishes a damaged final snapshot", async (t) => {
   const { spawn } = await import("node:child_process");
   const crypto = await import("node:crypto");
-  const { readSnapshot } = await import("../packages/core/index.ts");
+  const { snapshotMetadata: readSnapshot } =
+    await import("../packages/core/stream-v2.ts");
   const { root, temp } = await fixture(t);
   await fs.writeFile(
     path.join(root, "random.bin"),

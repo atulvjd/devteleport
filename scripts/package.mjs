@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
+const project = JSON.parse(await fs.readFile("package.json", "utf8"));
 const root = path.resolve("dist/cli");
 await fs.rm(root, { recursive: true, force: true });
 await fs.mkdir(root, { recursive: true });
@@ -35,7 +36,7 @@ await fs.writeFile(
   JSON.stringify(
     {
       name: "devteleport",
-      version: "0.1.0",
+      version: project.version,
       type: "module",
       description: "Encrypted local-first development workspace snapshots",
       license: "MIT",

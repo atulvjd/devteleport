@@ -1,0 +1,1 @@
+const {app,BrowserWindow}=require('electron');const path=require('node:path');app.whenReady().then(()=>{const window=new BrowserWindow({width:1024,height:1024,show:false,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}});window.loadFile(path.resolve('assets/icon.svg'));});

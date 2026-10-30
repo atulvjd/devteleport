@@ -1,7 +1,9 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { stripTypeScriptTypes } from "node:module";
 export async function buildBackend(root = path.resolve("dist/backend")) {
+  await fs.rm(root, { recursive: true, force: true });
   await fs.mkdir(root, { recursive: true });
   for (const directory of ["apps/cli", "packages/core"]) {
     await fs.mkdir(path.dirname(path.join(root, directory)), {
@@ -33,6 +35,43 @@ export async function buildBackend(root = path.resolve("dist/backend")) {
   await fs.writeFile(
     path.join(root, "package.json"),
     JSON.stringify({ type: "module" }),
+  );
+  const inventory = {};
+  async function hashTree(directory) {
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
+      if (entry.isDirectory()) await hashTree(file);
+      else
+        inventory[path.relative(root, file).split(path.sep).join("/")] = crypto
+          .createHash("sha256")
+          .update(await fs.readFile(file))
+          .digest("hex");
+    }
+  }
+  await hashTree(root);
+  const ui = {};
+  for (const name of await fs.readdir("apps/desktop"))
+    if (/\.(cjs|js|css|html)$/.test(name)) {
+      const relative = "apps/desktop/" + name;
+      ui[relative] = crypto
+        .createHash("sha256")
+        .update(await fs.readFile(relative))
+        .digest("hex");
+    }
+
+  await fs.writeFile(
+    path.join(root, "build-info.json"),
+    JSON.stringify(
+      {
+        formatVersion: 1,
+        hostArchitecture: process.arch,
+        files: inventory,
+        ui,
+        version: JSON.parse(await fs.readFile("package.json", "utf8")).version,
+      },
+      null,
+      2,
+    ),
   );
 }
 if (process.argv[1] === new URL(import.meta.url).pathname) await buildBackend();

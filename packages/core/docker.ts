@@ -1,7 +1,13 @@
-import { execFile } from "node:child_process";
+import {
+  execText,
+  trackChild,
+  registerCleanup,
+  spawnBuffered,
+} from "./processes.ts";
+
 import { promisify } from "node:util";
 import crypto from "node:crypto";
-const exec = promisify(execFile);
+const exec = execText;
 const IMAGE = "python:3.13-alpine";
 const valid = (name: string) =>
   typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(name);
@@ -28,12 +34,16 @@ async function helper(
 ) {
   if (!valid(volume)) throw new Error("Invalid Docker named volume");
   const name = "devteleport-" + crypto.randomUUID();
+  const unregister = registerCleanup(() =>
+    docker(["rm", "-f", name]).catch(() => {}),
+  );
   try {
     return await new Promise<Buffer>((resolve, reject) => {
-      const child = execFile(
+      const child = spawnBuffered(
         "docker",
         [
           "run",
+          ...(process.arch === "arm64" ? ["--platform", "linux/arm64"] : []),
           "--rm",
           "--name",
           name,
@@ -55,7 +65,12 @@ async function helper(
           "-c",
           code,
         ],
-        { encoding: "buffer", maxBuffer: 34 * 1024 * 1024, timeout: 180000 },
+        {
+          encoding: "buffer",
+          detached: process.platform !== "win32",
+          maxBuffer: 34 * 1024 * 1024,
+          timeout: 180000,
+        },
         (error, stdout) =>
           error
             ? reject(
@@ -69,6 +84,7 @@ async function helper(
     });
   } finally {
     await docker(["rm", "-f", name]).catch(() => {});
+    unregister();
   }
 }
 export async function captureVolume(volume: string) {
