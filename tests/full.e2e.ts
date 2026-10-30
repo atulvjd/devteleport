@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { waitForPort } from "./wait-for-port.ts";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -174,24 +175,7 @@ test("combined independent Express, Git, PostgreSQL and Compose reconstruction",
     env: { ...process.env, DATABASE_URL: url("destination_dev") },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const appPort = await new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Restored Express startup timed out")),
-      15000,
-    );
-    server.once("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    server.once("exit", () => {
-      clearTimeout(timer);
-      reject(new Error("Restored Express exited before startup"));
-    });
-    server.stdout.once("data", (data) => {
-      clearTimeout(timer);
-      resolve(Number(data.toString().trim()));
-    });
-  });
+  const appPort = await waitForPort(server, "Restored Express");
   const response = await fetch(`http://127.0.0.1:${appPort}/`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), [

@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { waitForPort } from "./wait-for-port.ts";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -63,20 +64,7 @@ test("Express runs after source removal and approved independent dependency inst
     cwd: target,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const port = await new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Express startup timeout")),
-      15000,
-    );
-    server.once("error", reject);
-    server.stdout.once("data", (chunk) => {
-      clearTimeout(timer);
-      resolve(Number(chunk.toString().trim()));
-    });
-    server.once("exit", (code) => {
-      if (code) reject(new Error("Express exited before startup"));
-    });
-  });
+  const port = await waitForPort(server, "Express");
   const response = await fetch(`http://127.0.0.1:${port}/`);
   assert.deepEqual(await response.json(), { message: "independent" });
   assert.equal(
