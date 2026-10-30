@@ -105,4 +105,5 @@ export type CliOptions = CaptureOptions &
     snapshot?: string;
     key?: string;
     verifyKey?: string;
+    includeGit?: boolean;
   };

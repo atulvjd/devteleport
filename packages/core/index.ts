@@ -467,11 +467,8 @@ export async function dbEnv(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
   );
   return { ...cleanEnv, ...localConnection(c, d) };
 }
-export async function capture(options: CaptureOptions = {}) {
-  if(options.format===2)return (await import("./stream-v2.ts")).captureV2(options);
-  options.onProgress?.("Analyzing workspace");
-  const report = await inspect(options.root ?? ".");
-  const c = await config(report.root);
+/** Adds Git-ignored paths to the configured exclusions, as capture does. */
+async function withGitIgnored(root: string, c: WorkspaceConfig) {
   const ignored = await optional(
     "git",
     [
@@ -482,7 +479,7 @@ export async function capture(options: CaptureOptions = {}) {
       "--directory",
       "-z",
     ],
-    report.root,
+    root,
   );
   if (ignored)
     c.exclude = [
@@ -492,6 +489,27 @@ export async function capture(options: CaptureOptions = {}) {
         .filter(Boolean)
         .map((p) => p.replace(/\/$/, "")),
     ];
+  return c;
+}
+/**
+ * Lists the entries capture would include for a directory, without reading
+ * Git integrity, databases or volumes. Used by diff to compare a live folder.
+ */
+export async function listWorkspace(directory = ".") {
+  const root = await fs.realpath(directory);
+  const c = await withGitIgnored(root, await config(root));
+  // Stream-hash each file so large workspaces (format 2) are not loaded into memory.
+  const listing = await enumerate(root, c, true);
+  const { hashFile } = await import("./stream-v2.ts");
+  for (const f of listing.files)
+    if (f.type === "file") f.checksum = await hashFile(path.join(root, f.path));
+  return listing;
+}
+export async function capture(options: CaptureOptions = {}) {
+  if(options.format===2)return (await import("./stream-v2.ts")).captureV2(options);
+  options.onProgress?.("Analyzing workspace");
+  const report = await inspect(options.root ?? ".");
+  const c = await withGitIgnored(report.root, await config(report.root));
   if (
     await exists(
       path.join(report.root, ".git", "objects", "info", "alternates"),
