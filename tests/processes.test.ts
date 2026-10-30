@@ -28,7 +28,11 @@ test("cancellation terminates a supervised tool and its descendant process group
     );
     child.stdout.once("data", (bytes) => {
       clearTimeout(timer);
-      resolve(Number(bytes.toString().trim()));
+      // FORCE_COLOR (set by the test runner in a colour terminal) wraps the
+      // printed number in ANSI codes; strip them before parsing.
+      resolve(
+        Number(bytes.toString().replace(/\x1b\[[0-9;]*m/g, "").trim()),
+      );
     });
   });
   assert(Number.isInteger(descendant));
