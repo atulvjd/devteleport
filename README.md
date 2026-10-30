@@ -44,6 +44,15 @@ Format 2 hashes/stages files and PostgreSQL exports in bounded chunks, streams A
 
 Private plaintext staging requires additional free disk. Permissions protect temporary data; no physical erasure guarantee is made. Stop source writers: consistency checks are not one transaction across source, databases and volumes. Capture/receive publication requires hard-link-capable storage (APFS/HFS+/compatible POSIX filesystems). For ExFAT or unsupported external drives, capture internally and export the encrypted file; do not bypass atomic no-overwrite checks.
 
+## See what changed
+
+```sh
+devteleport diff project.dtp /path/to/project          # snapshot vs folder
+devteleport diff old.dtp --snapshot new.dtp            # snapshot vs snapshot
+```
+
+Lists files added, removed or modified (content, permissions, link target or type) using the same exclusion rules as capture. Works with format 1 and format 2 snapshots. Git internals are summarized unless `--include-git` is given. Exits 2 when anything differs. A second snapshot with a different passphrase reads `DEVTELEPORT_NEWER_PASSWORD`.
+
 ## Configure components
 
 `devteleport.json` uses validated literal relative exclusion prefixes and explicit adapter names:
