@@ -30,6 +30,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y postgresql
       - run: echo "/usr/lib/postgresql/$(ls /usr/lib/postgresql | sort -V | tail -1)/bin" >> "$GITHUB_PATH"
       - run: npm run test:postgres
+      - run: npm run test:docker:live
       - run: npm run test:docker
       - run: npm run test:e2e
       - run: npm run test:full
@@ -43,7 +44,21 @@ jobs:
       - run: npm ci
       - run: node node_modules/electron/install.js
       - run: npm run test:desktop
+      - run: |
+          if [ "$(uname -m)" = "arm64" ]; then dtp_code_platform=darwin-arm64; else dtp_code_platform=darwin; fi
+          curl -fsSL "https://update.code.visualstudio.com/latest/$dtp_code_platform/stable" -o "$RUNNER_TEMP/vscode.zip"
+          unzip -q "$RUNNER_TEMP/vscode.zip" -d "$RUNNER_TEMP/vscode"
+          for dtp_binary in "$RUNNER_TEMP/vscode/Visual Studio Code.app/Contents/MacOS/"*; do
+            if [ -f "$dtp_binary" ] && [ -x "$dtp_binary" ]; then echo "DEVTELEPORT_VSCODE_BINARY=$dtp_binary" >> "$GITHUB_ENV"; break; fi
+          done
       - run: npm run package:extension
+      - run: npm run test:vscode
+        env:
+          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.1.0.vsix
+      - run: npm run test:vscode
+        env:
+          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.1.0.vsix
+          DTP_TEST_UNTRUSTED: '1' 
       - run: npm run package:desktop -- --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

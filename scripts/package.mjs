@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
 const root = path.resolve("dist/cli");
+await fs.rm(root, { recursive: true, force: true });
 await fs.mkdir(root, { recursive: true });
 for (const p of ["apps/cli", "packages/core", "docs"]) {
   await fs.mkdir(path.dirname(path.join(root, p)), { recursive: true });

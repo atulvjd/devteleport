@@ -22,12 +22,15 @@ try {
     ],
     { stdio: "pipe" },
   );
+  const workspace = path.join(temp, "workspace");
+  await fs.mkdir(workspace);
+  await fs.writeFile(path.join(workspace, "hello.txt"), "installed package");
   const output = execFileSync(
     path.join(temp, "bin", "devteleport"),
-    ["inspect", "--root", path.resolve("examples/hello")],
+    ["inspect", "--root", workspace],
     { encoding: "utf8" },
   );
-  assert.equal(JSON.parse(output).root, await fs.realpath("examples/hello"));
+  assert.equal(JSON.parse(output).root, await fs.realpath(workspace));
   console.log(
     "PASS: installed CLI tarball runs from node_modules through its executable bin.",
   );

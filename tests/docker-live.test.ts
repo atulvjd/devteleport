@@ -146,3 +146,14 @@ test("malicious volume symlinks are rejected and the newly owned target volume i
   await assert.rejects(restoreVolume(volume, data), /adapter failed/);
   assert.throws(() => docker("volume", "inspect", volume));
 });
+test("oversized volume members are refused before archive expansion", async () => {
+  const { restoreVolume } = await import("../packages/core/docker.ts");
+  const { execFileSync } = await import("node:child_process");
+  const volume = "dtp-expansion-" + crypto.randomBytes(6).toString("hex");
+  const data = execFileSync("python3", [
+    "-c",
+    "import tarfile,io,sys;buf=io.BytesIO();t=tarfile.open(fileobj=buf,mode='w:gz');m=tarfile.TarInfo('huge');m.size=134217729;t.addfile(m);t.close();sys.stdout.buffer.write(buf.getvalue())",
+  ]);
+  await assert.rejects(restoreVolume(volume, data), /adapter failed/);
+  assert.throws(() => docker("volume", "inspect", volume));
+});

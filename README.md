@@ -32,7 +32,7 @@ devteleport verify /path/to/new-project --snapshot /path/to/my-workspace.dtp
 
 Passphrases are prompted with hidden input; capture requires at least 12 characters. Noninteractive clients can supply `DEVTELEPORT_PASSWORD` through a protected process environment. Never put credentials in command arguments, source files or shell history. There is no password recovery. Encrypted-file `export`/`import` authenticate before copying and refuse existing destinations. No network receiver is opened.
 
-Capture includes saved source, untracked and uncommitted files, Git objects/index/HEAD, lockfiles, Compose files and supported editor files. Staged versus unstaged changes, detached HEAD and unborn branches are preserved. Git configuration, hooks, reflogs and remote URLs are omitted; configure remotes manually. LFS pointer blobs in locally stored Git objects are checked against captured LFS objects; missing or corrupt objects cause refusal. Shallow repositories, alternate object stores, linked worktrees, submodules and nested repositories require standalone captures or preparation first. Safe internal links are supported; dangling/chained links are rejected.
+Capture includes saved source, untracked and uncommitted files, Git objects/index/HEAD, lockfiles, Compose files and supported editor files. Staged versus unstaged changes, detached HEAD and unborn branches are preserved. Git configuration, hooks, reflogs and remote URLs are omitted; configure remotes manually. LFS pointer blobs in locally stored Git objects are checked against captured LFS objects; missing or corrupt objects cause refusal. Partial clones, shallow repositories, alternate object stores, linked worktrees, submodules and nested repositories require standalone captures or preparation first. Safe internal links are supported; dangling/chained links are rejected.
 
 Git ignored files, dependency directories at every depth, known credential files/directories, private-key filenames, `.env*`, snapshot output, recovery staging and verification metadata are excluded. High-confidence embedded private keys and common GitHub/AWS credentials are excluded with an explicit omission record. This is not universal secret detection: historical Git objects, arbitrary strings, database contents and volume backups can contain secrets. Review capture contents and omissions before transfer.
 
@@ -92,7 +92,7 @@ Default restore executes no project code. `--install --approve-execution` allows
 
 ## Desktop and editor workflows
 
-The desktop app uses the same compiled CLI in an isolated Electron utility process. It provides capture and restore review steps, database/volume/dependency approval options, snapshot history, verification, Compose diagnostics, progress phases, cancellation and saved nonsecret path settings. Passphrases are never persisted in settings. A cancelled or crashed operation may leave a private partial/staging path; inspect recovery before removing anything.
+The desktop app uses the same compiled CLI in an isolated Electron utility process. It provides capture and restore review steps, database/volume/dependency approval options, snapshot history, verification, Compose diagnostics, progress phases, cancellation and saved nonsecret path/tool-directory settings. Passphrases are never persisted in settings. A cancelled or crashed operation may leave a private partial/staging path; inspect recovery before removing anything.
 
 The VS Code sidebar runs real CLI operations, saves dirty files only after approval, records saved tabs in `.vscode/devteleport-session.json`, and offers to reopen saved files through public APIs in a trusted workspace. Paths outside the restored folder are refused. The generated session file is part of the working tree. Actual extension-host tests cover commands, cancellation, dirty-buffer saving, saved-tab reopening and untrusted capture refusal. Unsaved buffers, terminals, debugger state and arbitrary extension state are not migrated.
 
@@ -135,7 +135,7 @@ JSON results go to stdout; diagnostics go to stderr. Unknown commands/options fa
 ```sh
 npm ci
 npm run check              # strict TypeScript + application syntax checks
-npm test                   # 20 core/security tests
+npm test                   # 22 core/security tests
 npm run test:postgres      # isolated PostgreSQL cluster; source DB removed before restore
 npm run test:docker        # real Compose analysis, no daemon needed
 npm run test:docker:live   # actual volumes, malicious archive refusal, Compose startup

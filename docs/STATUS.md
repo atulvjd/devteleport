@@ -1,63 +1,66 @@
 # Implementation status — 2026-10-31
 
-Implemented in an initially empty workspace. Local validation used macOS arm64 and Node 24.21.0. No physical two-machine transfer, Intel execution, Linux execution, Windows execution, remote CI run, code signing, notarization or publishing was performed.
+The functional local-first MVP is implemented. The follow-up work removed the external Node dependency from desktop, validated the actual VS Code extension host, added real Docker service/volume operations, enabled strict TypeScript, and hardened authentication, interruption handling, secrets, LFS and PostgreSQL compatibility. Signing/notarization, remote CI execution and a physical two-Mac transfer are not claimed.
 
 ## Deliverables
 
 | Deliverable | Status | Evidence / boundary |
 | --- | --- | --- |
-| CLI | Implemented and tested | Real subprocess capture/restore/verify lifecycle; portable npm tarball |
-| Capture and restore engine | Implemented and tested within limits | Independent destination after source removal; double-read change detection, new destinations only |
-| Versioned snapshot format | Implemented and tested | Strict format 1 reader; unsupported versions rejected; future migration policy documented |
-| Encryption and integrity | Implemented and tested | Scrypt + AES-256-GCM, per-payload SHA-256, wrong-password and corruption failures; no public-key signatures |
-| Git preservation | Implemented and tested for standalone repositories | Index, objects, HEAD, staged/unstaged/deleted/untracked files, unborn and detached HEAD; local config/hooks/remotes omitted |
-| PostgreSQL | Implemented and integration tested on PostgreSQL 15 | Real dump, removal of source DB, restore, record query and nonempty-destination refusal; localhost only |
-| Docker Compose | Partially supported and configuration tested | Real Compose parsing, images/ports/dependencies/mount projection and reviewed command; no volume/image backup or automatic startup |
-| VS Code extension | Implemented and VSIX packaged; runtime unverified | Five commands, sidebar, public saved-tab metadata APIs; needs actual VS Code extension-host validation |
-| Desktop app | Implemented and automated workflow tested | Actual Electron controls: inspect, review capture, encrypted capture, restore after source deletion, verify; source and packaged arm64 app tested; screenshot generated |
-| Snapshot history | Implemented | Lists actual encrypted snapshot files with size/time; unlock for content details; no global database/index |
-| Verification | Implemented and tested | File hashes, types, safe links and permissions; Git index cache refresh is checked against staged entries; local editable inventory is not a signature |
-| Test suite | Implemented and locally run | 13 core tests, separate PostgreSQL, Docker config and Express integration cases, and desktop automation |
-| Documentation | Implemented | README, architecture/format, security, troubleshooting, contributor/release, example, and this status matrix |
-| Build/install scripts | Implemented and artifacts generated | Installed CLI tgz smoke-tested, VSIX, unsigned arm64/x64 macOS DMGs; no bundled external Node backend |
-| CI | Configured, not remotely run | macOS/Linux matrix, database/Compose/Express checks, artifact build/upload jobs |
-| Example app | Implemented | Express server, package manifest, Compose PostgreSQL configuration and database adapter example |
-| Support/limitations matrix | Implemented | This document plus security/architecture details |
+| CLI | Implemented and tested | Real subprocess lifecycle; standalone JavaScript npm tarball and installed-bin smoke test |
+| Capture/restore engine | Implemented and tested within documented limits | Source removed before independent-directory recovery; no overwriting; double-read consistency checks; private staging and journals |
+| Versioned format | Implemented and tested | Format 1 authenticated envelope, validated manifest, optional database/volume records, unknown-version rejection |
+| Encryption/integrity/authenticity | Implemented and tested | Scrypt/AES-256-GCM, SHA-256 checksums, optional detached Ed25519 signatures, verification against authenticated original archive |
+| Git preservation | Implemented and tested for standalone repositories | Staged/unstaged/deleted/untracked files, objects/index/HEAD, unborn/detached HEAD; LFS completeness checks; unsafe layouts rejected explicitly |
+| PostgreSQL | Implemented and real integration tested | PostgreSQL 15 round trip, 15-to-16 restore, source removal, exclusion policy, nonempty-target refusal, older-client refusal and version preflight |
+| Docker Compose/volumes | Implemented for stated adapters and live tested | Approved Compose startup, stopped plain local named-volume backup/restore, non-root file ownership, existing-volume refusal, malicious symlink archive rejection |
+| VS Code extension | Implemented, packaged and actual-host tested | Commands, dirty-buffer saving, saved-tab capture/reopen, cancellation and untrusted capture refusal; public APIs only |
+| Desktop | Implemented, packaged and actual UI tested | Bundled Electron utility-process backend, review steps, options/approvals, progress, cancellation, nonsecret saved settings, diagnostics and history |
+| Snapshot history | Implemented | Real encrypted-file listing with size/time; no fabricated content or global index |
+| Verification/recovery | Implemented and tested | File hashes/types/modes, canonical Git index comparison, original-archive verification, read-only recovery inspection and interruption tests |
+| Tests | Implemented and run | 22 core/security tests plus real service/database/GUI/editor integration suites; see observed validation |
+| Documentation | Updated | README, architecture, security, CLI/configuration usage, troubleshooting, example and contributor/release instructions |
+| Installation/build artifacts | Generated | CLI tgz, installable VSIX, unsigned arm64/x64 DMGs; desktop backend bundled in application resources |
+| CI | Configured; remote execution pending | macOS/Linux checks, integrations and artifact generation; no remote repository was configured or pushed |
+| Example app | Implemented | Express, Compose/PostgreSQL and adapter configuration example; real application HTTP behavior tested |
+| Support matrix | Updated | Current evidence and explicit limitations below |
 
 ## Observed validation
 
-- `npm run check`: passed baseline TypeScript checking and desktop/extension JavaScript syntax checks. Strict TypeScript mode is not enabled.
-- `npm test`: 13 core tests passed, zero failures/skips. Coverage includes actual Git/CLI restoration, secrets/dependency exclusions, safe-path/schema attacks, incorrect passphrase, archive tampering, size limits, approval gates and exact permission restoration under restrictive umask.
-- `npm run test:postgres`: passed with a real temporary PostgreSQL cluster, real custom-format dump and restore. The sandbox initially denied PostgreSQL shared memory; the same test passed outside that sandbox. No preexisting database was modified.
-- `npm run test:docker`: passed real Docker Compose configuration analysis without a daemon. No containers were started; the Docker daemon was unavailable.
-- `npm run test:e2e`: passed a real HTTP request to independently restored Express code after deleting the original project, reinstalling dependencies with explicit approval, and checking uncommitted/untracked Git state.
-- `npm run test:desktop`: passed actual Electron UI controls and generated `dist/desktop-smoke.png`. Launch requires removing the host's `ELECTRON_RUN_AS_NODE` flag; the automated runner does so explicitly.
-- `npm run test:package`: passed actual offline global tarball installation in a temporary prefix and execution from `node_modules`. Packaging emits JavaScript because Node forbids native type stripping inside installed dependency directories.
-- `npm run package:cli`, `npm run package:extension` and `npm run package:desktop -- --publish never`: generated local artifacts. DMGs are unsigned and not notarized.
-- Dependency installation/audit after upgrading Electron reported zero known vulnerabilities at that time. This is not a permanent or independent security certification.
+- `npm run check`: strict TypeScript checking and application syntax checks passed. No `noImplicitAny` exception or blanket diagnostic suppression was introduced.
+- `npm test`: 22 actual core/security tests passed with zero skips. Includes filesystem/Git/CLI lifecycles, archive tampering, password failures, path/schema attacks, no-overwrite protections, permissions under restrictive umask, staged-index semantics, authenticated import/export, embedded credentials, signatures, forged local inventory, LFS completeness, forced SIGKILL during publication, disabled Git fsmonitor execution during inspection, corrupt-object refusal and partial-clone rejection.
+- Linux: the core/security suite ran in an isolated official Node 24 Debian container with read-only source, non-root user, no network and temporary writable filesystems. An initial approval-error-order failure was fixed before rerunning successfully. Later final source was also rechecked in that environment; exact counts are recorded by its test output.
+- `npm run test:postgres`: real isolated PostgreSQL 15 cluster; source database removed before restore; records recovered; excluded table absent; nonempty destination refused.
+- `npm run test:pg-versions`: real PostgreSQL 15 and 16 Docker containers; source 15 container removed before approved restore into 16; HTTP-independent SQL records confirmed; PostgreSQL 15 dump client refused capture from server 16. This fixture explicitly requires host pg_dump 15.
+- `npm run test:docker`: actual Compose configuration projection without secret environment values.
+- `npm run test:docker:live`: actual stopped named-volume capture, source deletion, independent restoration, ownership preservation, existing-target refusal, approved Compose service startup and malicious escaping-link archive rejection and oversized-member refusal before expansion. Temporary containers/volumes are cleaned by the tests.
+- `npm run test:e2e` and `npm run test:full`: independent Express recovery and combined Express/Git/PostgreSQL/Compose configuration recovery; source folder and database removed before restoration; approved npm install; real database-backed HTTP response.
+- `npm run test:vscode`: actual installed VS Code Insiders extension host with isolated user/extension profiles, not a mocked VS Code module. Tested inspect/capture/restore/verify/history, save-all approval for dirty files, capture cancellation and saved-file reopening. A separate untrusted-workspace run refused capture. Packaged-VSIX checks load extracted actual VSIX files through the same extension-host runner.
+- `npm run test:desktop`: actual Electron controls, bundled backend with intentionally nonexistent external Node path, capture/restore review, source deletion, verification, settings without passwords and cancellation before publication. Packaged arm64 and packaged x64 app bundles also passed; x64 ran through Rosetta on Apple Silicon, not an Intel physical Mac.
+- `npm run test:package`: offline npm tarball installation into a temporary prefix and real installed executable invocation passed.
+- Packaging generated local CLI tgz, VSIX and macOS DMGs. No code signing, notarization, upload, push, publishing or remote CI run occurred.
 
-The combined `npm run test:full` case passed real CLI capture/restore of Express, Git changes, PostgreSQL records and Compose configuration, removed both source project and source database, installed approved dependencies, and verified a database-backed HTTP response. This is independent-directory/database testing on one host, not physical two-device testing. Docker containers were not started. The GUI test covers file reconstruction; it does not test graphical PostgreSQL restore or VS Code extension behavior.
+## Platform evidence
 
-## Platform support
-
-| Platform | Local evidence |
+| Platform | Status |
 | --- | --- |
-| macOS Apple Silicon | CLI, Git, PostgreSQL, Compose analysis, Express and desktop workflows tested |
-| macOS Intel | Installer generated; execution and physical-machine validation pending |
-| Linux | Core is designed around compatible POSIX APIs; CI configured; not locally run |
-| Windows | Unsupported until a separately tested path/permissions/process implementation exists |
+| macOS Apple Silicon | Core, PostgreSQL, Docker, Express, actual editor and desktop workflows validated locally |
+| macOS Intel | x64 installer generated; packaged x64 workflow validated under Rosetta; physical Intel testing still needed |
+| Linux | Core/security suite executed successfully in a real Linux container; native-host desktop/database combinations not certified |
+| Windows | Unsupported secondary platform until separately implemented and tested |
 
-## Remaining work
+## External release gates
 
-1. Validate the VSIX in actual VS Code, including workspace trust, saved tab restoration and all cancellation/error paths.
-2. Run signed-off physical Apple Silicon-to-Intel and Intel-to-Apple Silicon transfers with the source offline; verify native package reinstall behavior.
-3. Run Linux CI and validate generated installers on their target architectures. Sign/notarize only with authorized credentials.
-4. Extend the passing combined Express/Git/PostgreSQL/Compose-analysis fixture with Docker daemon service startup verification; keep volume backup claims disabled until adapters exist.
-5. Bundle an appropriate backend Node runtime for standalone desktop distribution; add persistent settings, cancellation, progress phases and a richer restore wizard. Current desktop requires external Node 24.
-6. Add PostgreSQL table/schema exclusion policy, explicit server-version preflight and broader version testing. Current utility compatibility failures stop the operation, but no multi-version compatibility certification exists.
-7. Add explicit volume backup adapters, LFS completeness checks, and separately scoped Git worktree/submodule/nested repository support. LFS object data is included only when it exists locally; missing objects are not downloaded or guaranteed.
-8. Add streaming bounded snapshots, richer configuration validation, strict typing, journaling for interrupted capture/restore and broader race/fault-injection tests. Current archives are memory-bound and hard-limited.
-9. Improve detection of secrets embedded in arbitrary file content, provide opt-in signing and authenticate inventories against the original archive.
-10. Keep transfer file-based until a separately tested authenticated pairing/resume protocol exists. No peer-to-peer send/receive is simulated.
+1. **Apple Developer credentials:** no usable Developer ID identity/notarization credentials were available. Installers remain unsigned and unnotarized. Sign and notarize only with explicit authorization and the user's credentials.
+2. **Physical devices:** a second physical Mac, ideally Intel, was unavailable. Independent-directory/database tests and Rosetta execution do not replace physical cross-device transfer validation.
+3. **Remote repository/CI:** no target repository was configured. The workflow is prepared and local equivalents were run; pushing code and triggering remote jobs require an explicitly selected repository and authorization.
 
-No live process memory, TCP connections, unsaved editor buffers, terminal execution, arbitrary extension state or debugger continuation is implemented.
+## Deliberate MVP limits and optional future work
+
+These are documented product boundaries, not fake completed features:
+
+- File-based transfer ships; peer-to-peer pairing/resume is optional future work, as allowed by the original specification.
+- Format 1 is bounded and memory-based: 128 MiB aggregate decoded project/database/compressed-volume payload, 32 MiB per payload, 50,000 project entries, 256 MiB expanded manifest JSON. Each volume also has expansion limits. Streaming/larger archives require a future compatible format.
+- Standalone Git repositories ship. Linked worktrees, submodules, nested repositories, shallow history and external alternates are rejected or require separate preparation. Only locally stored Git/LFS objects can be assessed; inaccessible remote history is not fabricated or downloaded automatically.
+- Plain local named Docker volumes ship. Bind mounts, external volume drivers, Docker image transport and arbitrary live database volume consistency do not. Stop writers and configure restored Compose volume names explicitly.
+- Cancellation stops the backend but is not a cross-component rollback. Temporary files or a new partial destination can remain after abrupt termination or post-action failure. Journals/recovery inspection expose that state; no preexisting destination is overwritten or automatically deleted.
+- No universal secret detector, independent security audit, global snapshot index, live process migration, unsaved-buffer replay, terminal execution replay or arbitrary editor extension-state migration is claimed.

@@ -1,10 +1,10 @@
-const reviews=new Map();
+const reviews = new Map();
 const $ = (id) => document.getElementById(id);
 for (const [button, field, kind] of [
   ["chooseWorkspace", "source", "directory"],
   ["chooseOutput", "output", "directory"],
   ["chooseSnapshot", "snapshot", "snapshot"],
-  ["chooseConfig","dbConfig","file"],
+  ["chooseConfig", "dbConfig", "file"],
 ])
   $(button).onclick = async () => {
     const p = await window.teleport.choose(kind);
@@ -27,22 +27,41 @@ for (const button of document.querySelectorAll("[data-action]"))
       target: $("target").value,
       password: $(action === "capture" ? "capturePassword" : "restorePassword")
         .value,
-      includeDb: $("includeDb").checked,includeVolumes:$("includeVolumes").checked,restoreDb:$("restoreDb").checked,restoreVolumes:$("restoreVolumes").checked,install:$("install").checked,dbConfig:$("dbConfig").value,
+      toolDirectories: $("toolDirectories").value,
+      includeDb: $("includeDb").checked,
+      includeVolumes: $("includeVolumes").checked,
+      restoreDb: $("restoreDb").checked,
+      restoreVolumes: $("restoreVolumes").checked,
+      install: $("install").checked,
+      dbConfig: $("dbConfig").value,
     };
     await window.teleport.settings({
       source: $("source").value,
       output: $("output").value,
       name: $("name").value,
       target: $("target").value,
+      toolDirectories: $("toolDirectories").value,
     });
     $("status").textContent = "Working…";
     for (const b of document.querySelectorAll("button"))
       b.disabled = b.id !== "cancel";
     try {
-      const reviewKey=JSON.stringify({...input,password:undefined,dryRun:undefined});
-      if(["capture","restore"].includes(action)&&!input.dryRun&&reviews.get(action)!==reviewKey)throw new Error("Review the capture or restore plan first, after selecting your final options.");
+      const reviewKey = JSON.stringify({
+        ...input,
+        password: undefined,
+        dryRun: undefined,
+      });
+      if (
+        ["capture", "restore"].includes(action) &&
+        !input.dryRun &&
+        reviews.get(action) !== reviewKey
+      )
+        throw new Error(
+          "Review the capture or restore plan first, after selecting your final options.",
+        );
       const result = await window.teleport.operation(input);
-      if(input.dryRun)reviews.set(action,reviewKey);else reviews.delete(action);
+      if (input.dryRun) reviews.set(action, reviewKey);
+      else reviews.delete(action);
       $("result").textContent = JSON.stringify(result, null, 2);
       $("status").textContent = "Completed";
     } catch (e) {
@@ -58,7 +77,7 @@ for (const button of document.querySelectorAll("[data-action]"))
 window.teleport
   .settings()
   .then((settings) => {
-    for (const key of ["source", "output", "name", "target"])
+    for (const key of ["source", "output", "name", "target", "toolDirectories"])
       if (settings[key]) $(key).value = settings[key];
   })
   .catch((error) => {

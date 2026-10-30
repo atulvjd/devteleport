@@ -71,7 +71,11 @@
             ><input id="includeDb" type="checkbox" /> Include configured local
             PostgreSQL databases</label
           >
-          <label class="check"><input id="includeVolumes" type="checkbox"> Include explicitly configured local Docker volumes</label><div class="row">
+          <label class="check"
+            ><input id="includeVolumes" type="checkbox" /> Include explicitly
+            configured local Docker volumes</label
+          >
+          <div class="row">
             <button data-action="capture" data-dry="true">Review capture</button
             ><button data-action="capture" class="primary">
               Create encrypted snapshot
@@ -98,11 +102,31 @@
               type="password"
               autocomplete="current-password"
           /></label>
-          <label>Trusted destination mapping<div class="row"><input id="dbConfig" placeholder="External JSON mapping for database/volume targets"><button id="chooseConfig">Browse</button></div></label>
-          <label class="check"><input id="restoreDb" type="checkbox"> Approve SQL execution into an empty development database</label>
-          <label class="check"><input id="restoreVolumes" type="checkbox"> Approve restoring configured volumes into new names</label>
-          <label class="check"><input id="install" type="checkbox"> Approve npm ci, including package lifecycle scripts</label>
-          <p class="hint">Review the plan after changing options. Existing directories, databases and volumes remain protected.</p>
+          <label
+            >Trusted destination mapping
+            <div class="row">
+              <input
+                id="dbConfig"
+                placeholder="External JSON mapping for database/volume targets"
+              /><button id="chooseConfig">Browse</button>
+            </div></label
+          >
+          <label class="check"
+            ><input id="restoreDb" type="checkbox" /> Approve SQL execution into
+            an empty development database</label
+          >
+          <label class="check"
+            ><input id="restoreVolumes" type="checkbox" /> Approve restoring
+            configured volumes into new names</label
+          >
+          <label class="check"
+            ><input id="install" type="checkbox" /> Approve npm ci, including
+            package lifecycle scripts</label
+          >
+          <p class="hint">
+            Review the plan after changing options. Existing directories,
+            databases and volumes remain protected.
+          </p>
           <div class="row">
             <button data-action="restore" data-dry="true">Review restore</button
             ><button data-action="restore" class="primary">
@@ -111,6 +135,22 @@
           </div>
         </section>
       </div>
+      <section>
+        <h2>Tool settings</h2>
+        <label
+          >Additional trusted tool directories (one absolute path per
+          line)<textarea
+            id="toolDirectories"
+            rows="3"
+            aria-label="Additional tool directories"
+          ></textarea>
+        </label>
+        <p class="hint">
+          Used only to find tools such as Git, npm, PostgreSQL and Docker. The
+          built-in workspace engine does not require external Node. Settings
+          save when you run an operation; passphrases are never saved.
+        </p>
+      </section>
       <section aria-live="polite">
         <div class="row">
           <h2>Activity & diagnostics</h2>

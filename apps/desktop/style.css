@@ -185,3 +185,16 @@ footer {
     width: calc(100% - 200px);
   }
 }
+
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  background: #10151e;
+  color: #eef1ff;
+  border: 1px solid #394356;
+  border-radius: 6px;
+  padding: 11px;
+  font: inherit;
+  resize: vertical;
+}

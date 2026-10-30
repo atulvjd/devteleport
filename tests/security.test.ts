@@ -231,3 +231,54 @@ test("CLI signing and archive-backed verification execute through strict command
   assert(call("verify", target, "--snapshot", a.output).ok);
   assert.throws(() => call("unknown-command"));
 });
+test("inspection never executes a repository fsmonitor command", async (t) => {
+  const { execFileSync } = await import("node:child_process");
+  const { inspect } = await import("../packages/core/index.ts");
+  const { root, temp } = await fixture(t);
+  const marker = path.join(temp, "fsmonitor-ran");
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  const script = path.join(temp, "monitor.sh");
+  await fs.writeFile(script, '#!/bin/sh\ntouch "' + marker + '"\n', {
+    mode: 0o755,
+  });
+  execFileSync("git", ["config", "core.fsmonitor", script], { cwd: root });
+  await inspect(root);
+  await assert.rejects(fs.stat(marker));
+});
+test("corrupt Git objects and partial clones fail before snapshot publication", async (t) => {
+  const { execFileSync } = await import("node:child_process");
+  const { root, temp } = await fixture(t);
+  const git = (...args) =>
+    execFileSync("git", args, {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  git("init", "-q");
+  git("config", "user.name", "Test");
+  git("config", "user.email", "test@example.invalid");
+  await fs.writeFile(path.join(root, "a"), "git integrity");
+  git("add", ".");
+  git("commit", "-qm", "initial");
+  git("config", "extensions.partialClone", "origin");
+  await assert.rejects(
+    capture({ root, name: "partial", output: temp, password }),
+    /Partial Git clones/,
+  );
+  git("config", "--unset", "extensions.partialClone");
+  const oid = git("rev-parse", "HEAD:a");
+  const object = path.join(
+    root,
+    ".git",
+    "objects",
+    oid.slice(0, 2),
+    oid.slice(2),
+  );
+  await fs.chmod(object, 0o600);
+  await fs.writeFile(object, "damaged");
+  await assert.rejects(
+    capture({ root, name: "corrupt", output: temp, password }),
+    /Git integrity check failed/,
+  );
+  await assert.rejects(fs.stat(path.join(temp, "corrupt.dtp")));
+});

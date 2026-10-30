@@ -93,6 +93,29 @@ async function run(
   extra: import("node:child_process").ExecFileOptionsWithStringEncoding = {},
 ) {
   try {
+    if (tool === "git") {
+      args = [
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        ...args,
+      ];
+      const env = Object.fromEntries(
+        Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+      );
+      extra = {
+        ...extra,
+        env: {
+          ...env,
+          ...extra.env,
+          GIT_CONFIG_NOSYSTEM: "1",
+          GIT_NO_LAZY_FETCH: "1",
+          GIT_CONFIG_GLOBAL: "/dev/null",
+        },
+      };
+    }
     return (
       await exec(tool, args, {
         cwd,
@@ -208,6 +231,16 @@ export async function inspect(directory = ".") {
   const root =
     (await optional("git", ["rev-parse", "--show-toplevel"], requested)) ||
     requested;
+  if (
+    await optional(
+      "git",
+      ["config", "--local", "--get", "extensions.partialClone"],
+      root,
+    )
+  )
+    throw new Error(
+      "Partial Git clones require conversion to a complete standalone repository before capture or inspection.",
+    );
   const c = await config(root);
   let pkg: PackageMetadata = {};
   if (await exists(path.join(root, "package.json")))
@@ -470,8 +503,27 @@ export async function capture(options: CaptureOptions = {}) {
       "Shallow repositories are not supported; unshallow before capture.",
     );
   options.onProgress?.("Enumerating and checking files");
+  if (report.git) {
+    try {
+      await run("git", ["fsck", "--full", "--no-dangling"], report.root);
+    } catch {
+      throw new Error(
+        "Git integrity check failed. Repair missing or corrupt Git objects before capture.",
+      );
+    }
+  }
   const firstStatus = report.git?.status;
   const { files, omitted } = await enumerate(report.root, c);
+  if (
+    files.some(
+      (file) =>
+        file.path.startsWith(".git/objects/pack/") &&
+        file.path.endsWith(".promisor"),
+    )
+  )
+    throw new Error(
+      "Promisor Git object packs require conversion to a complete standalone repository before capture.",
+    );
   const lfs = report.git
     ? await verifyLfsCompleteness(report.root, files)
     : null;

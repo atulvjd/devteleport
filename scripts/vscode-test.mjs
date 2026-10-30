@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), "dtp-vscode-"));
 try {
@@ -19,6 +19,16 @@ try {
       "security.workspace.trust.startupPrompt": "never",
     }),
   );
+  let extensionPath = path.resolve("apps/vscode-extension");
+  if (process.env.DTP_TEST_VSIX) {
+    execFileSync("unzip", [
+      "-q",
+      path.resolve(process.env.DTP_TEST_VSIX),
+      "-d",
+      path.join(temp, "vsix"),
+    ]);
+    extensionPath = path.join(temp, "vsix", "extension");
+  }
   const binary =
     process.env.DEVTELEPORT_VSCODE_BINARY ||
     "/Applications/Visual Studio Code - Insiders.app/Contents/MacOS/Code - Insiders";
@@ -37,7 +47,7 @@ try {
       path.join(temp, "profile"),
       "--extensions-dir",
       path.join(temp, "extensions"),
-      "--extensionDevelopmentPath=" + path.resolve("apps/vscode-extension"),
+      "--extensionDevelopmentPath=" + extensionPath,
       "--extensionTestsPath=" + path.resolve("tests/vscode-host/index.cjs"),
       ...(process.env.DTP_TEST_UNTRUSTED === "1"
         ? []

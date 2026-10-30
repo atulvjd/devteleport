@@ -9,7 +9,8 @@
   },
   "main": "./extension.cjs",
   "activationEvents": [
-    "onView:devteleport.workspace"
+    "onView:devteleport.workspace",
+    "workspaceContains:.vscode/devteleport-session.json"
   ],
   "contributes": {
     "commands": [

@@ -12,6 +12,15 @@ async function git(
       args,
       {
         cwd: root,
+        env: {
+          ...Object.fromEntries(
+            Object.entries(process.env).filter(
+              ([key]) => !key.startsWith("GIT_"),
+            ),
+          ),
+          GIT_CONFIG_NOSYSTEM: "1",
+          GIT_CONFIG_GLOBAL: "/dev/null",
+        },
         encoding: "buffer",
         maxBuffer: 16 * 1024 * 1024,
         timeout: 120000,

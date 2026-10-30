@@ -42,8 +42,9 @@ async function helper(
           "--read-only",
           "--cap-drop",
           "ALL",
-          "--cap-add","DAC_OVERRIDE",
-          ...(!readonly?["--cap-add","CHOWN"]:[]),
+          "--cap-add",
+          "DAC_OVERRIDE",
+          ...(!readonly ? ["--cap-add", "CHOWN"] : []),
           "--security-opt",
           "no-new-privileges",
           "-i",
@@ -131,8 +132,12 @@ if os.listdir('/data'): raise RuntimeError('destination not empty')
 data=sys.stdin.buffer.read(33554433)
 if len(data)>33554432: raise RuntimeError('archive too large')
 with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
- members=archive.getmembers()
- if len(members)>50000 or sum(m.size for m in members)>134217728: raise RuntimeError('expanded volume too large')
+ members=[]
+ total=0
+ for member in archive:
+  total+=member.size
+  if len(members)>=50000 or total>134217728 or len(member.name)>4096 or member.name.count('/')>256: raise RuntimeError('expanded volume too large')
+  members.append(member)
  for m in members:
   if m.name.startswith('/') or '..' in m.name.split('/') or not (m.isfile() or m.isdir() or m.issym() or m.islnk()): raise RuntimeError('unsafe archive entry')
   tarfile.data_filter(m,'/data')
