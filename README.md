@@ -1,156 +1,158 @@
-# DevTeleport
+# DevTeleport 0.2 — Apple Silicon release candidate
 
 **Your development environment. Anywhere. Exactly where you left off.**
 
-Local-first development workspace capture and reconstruction, with encrypted `.dtp` files, offline Git recovery, PostgreSQL backups, explicitly configured Docker volumes, a standalone Electron app and a VS Code extension. No cloud account or paid API is required. DevTeleport reconstructs saved state; it does not migrate running processes, TCP connections, debugger execution or unsaved buffers.
+Capture saved development state on one Mac, transfer an encrypted snapshot, and reconstruct an independent workspace on another. Native ARM64 Electron app, CLI and VS Code extension. Local-first; no cloud account, paid API, analytics or telemetry.
 
-## Install
+**Development release candidate, not production-certified.** Signing/notarization and physical two-Mac acceptance remain release gates. [Current status](docs/STATUS.md) · [Apple Silicon release report](docs/APPLE-SILICON-RELEASE.md).
 
-CLI: install Node 24 LTS and install the local tarball:
+## Install and begin
 
-```sh
-npm install -g /path/to/devteleport-0.1.0.tgz
-```
+Use the unsigned ARM64 DMG/ZIP only as a development artifact. Production distribution requires real Developer ID signing, notarization and Gatekeeper verification; no protection should be disabled. The desktop bundles its own native engine runtime. Git/npm/PostgreSQL/Docker are needed only for the operations using them.
 
-The tarball contains JavaScript compiled from TypeScript, with no runtime npm dependencies. From a source checkout, `node apps/cli/main.ts` is equivalent to `devteleport`. Development checks/builds require `npm ci`.
-
-Desktop: install the appropriate macOS DMG. **The desktop engine uses Electron's bundled Node runtime and does not require an external Node installation.** Git, npm, PostgreSQL clients and Docker remain prerequisites only for operations that use those tools. The app is currently unsigned and not notarized. See [status](docs/STATUS.md) for actual architecture testing.
-
-VS Code: install the generated VSIX. Set `devteleport.cliPath` to the absolute installed `apps/cli/main.js` (or `main.ts` in a source checkout) and `devteleport.nodePath` to Node 24. Workspace capture requires workspace trust. Restoring saved files requires their own execution approvals before package or database operations.
-
-## Capture, transfer, restore
+CLI installation requires native Node 24 LTS:
 
 ```sh
+npm install -g /path/to/devteleport-0.2.0.tgz
+devteleport diagnostics
 devteleport inspect /path/to/project
-devteleport capture --root /path/to/project --name my-workspace --dry-run
-devteleport capture --root /path/to/project --name my-workspace --output /path/to/snapshots
-# Copy my-workspace.dtp to the destination computer.
-devteleport restore /path/to/my-workspace.dtp --target /path/to/new-project --dry-run
-devteleport restore /path/to/my-workspace.dtp --target /path/to/new-project
-devteleport verify /path/to/new-project --snapshot /path/to/my-workspace.dtp
+devteleport capture --root /path/to/project --name my-project --output /path/to/snapshots --dry-run
+devteleport capture --root /path/to/project --name my-project --output /path/to/snapshots
+# Transfer the .dtp using file export/import or approved TLS pairing.
+devteleport restore /path/to/my-project.dtp --target /path/to/new-project --dry-run
+devteleport restore /path/to/my-project.dtp --target /path/to/new-project
+devteleport verify /path/to/new-project --snapshot /path/to/my-project.dtp
 ```
 
-Passphrases are prompted with hidden input; capture requires at least 12 characters. Noninteractive clients can supply `DEVTELEPORT_PASSWORD` through a protected process environment. Never put credentials in command arguments, source files or shell history. There is no password recovery. Encrypted-file `export`/`import` authenticate before copying and refuse existing destinations. No network receiver is opened.
+The CLI npm tarball contains JavaScript and no runtime npm dependencies. From source, `node apps/cli/main.ts` is equivalent. Capture/restore prompt for hidden passphrases; automation can supply `DEVTELEPORT_PASSWORD` through a protected environment. Never put credentials in command arguments or source. No password recovery exists.
 
-Capture includes saved source, untracked and uncommitted files, Git objects/index/HEAD, lockfiles, Compose files and supported editor files. Staged versus unstaged changes, detached HEAD and unborn branches are preserved. Git configuration, hooks, reflogs and remote URLs are omitted; configure remotes manually. LFS pointer blobs in locally stored Git objects are checked against captured LFS objects; missing or corrupt objects cause refusal. Partial clones, shallow repositories, alternate object stores, linked worktrees, submodules and nested repositories require standalone captures or preparation first. Safe internal links are supported; dangling/chained links are rejected.
+Install the VSIX in VS Code. It finds an installed `devteleport` on PATH or accepts absolute CLI/Node paths in **user/machine settings**. Snapshot workspace settings cannot select executable paths. The extension supports workspace trust, saved-file capture/reopen, progress cancellation, history, verification and opening the installed desktop through its registered URL scheme.
 
-Git ignored files, dependency directories at every depth, known credential files/directories, private-key filenames, `.env*`, snapshot output, recovery staging and verification metadata are excluded. High-confidence embedded private keys and common GitHub/AWS credentials are excluded with an explicit omission record. This is not universal secret detection: historical Git objects, arbitrary strings, database contents and volume backups can contain secrets. Review capture contents and omissions before transfer.
+## What travels
 
-Stop writers before capture. Files are read twice and checked for changes, but capture is not a filesystem transaction. Each PostgreSQL dump has its own transaction-consistent view; source, databases and volumes do not share an atomic point in time.
+Saved files; standalone Git objects/index/HEAD; staged/unstaged/deleted/untracked changes; lockfiles/runtime metadata; saved editor files; Compose configuration; explicitly selected PostgreSQL dumps and stopped plain local Docker named volumes. Restore works independently after the original source and source database are removed.
 
-## Configuration
+No live process memory, open connections, debugger continuation, unsaved editor buffers, arbitrary extension state or terminal history replay is claimed. Linked worktrees/submodules/nested repositories need separate preparation/captures. Shallow/partial/externally shared/corrupt Git object stores are refused. Locally stored LFS pointer blobs must have complete captured objects.
 
-`devteleport.json` supports validated fields only. Exclusions are literal relative prefixes, not globs. PostgreSQL exclusion patterns use the underlying pg_dump pattern syntax.
+Git configuration/hooks/remotes/reflogs, dependency directories, known credential paths and high-confidence embedded secrets are excluded with explicit review records. Secret detection is conservative and can have false positives; it cannot detect every embedded/historical secret. Databases and selected volumes may contain sensitive data and are encrypted, not automatically scrubbed. Provision excluded secrets separately and inspect omissions before deleting the original.
+
+## Streaming snapshots
+
+CLI/desktop capture default to format 2; `--format 1` retains the legacy writer and both readers remain supported. The library capture API retains its prior default unless `{format:2}` is requested.
+
+Format 2 hashes/stages files and PostgreSQL exports in bounded chunks, streams AES-256-GCM encryption, authenticates the entire archive before parsing metadata/extracting, and verifies each body checksum before publication. Limits: **16 GiB per file/database**, **32 GiB aggregate**, 16 MiB metadata, 50,000 entries. The volume adapter retains its separate small-volume limits. Format 1's old limits remain unchanged. See [format 2](docs/FORMAT-2.md).
+
+Private plaintext staging requires additional free disk. Permissions protect temporary data; no physical erasure guarantee is made. Stop source writers: consistency checks are not one transaction across source, databases and volumes. Capture/receive publication requires hard-link-capable storage (APFS/HFS+/compatible POSIX filesystems). For ExFAT or unsupported external drives, capture internally and export the encrypted file; do not bypass atomic no-overwrite checks.
+
+## Configure components
+
+`devteleport.json` uses validated literal relative exclusion prefixes and explicit adapter names:
 
 ```json
 {
-  "exclude": ["coverage", "dist"],
-  "databases": [{
-    "name": "app",
-    "connectionEnv": "DEV_DATABASE_URL",
-    "excludeSchemas": ["analytics"],
-    "excludeTables": ["public.private_events"]
-  }],
-  "volumes": [{"name": "uploads", "volume": "myproject_uploads"}]
+  "exclude": ["dist", "coverage"],
+  "databases": [{"name":"app", "connectionEnv":"DEV_DATABASE_URL", "excludeTables":["public.private_events"]}],
+  "volumes": [{"name":"uploads", "volume":"project_uploads"}]
 }
 ```
 
-Connection URLs belong in the named environment variables, not configuration files. Unknown fields, duplicate adapter names and malformed arrays are rejected.
+Use `--exclude PREFIX` repeatedly for additional capture exclusions. Unknown configuration fields, duplicate adapters and malformed paths are refused.
 
-## PostgreSQL
+### PostgreSQL
 
-Install `psql`, `pg_dump` and `pg_restore`. Configure an explicit localhost development URL such as `postgresql://user:password@127.0.0.1:5432/project_dev` using a protected environment. Names containing `prod` or `production` are rejected. Localhost checks cannot detect a production port forward: verify the target yourself.
+Supply an explicitly named localhost development URL through the configured environment variable, using protected credential handling. Connection URLs are not stored in metadata or passed as process arguments. Production-like names/remote hosts are refused; localhost checks cannot detect a production port forward.
 
 ```sh
 devteleport capture --name project --include-db --output /path/to/snapshots
 # Create a NEW EMPTY local development database and a trusted mapping outside the snapshot.
-devteleport restore project.dtp --target /path/to/new-project --restore-db --approve-db --db-config /path/to/trusted-target.json
+devteleport restore project.dtp --target /path/to/new --restore-db --approve-db --db-config /trusted/target.json
 ```
 
-The trusted target mapping uses the same database alias with a destination `connectionEnv`. Snapshot-provided connection settings are never used for destination selection. Capture checks server/client major versions; restore refuses an older target server or older restore client. PostgreSQL 15 round trips and 15-to-16 forward restore have been tested. Other major versions need their own validation.
+The external target mapping uses the same alias with a destination `connectionEnv`. Snapshot-provided connections are not used for destination selection. Capture reports source/tool versions, database size and backup timing. Restore checks versions and refuses nonempty targets. PostgreSQL 15 and 15-to-16 restoration are tested. Compatibility beyond tested versions is not certified. Custom-format dumps are executable SQL: approve only trusted provenance. A database restore uses its own transaction, not a cross-system rollback.
 
-Restoration refuses existing user database objects and uses a single transaction per database without `--clean`, ownership or ACL replay. Dumps are executable SQL: approve restoration only for trusted snapshots. Source/database/volume restoration is not an atomic transaction across components. If a post-action fails, restored files remain and recovery metadata reports the last completed file phase.
-
-## Docker services and named volumes
+### Docker
 
 ```sh
-devteleport services /path/to/restored-project
-# Review the plan and Compose files before granting container execution.
-devteleport services /path/to/restored-project --start --approve-execution
-
+devteleport services /path/to/project
+# Review configuration, images, mounts and architecture warnings.
+devteleport services /path/to/project --start --approve-execution
 devteleport capture --name project --include-volumes --output /path/to/snapshots
-devteleport restore project.dtp --target /path/to/restored-project --restore-volumes --approve-volumes --db-config /path/to/trusted-target.json
+devteleport restore project.dtp --target /path/to/new --restore-volumes --approve-volumes --db-config /trusted/target.json
 ```
 
-The external destination mapping contains `volumes: [{"name":"uploads","volume":"new_uploads_volume"}]`. **Existing destination volumes are always refused**, even if empty. Only plain Docker local named volumes with no driver options are supported. Stop containers using the source volume before capture; the adapter rejects active mounts. Database volumes should use the PostgreSQL adapter instead of raw filesystem backup.
+The trusted target mapping uses `volumes:[{"name":"uploads","volume":"new_uploads"}]`. Existing volumes are always refused. Only stopped plain local named volumes are supported; bind mounts/external drivers/images are not backed up. Use PostgreSQL dumps for live database data instead of raw volume copying. Configure Compose to reference restored volume names explicitly.
 
-The adapter uses a public `python:3.13-alpine` helper image, which must be available locally or downloadable. It runs without network access, without host binds or a Docker socket, with a read-only container root. Only the selected volume is mounted. Narrow DAC/CHOWN capabilities permit reading and preserving non-root-owned data; archive filtering removes unsafe privilege bits and rejects traversal, special files and escaping links. Volume ownership is preserved, subject to Python's safe extraction permission normalization. Images, bind mounts, arbitrary drivers, live database filesystem consistency and automatic Compose logical-name remapping are not supported. Configure Compose to use the approved restored volume explicitly.
+Helpers use a public `python:3.13-alpine` image, native ARM64 when running natively on Apple Silicon, no network/host binds/Docker socket, a read-only root, bounded safe extraction and narrow file-access/ownership capabilities. Archive traversal, unsafe links/special files and expansion limits are checked. Source ownership is retained subject to safe permission normalization. Service startup waits for configured health checks or running state; lack of a health check is not application health certification. Unavailable image architectures are reported as unknown, never fabricated as compatible.
 
-## Dependency installation
+### Dependency execution
 
-Default restore executes no project code. `--install --approve-execution` allows `npm ci` **including lifecycle scripts** when `package-lock.json` is present. Inspect source first. Other package managers are detected and require a reviewed manual installation. Native packages must be rebuilt for the destination platform.
+Ordinary restoration executes no project code. `--install --approve-execution` explicitly permits `npm ci`, including lifecycle scripts, when `package-lock.json` exists. Review source first. Other package managers are detected and require separately reviewed installation. Native dependencies must match the destination architecture. Tool discovery never silently installs Homebrew software; Corepack network provisioning is disabled during diagnostic probes.
 
-## Desktop and editor workflows
+## Pair and transfer over your LAN
 
-The desktop app uses the same compiled CLI in an isolated Electron utility process. It provides capture and restore review steps, database/volume/dependency approval options, snapshot history, verification, Compose diagnostics, progress phases, cancellation and saved nonsecret path/tool-directory settings. Passphrases are never persisted in settings. A cancelled or crashed operation may leave a private partial/staging path; inspect recovery before removing anything.
-
-The VS Code sidebar runs real CLI operations, saves dirty files only after approval, records saved tabs in `.vscode/devteleport-session.json`, and offers to reopen saved files through public APIs in a trusted workspace. Paths outside the restored folder are refused. The generated session file is part of the working tree. Actual extension-host tests cover commands, cancellation, dirty-buffer saving, saved-tab reopening and untrusted capture refusal. Unsaved buffers, terminals, debugger state and arbitrary extension state are not migrated.
-
-## Authenticity and recovery
+On the receiving Mac:
 
 ```sh
-# Key generation and signing prompt for the signing-key passphrase.
-devteleport keygen --target /secure/path/team-signing
-devteleport sign project.dtp --key /secure/path/team-signing.private.pem
-devteleport check-signature project.dtp --key /trusted/path/team-signing.public.pem
-devteleport restore project.dtp --target /path/to/new --verify-key /trusted/path/team-signing.public.pem
-
-# Inspect an interrupted operation without deleting or merging data.
-devteleport recover /path/to/snapshots
-devteleport recover /path/to/restored-project
+devteleport receive --target /path/to/received.dtp --pairing-output /private/path/pairing.json \
+  --bind 0.0.0.0 --advertise 192.168.1.20 --approve-receive
 ```
 
-Signatures are optional detached Ed25519 sidecars (`project.dtp.sig`). Transfer the sidecar with the archive and obtain the trusted public key independently. Generated private keys are passphrase-encrypted and permission-restricted. A snapshot passphrase authenticates archive contents but does not identify its author.
+Share the protected descriptor out of band and compare its fingerprint. On the sender:
 
-`verify DIR` trusts the local editable inventory. Prefer `verify DIR --snapshot FILE` to compare against the authenticated original archive; edited inventories cannot hide modifications in that mode. Verification permits extra files and tolerates Git index stat-cache refresh only when staged entries still match. Capture publishes final `.dtp` names atomically without overwriting; incomplete writes retain a distinct private partial filename. Restore journals distinguish staging, file restoration and completed operations. Recovery inspection is read-only.
+```sh
+devteleport pairing-info --pairing /private/path/pairing.json
+devteleport send project.dtp --pairing /private/path/pairing.json --approve-peer
+```
 
-## Commands
+TLS 1.3 authenticates the receiving certificate; a random bearer token authorizes uploads. The receiver never obtains the snapshot passphrase and never executes contents. Interrupted uploads can resume with matching size/hash and explicit restart pairing. Default bind is loopback, not LAN. No firewall protection should be disabled. Manual addressing ships; discovery is not implemented. **Network transfer remains experimental until real two-Mac validation.** [Protocol/recovery guide](docs/NETWORK-TRANSFER.md).
 
-| Command | Purpose |
-| --- | --- |
-| `inspect [DIR]` | Runtime, Git and component support report |
-| `capture --name NAME` | `--root`, `--output`, `--dry-run`, `--include-db`, `--include-volumes` |
-| `restore FILE --target DIR` | Plan or restore new destination; optional explicitly approved post-actions |
-| `verify DIR [--snapshot FILE]` | Check expected files and Git staged state; exit 2 on mismatch |
-| `history [DIR]` | List real encrypted snapshot files without unlocking |
-| `recover DIR` | Read-only partial/staging/journal inspection |
-| `services DIR [--start --approve-execution]` | Compose plan or approved startup |
-| `export/import FILE --target FILE` | Authenticate and copy without overwriting |
-| `keygen`, `sign`, `check-signature` | Optional Ed25519 signatures |
+## Provenance and recovery
 
-JSON results go to stdout; diagnostics go to stderr. Unknown commands/options fail. Dry-run restore authenticates the archive but performs no restoration or execution.
+```sh
+devteleport keygen --target /secure/path/signing-key
+devteleport sign project.dtp --key /secure/path/signing-key.private.pem
+devteleport check-signature project.dtp --key /trusted/path/signing-key.public.pem
+devteleport restore project.dtp --target /path/to/new --verify-key /trusted/path/signing-key.public.pem
 
-## Development and release
+devteleport recover /path/to/snapshots
+devteleport recover /path/to/snapshots --cleanup /path/to/.devteleport-v2-ID
+# Only after reviewing the preview:
+devteleport recover /path/to/snapshots --cleanup /path/to/.devteleport-v2-ID --approve-cleanup
+```
+
+Ed25519 signatures bind the encrypted file and use externally trusted public keys; transfer `.sig` sidecars separately. Generated private keys are encrypted and permission-restricted. A passphrase authenticates bytes, not an author identity. `verify DIR` trusts an editable local inventory; prefer `verify DIR --snapshot FILE` for comparison against authenticated source metadata. Extra files are permitted. Git index cache refresh is tolerated only when staged entries match.
+
+Cleanup is limited to owned, inactive, recognized private format 2 stages/partials. It refuses active processes, symlinks and arbitrary project directories. Journals expose interrupted phases. Approved post-action failure can leave restored source and earlier successful components intact. No rollback across filesystem/PostgreSQL/Docker is promised.
+
+## Desktop and privacy
+
+The ARM64 app bundles its engine through native Electron utility processes. It includes onboarding, real recent workspaces/snapshots, inspector, capture/restore reviews, local library labels/export/trash, approved network transfer, settings/tool discovery, light/dark mode, native menus, window restoration, local completion preferences, redacted manual diagnostics export and license/privacy information. No data is automatically uploaded.
+
+Unsigned executable auto-updates are disabled. Signed release metadata/version infrastructure is tested, but a trusted production feed, Developer ID, notarized artifacts and application installation/restart recovery still require external validation. No independent security audit is implied.
+
+## Verify and build
 
 ```sh
 npm ci
-npm run check              # strict TypeScript + application syntax checks
-npm test                   # 22 core/security tests
-npm run test:postgres      # isolated PostgreSQL cluster; source DB removed before restore
-npm run test:docker        # real Compose analysis, no daemon needed
-npm run test:docker:live   # actual volumes, malicious archive refusal, Compose startup
-npm run test:pg-versions   # Docker PostgreSQL 15 -> 16, requires host pg_dump 15
-npm run test:e2e           # independent Express restore
-npm run test:full          # combined Express/Git/PostgreSQL/Compose configuration
-npm run test:vscode        # isolated actual VS Code Insiders profile
-DTP_TEST_UNTRUSTED=1 npm run test:vscode
-npm run test:desktop       # actual Electron controls, settings and cancellation
+npm run check
+npm test                         # core/security/format/recovery/process tests
+npm run test:transfer             # real TLS, interruption/resume and expiry
+npm run test:updates              # actual HTTPS signed-release metadata
+npm run test:postgres
+npm run test:pg-versions          # requires host pg_dump 15 and Docker
+npm run test:docker:live
+npm run test:full                 # source/database removed, real restored HTTP behavior
+npm run test:vscode               # actual native host; isolated profile
+npm run test:desktop              # real Electron controls/main/backend architecture
+npm run test:desktop:transfer     # two real Electron instances, localhost only
 npm run package:cli
-npm run test:package       # offline installed executable smoke test
+npm run test:package
 npm run package:extension
 npm run package:desktop -- --publish never
+npm run verify:apple-silicon
+npm run checksums
 ```
 
-Integration commands fail when prerequisites are unavailable; they do not silently substitute mocks. GUI tests require access to a graphical session. Override `DEVTELEPORT_VSCODE_BINARY` for another VS Code installation. The local version-compatibility fixture is intentionally pinned to a host PostgreSQL 15 dump client.
+The verification gate never treats a required skip as success. See `dist/evidence/apple-silicon-verification.json` and per-stage logs for the actual last run. `verify:signing` reports external signing/notarization gates separately. `package:desktop:signed` requires authorized credentials and explicitly enables notarization upload; do not use it without authorization. Nothing is pushed/published automatically.
 
-See [support and remaining external validation](docs/STATUS.md), [architecture](docs/ARCHITECTURE.md), [security](docs/SECURITY.md), [troubleshooting](docs/TROUBLESHOOTING.md), [contribution/release](docs/CONTRIBUTING.md) and [example walkthrough](docs/WALKTHROUGH.md). The bounded in-memory snapshot format supports up to 128 MiB aggregate decoded payload, 32 MiB per file/dump/compressed volume archive, 50,000 project entries and 256 MiB decompressed manifest JSON. Larger projects need exclusions or a future streaming format. File-based transfer is the shipped transfer mechanism; peer-to-peer networking is deliberately not simulated.
+[Release report](docs/APPLE-SILICON-RELEASE.md) · [architecture](docs/ARCHITECTURE.md) · [security](docs/SECURITY.md) · [troubleshooting](docs/TROUBLESHOOTING.md) · [contributing](docs/CONTRIBUTING.md) · [example](docs/WALKTHROUGH.md). Historical MVP documentation is retained at `docs/MVP-README.md` and is not the current support contract.

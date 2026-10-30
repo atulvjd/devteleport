@@ -8,6 +8,20 @@ try {
   const root = path.join(temp, "workspace");
   await fs.mkdir(root);
   await fs.writeFile(path.join(root, "hello.txt"), "real host");
+  await fs.mkdir(path.join(root, ".vscode"));
+  await fs.writeFile(
+    path.join(root, ".vscode", "settings.json"),
+    JSON.stringify({
+      "devteleport.cliPath": path.join(root, "unsafe.cjs"),
+      "devteleport.nodePath": process.execPath,
+    }),
+  );
+  await fs.writeFile(
+    path.join(root, "unsafe.cjs"),
+    "require('node:fs').writeFileSync(" +
+      JSON.stringify(path.join(root, "unsafe-executed")) +
+      ",'bad');console.log('{}');",
+  );
   await fs.mkdir(path.join(temp, "profile", "User"), { recursive: true });
   await fs.writeFile(
     path.join(temp, "profile", "User", "settings.json"),
@@ -20,21 +34,44 @@ try {
     }),
   );
   let extensionPath = path.resolve("apps/vscode-extension");
-  if (process.env.DTP_TEST_VSIX) {
-    execFileSync("unzip", [
-      "-q",
-      path.resolve(process.env.DTP_TEST_VSIX),
-      "-d",
-      path.join(temp, "vsix"),
-    ]);
-    extensionPath = path.join(temp, "vsix", "extension");
-  }
   const binary =
     process.env.DEVTELEPORT_VSCODE_BINARY ||
     "/Applications/Visual Studio Code - Insiders.app/Contents/MacOS/Code - Insiders";
+  if (process.env.DTP_TEST_VSIX) {
+    const bin = path.resolve(path.dirname(binary), "../Resources/app/bin");
+    let command;
+    for (const name of ["code", "code-insiders"])
+      try {
+        await fs.access(path.join(bin, name), 1);
+        command = path.join(bin, name);
+        break;
+      } catch {}
+    if (!command) throw new Error("VS Code installation CLI was not found");
+    const environment = { ...process.env };
+    delete environment.NODE_OPTIONS;
+    execFileSync(
+      command,
+      [
+        "--install-extension",
+        path.resolve(process.env.DTP_TEST_VSIX),
+        "--extensions-dir",
+        path.join(temp, "extensions"),
+        "--user-data-dir",
+        path.join(temp, "profile"),
+      ],
+      { encoding: "utf8", env: environment, timeout: 60000, stdio: "pipe" },
+    );
+    const names = await fs.readdir(path.join(temp, "extensions"));
+    const installed = names.find((name) =>
+      name.startsWith("devteleport-local.devteleport-"),
+    );
+    if (!installed) throw new Error("Packaged VSIX was not actually installed");
+    extensionPath = path.join(temp, "extensions", installed);
+  }
   const env = {
     ...process.env,
     DTP_TEST_NODE: process.execPath,
+    DTP_TEST_EXPECT_ARCH: process.arch,
     DTP_TEST_UNTRUSTED: process.env.DTP_TEST_UNTRUSTED || "0",
     DTP_TEST_CLI: path.resolve("apps/cli/main.ts"),
   };
@@ -77,6 +114,7 @@ try {
     await fs.readFile(path.join(temp, "host-result.json"), "utf8"),
   );
   assert(result.passed);
+  await assert.rejects(fs.stat(path.join(root, "unsafe-executed")));
   console.log("PASS actual VS Code extension host:", result);
 } finally {
   await fs.rm(temp, { recursive: true, force: true });

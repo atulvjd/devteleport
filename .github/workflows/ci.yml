@@ -14,6 +14,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm test
+      - run: npm run test:transfer
+      - run: npm run test:updates
       - run: npm run package:cli
       - run: npm run test:package
       - uses: actions/upload-artifact@v4
@@ -35,7 +37,7 @@ jobs:
       - run: npm run test:e2e
       - run: npm run test:full
   applications:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,7 +45,9 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: node node_modules/electron/install.js
+      - run: test "$(uname -m)" = arm64
       - run: npm run test:desktop
+      - run: npm run test:desktop:transfer
       - run: |
           if [ "$(uname -m)" = "arm64" ]; then dtp_code_platform=darwin-arm64; else dtp_code_platform=darwin; fi
           curl -fsSL "https://update.code.visualstudio.com/latest/$dtp_code_platform/stable" -o "$RUNNER_TEMP/vscode.zip"
@@ -54,17 +58,24 @@ jobs:
       - run: npm run package:extension
       - run: npm run test:vscode
         env:
-          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.1.0.vsix
+          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.2.0.vsix
       - run: npm run test:vscode
         env:
-          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.1.0.vsix
-          DTP_TEST_UNTRUSTED: '1' 
+          DTP_TEST_VSIX: apps/vscode-extension/devteleport-0.2.0.vsix
+          DTP_TEST_UNTRUSTED: "1"
       - run: npm run package:desktop -- --publish never
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - run: npm run verify:architecture
+      - run: node scripts/desktop-smoke.mjs
+        env:
+          DEVTELEPORT_APP_BINARY: dist/desktop/mac-arm64/DevTeleport.app/Contents/MacOS/DevTeleport
+          DEVTELEPORT_EXPECT_ARCH: arm64
       - uses: actions/upload-artifact@v4
         with:
           name: unsigned-applications
           path: |
             apps/vscode-extension/*.vsix
             dist/desktop/*.dmg
+            dist/desktop/*.zip
+            dist/evidence/*

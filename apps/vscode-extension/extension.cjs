@@ -29,6 +29,27 @@ function activate(context) {
       };
     }
 
+  let activeChild = null,
+    activeCancel = null;
+  context.subscriptions.push({ dispose: () => activeCancel?.() });
+  const status = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    20,
+  );
+  status.text = "$(package) DevTeleport";
+  status.command = "devteleport.inspect";
+  status.show();
+  context.subscriptions.push(status);
+  context.subscriptions.push(
+    vscode.commands.registerCommand("devteleport.cancel", () => {
+      activeCancel?.();
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("devteleport.openDesktop", () =>
+      vscode.env.openExternal(vscode.Uri.parse("devteleport://open")),
+    ),
+  );
   const out = vscode.window.createOutputChannel("DevTeleport");
   context.subscriptions.push(out);
   let last = "No operation yet";
@@ -55,36 +76,108 @@ function activate(context) {
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("devteleport.workspace", tree),
   );
-  async function call(args, password) {
+  async function call(args, password, token) {
     const c = vscode.workspace.getConfiguration("devteleport");
-    const cli = c.get("cliPath");
+    // Executable paths are machine/user settings. Never trust paths supplied by a snapshot's workspace settings.
+    const setting = (key) => {
+      const value = c.inspect(key);
+      return value?.globalValue ?? value?.defaultValue;
+    };
+    let cli = setting("cliPath");
+    if (!cli) {
+      for (const directory of (process.env.PATH || "").split(path.delimiter)) {
+        try {
+          cli = await fs.realpath(path.join(directory, "devteleport"));
+          break;
+        } catch {}
+      }
+    }
     if (!path.isAbsolute(cli || ""))
       throw new Error(
-        "Configure devteleport.cliPath with the absolute installed main.ts path.",
+        "Install DevTeleport on PATH or configure its absolute CLI path in user settings.",
       );
-    return new Promise((resolve, reject) =>
-      execFile(
-        c.get("nodePath") || "node",
+    const node = setting("nodePath") || "node";
+    if (process.platform === "darwin" && process.arch === "arm64") {
+      const resolved = path.isAbsolute(node)
+        ? node
+        : (
+            await Promise.all(
+              (process.env.PATH || "")
+                .split(path.delimiter)
+                .map(async (directory) => {
+                  try {
+                    const file = path.join(directory, node);
+                    await fs.access(file, 1);
+                    return file;
+                  } catch {
+                    return null;
+                  }
+                }),
+            )
+          ).find(Boolean);
+      if (resolved) {
+        const kind = await new Promise((resolve, reject) =>
+          execFile(
+            "/usr/bin/file",
+            ["-b", "-L", resolved],
+            { timeout: 5000 },
+            (error, stdout) => (error ? reject(error) : resolve(stdout)),
+          ),
+        );
+        if (kind.includes("x86_64") && !kind.includes("arm64"))
+          throw new Error(
+            "Configured CLI Node is Intel-only. Select a native Apple Silicon Node executable.",
+          );
+      }
+    }
+    return new Promise((resolve, reject) => {
+      let cancelled = false;
+      let cancellation;
+      activeChild = execFile(
+        node,
         [cli, ...args],
         {
           env: { ...process.env, DEVTELEPORT_PASSWORD: password || "" },
           maxBuffer: 24 * 1024 * 1024,
           timeout: 180000,
         },
-        (err, stdout, stderr) =>
-          err
-            ? reject(
-                new Error(
-                  stderr
-                    .split("\n")
-                    .filter((x) => x.startsWith("DevTeleport:"))
-                    .join("\n") ||
-                    "CLI failed; check Node 24 and CLI settings.",
-                ),
-              )
-            : resolve(JSON.parse(stdout)),
-      ),
-    );
+        (err, stdout, stderr) => {
+          activeChild = null;
+          activeCancel = null;
+          cancellation?.dispose();
+          if (cancelled) {
+            reject(
+              new Error(
+                "Operation cancelled. Inspect recovery evidence before retrying.",
+              ),
+            );
+            return;
+          }
+          if (err) {
+            reject(
+              new Error(
+                stderr
+                  .split("\n")
+                  .filter((x) => x.startsWith("DevTeleport:"))
+                  .join("\n") ||
+                  "CLI failed; check native Node and installed CLI settings.",
+              ),
+            );
+            return;
+          }
+          try {
+            resolve(JSON.parse(stdout));
+          } catch {
+            reject(new Error("Invalid CLI response"));
+          }
+        },
+      );
+      activeCancel = () => {
+        cancelled = true;
+        activeChild?.kill("SIGTERM");
+      };
+      cancellation = token?.onCancellationRequested(() => activeCancel?.());
+    });
   }
   for (const action of ["inspect", "capture", "restore", "verify", "history"])
     context.subscriptions.push(
@@ -207,12 +300,15 @@ function activate(context) {
                 return;
               args.push(file[0].fsPath, "--target", target);
             } else args.push(root);
+            status.text = "$(sync~spin) DevTeleport: " + action;
+            status.command = "devteleport.cancel";
             const result = await vscode.window.withProgress(
               {
                 location: vscode.ProgressLocation.Notification,
                 title: `DevTeleport: ${action}`,
+                cancellable: true,
               },
-              () => call(args, password),
+              (_progress, token) => call(args, password, token),
             );
             password = undefined;
             lastResult = result;
@@ -220,6 +316,9 @@ function activate(context) {
             out.appendLine(JSON.stringify(result, null, 2));
             out.show(true);
             last = `${action}: completed`;
+            status.text = "$(check) DevTeleport: " + action;
+            status.command = "devteleport.inspect";
+            status.tooltip = last;
             emitter.fire();
             if (
               action === "restore" &&
@@ -236,6 +335,9 @@ function activate(context) {
             return result;
           } catch (e) {
             last = e.message;
+            status.text = "$(warning) DevTeleport";
+            status.tooltip = e.message;
+            status.command = "devteleport.inspect";
             lastError = e.message;
             emitter.fire();
             out.appendLine(e.message);
@@ -246,6 +348,7 @@ function activate(context) {
       ),
     );
   const api = {
+    isBusy: () => Boolean(activeChild),
     getLastResult: () => lastResult,
     getLastError: () => lastError,
   };

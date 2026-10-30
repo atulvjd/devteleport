@@ -2,169 +2,514 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self'; script-src 'self'"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:"
     />
-    <meta name="viewport" content="width=device-width" />
     <title>DevTeleport</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <aside>
-      <div class="brand">◈ DevTeleport</div>
-      <p>LOCAL WORKSPACE TRANSPORT</p>
-      <nav>
-        <button data-action="inspect">Workspace report</button
-        ><button data-action="history">Snapshot history</button
-        ><button data-action="services">Compose services</button
-        ><button data-action="verify">Verify workspace</button>
+      <div class="brand"><span class="mark">◈</span> DevTeleport</div>
+      <p class="caption">YOUR WORKSPACE, ANYWHERE</p>
+      <nav aria-label="Main navigation">
+        <button data-view="dashboard" class="selected">
+          ◷ <span>Overview</span></button
+        ><button data-view="workspace">
+          ⌘ <span>Workspace inspector</span></button
+        ><button data-view="capture">↗ <span>Capture workspace</span></button
+        ><button data-view="restore">↙ <span>Restore workspace</span></button
+        ><button data-view="library">▤ <span>Snapshot library</span></button
+        ><button data-view="transfer">
+          ⇄ <span>Mac-to-Mac transfer</span>
+        </button>
+        <div class="nav-divider"></div>
+        <button data-view="settings">⚙ <span>Settings</span></button
+        ><button data-view="about">ⓘ <span>About & privacy</span></button>
       </nav>
-      <small>Local-first · Encrypted<br />No cloud account required</small>
+      <div class="sidebar-bottom">
+        <span class="dot"></span> Local-first. Encrypted.<br /><small
+          id="sideArchitecture"
+          >Checking native runtime…</small
+        >
+      </div>
     </aside>
     <main>
       <header>
-        <span class="eyebrow">YOUR NEXT WORKSPACE STARTS HERE</span>
-        <h1>Pick up where you left off.</h1>
-        <p>
-          Your development environment. Anywhere. Exactly where you left off.
-        </p>
+        <div>
+          <span class="eyebrow">DEVTELEPORT FOR MAC</span>
+          <h1 id="pageTitle">A new place. The same workspace.</h1>
+          <p id="pageSubtitle">
+            Capture your saved development environment. Continue on another Mac.
+          </p>
+        </div>
+        <span class="architecture" id="architecture">—</span>
       </header>
-      <section>
-        <h2>Workspace</h2>
+      <div class="workspace-bar">
+        <label for="source">Current workspace</label>
         <div class="row">
           <input
             id="source"
-            aria-label="Workspace path"
-            placeholder="Choose a project folder"
-          /><button id="chooseWorkspace">Browse folder</button>
+            placeholder="Select a development project"
+            aria-label="Current workspace path"
+          /><button id="chooseWorkspace">Choose…</button
+          ><button data-action="inspect">Inspect</button
+          ><button data-action="verify">Verify files</button>
         </div>
-        <p class="hint">
-          Inspect files, Git context, runtime requirements and supported
-          services.
-        </p>
-      </section>
-      <div class="columns">
-        <section>
-          <h2>Capture a workspace</h2>
-          <label
-            >Snapshot name<input
-              id="name"
-              value="my-workspace"
-              pattern="[a-zA-Z0-9._-]+" /></label
-          ><label
-            >Output directory
-            <div class="row">
-              <input id="output" placeholder="Choose output folder" /><button
-                id="chooseOutput"
-              >
-                Browse
-              </button>
-            </div></label
-          ><label
-            >Passphrase<input
-              id="capturePassword"
-              type="password"
-              autocomplete="new-password"
-              placeholder="At least 12 characters" /></label
-          ><label class="check"
-            ><input id="includeDb" type="checkbox" /> Include configured local
-            PostgreSQL databases</label
-          >
-          <label class="check"
-            ><input id="includeVolumes" type="checkbox" /> Include explicitly
-            configured local Docker volumes</label
-          >
-          <div class="row">
-            <button data-action="capture" data-dry="true">Review capture</button
-            ><button data-action="capture" class="primary">
-              Create encrypted snapshot
-            </button>
-          </div>
-        </section>
-        <section>
-          <h2>Restore independently</h2>
-          <label
-            >Snapshot
-            <div class="row">
-              <input
-                id="snapshot"
-                placeholder="Select a .dtp snapshot"
-              /><button id="chooseSnapshot">Browse</button>
-            </div></label
-          ><label
-            >New destination path<input
-              id="target"
-              placeholder="/Users/you/Projects/restored-project" /></label
-          ><label
-            >Passphrase<input
-              id="restorePassword"
-              type="password"
-              autocomplete="current-password"
-          /></label>
-          <label
-            >Trusted destination mapping
-            <div class="row">
-              <input
-                id="dbConfig"
-                placeholder="External JSON mapping for database/volume targets"
-              /><button id="chooseConfig">Browse</button>
-            </div></label
-          >
-          <label class="check"
-            ><input id="restoreDb" type="checkbox" /> Approve SQL execution into
-            an empty development database</label
-          >
-          <label class="check"
-            ><input id="restoreVolumes" type="checkbox" /> Approve restoring
-            configured volumes into new names</label
-          >
-          <label class="check"
-            ><input id="install" type="checkbox" /> Approve npm ci, including
-            package lifecycle scripts</label
-          >
-          <p class="hint">
-            Review the plan after changing options. Existing directories,
-            databases and volumes remain protected.
-          </p>
-          <div class="row">
-            <button data-action="restore" data-dry="true">Review restore</button
-            ><button data-action="restore" class="primary">
-              Restore files
-            </button>
-          </div>
-        </section>
       </div>
-      <section>
-        <h2>Tool settings</h2>
-        <label
-          >Additional trusted tool directories (one absolute path per
-          line)<textarea
-            id="toolDirectories"
-            rows="3"
-            aria-label="Additional tool directories"
-          ></textarea>
-        </label>
-        <p class="hint">
-          Used only to find tools such as Git, npm, PostgreSQL and Docker. The
-          built-in workspace engine does not require external Node. Settings
-          save when you run an operation; passphrases are never saved.
-        </p>
+      <section data-pane="dashboard">
+        <div class="stats">
+          <article>
+            <span>Available local storage</span
+            ><strong id="storage">Checking…</strong
+            ><small>Secure staging needs additional free space</small>
+          </article>
+          <article>
+            <span>Last successful capture</span
+            ><strong id="lastCapture">No captures yet</strong
+            ><small id="lastCaptureDetail"
+              >Your first snapshot will appear here.</small
+            >
+          </article>
+          <article>
+            <span>Last restoration</span
+            ><strong id="lastRestore">No restores yet</strong
+            ><small id="lastRestoreDetail"
+              >Every restore uses a new destination.</small
+            >
+          </article>
+        </div>
+        <div class="two">
+          <article class="card">
+            <h2>Your next workspace starts here.</h2>
+            <p>
+              Saved files, Git changes, development records and supported
+              services. Encrypted before they leave your Mac.
+            </p>
+            <div class="row">
+              <button class="primary" data-go="capture">
+                Capture a workspace</button
+              ><button data-go="restore">Restore a snapshot</button>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Recent workspaces</h2>
+            <div id="recentWorkspaces" class="empty">
+              Inspect a workspace to add it here.
+            </div>
+          </article>
+        </div>
+        <article class="card">
+          <h2>Recent snapshots</h2>
+          <div id="recentSnapshots" class="empty">
+            No captured snapshots have been recorded.
+          </div>
+        </article>
       </section>
-      <section aria-live="polite">
+      <section data-pane="workspace" hidden>
+        <article class="card">
+          <div class="row">
+            <h2>Understand what will travel.</h2>
+            <button data-action="diagnostics">Check local toolchain</button>
+          </div>
+          <p>
+            Inspect the selected workspace for Git state, runtimes, configured
+            databases, Compose files, omissions and unsupported components. No
+            project commands are executed by inspection.
+          </p>
+          <pre id="inspectorResult">
+Choose a project above, then select Inspect.</pre>
+        </article>
+      </section>
+      <section data-pane="capture" hidden>
+        <div class="steps" aria-label="Capture steps">
+          <span>1 · Choose project</span><span>2 · Select components</span
+          ><span>3 · Review</span><span>4 · Encrypt & verify</span>
+        </div>
+        <div class="two">
+          <article class="card">
+            <h2>What comes with you?</h2>
+            <label
+              >Snapshot name<input
+                id="name"
+                value="my-workspace"
+                maxlength="100"
+                aria-label="Snapshot name" /></label
+            ><label
+              >Destination folder
+              <div class="row">
+                <input
+                  id="output"
+                  placeholder="Choose where encrypted snapshots are saved"
+                /><button id="chooseOutput">Choose…</button>
+              </div></label
+            ><label class="check"
+              ><input id="includeDb" type="checkbox" />Include configured
+              development PostgreSQL databases</label
+            ><label class="check"
+              ><input id="includeVolumes" type="checkbox" />Include configured
+              stopped local Docker volumes</label
+            >
+            <p class="hint">
+              Database and Docker options require entries in the project’s
+              devteleport.json. Leave them unchecked for a files-and-Git
+              snapshot. Files, offline Git context and saved editor files are
+              included by default. Secrets and dependencies are excluded with
+              review records.
+            </p>
+          </article>
+          <article class="card">
+            <h2>Private by default.</h2>
+            <label
+              >Encryption passphrase<input
+                id="capturePassword"
+                type="password"
+                autocomplete="new-password"
+                placeholder="At least 12 characters"
+                aria-label="Capture encryption passphrase"
+            /></label>
+            <div class="callout">
+              AES-256-GCM · streaming format 2<br /><small
+                >Passphrases stay out of settings and logs. Keep yours safe:
+                there is no password recovery.</small
+              >
+            </div>
+            <div class="row wrap">
+              <button data-action="capture" data-dry="true">
+                Review capture</button
+              ><button data-action="capture" class="primary">
+                Create encrypted snapshot
+              </button>
+            </div>
+            <p class="hint">
+              Review again after changing paths, options or exclusions. The
+              archive is authenticated after capture before success is reported.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section data-pane="restore" hidden>
+        <div class="steps">
+          <span>1 · Choose snapshot</span><span>2 · Authenticate & inspect</span
+          ><span>3 · Approve</span><span>4 · Restore & verify</span>
+        </div>
+        <div class="two">
+          <article class="card">
+            <h2>Resume independently.</h2>
+            <label
+              >Encrypted snapshot
+              <div class="row">
+                <input
+                  id="snapshot"
+                  placeholder="Select a .dtp archive"
+                /><button id="chooseSnapshot">Choose…</button>
+              </div></label
+            ><label
+              >Passphrase<input
+                id="restorePassword"
+                type="password"
+                autocomplete="current-password"
+                aria-label="Restore encryption passphrase" /></label
+            ><label
+              >New destination path<input
+                id="target"
+                placeholder="/Users/you/Projects/restored-project" /></label
+            ><label
+              >Trusted external database/volume mapping
+              <div class="row">
+                <input
+                  id="dbConfig"
+                  placeholder="Only needed for database or volume restoration"
+                /><button id="chooseConfig">Choose…</button>
+              </div></label
+            >
+          </article>
+          <article class="card">
+            <h2>Review before anything runs.</h2>
+            <label class="check"
+              ><input id="restoreDb" type="checkbox" />Approve SQL execution
+              into a configured empty development database</label
+            ><label class="check"
+              ><input id="restoreVolumes" type="checkbox" />Approve configured
+              volumes restored into new volume names</label
+            ><label class="check"
+              ><input id="install" type="checkbox" />Approve npm ci, including
+              lifecycle scripts</label
+            >
+            <div class="callout">
+              Existing directories and volumes are never overwritten. Nonempty
+              database targets are refused.
+            </div>
+            <div class="row wrap">
+              <button data-action="restore" data-dry="true">
+                Review restore</button
+              ><button data-action="restore" class="primary">
+                Restore files</button
+              ><button id="openProject">Open restored project</button>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section data-pane="library" hidden>
+        <article class="card">
+          <div class="row">
+            <h2>Your encrypted snapshots.</h2>
+            <button data-action="history">Refresh library</button>
+          </div>
+          <p>
+            Uses the selected capture destination folder. Display labels are
+            stored locally and never alter archive contents.
+          </p>
+          <div id="libraryList" class="empty">
+            Select a destination folder in Capture, then refresh the library.
+          </div>
+          <div class="row">
+            <button id="inspectRecovery">Inspect recovery evidence</button>
+          </div>
+        </article>
+      </section>
+      <section data-pane="transfer" hidden>
+        <div class="callout">
+          Local-network transfer · experimental until physical two-Mac
+          validation.<br /><small
+            >TLS 1.3, explicit receiving approval, certificate-based pairing and
+            SHA-256 verification. No cloud relay or remote command execution.
+            Share the protected pairing descriptor out of band and compare the
+            fingerprint. Never disable the firewall.</small
+          >
+        </div>
+        <div class="two">
+          <article class="card">
+            <h2>Receive on this Mac</h2>
+            <label
+              >New snapshot destination
+              <div class="row">
+                <input
+                  id="receiveTarget"
+                  placeholder="Choose a new .dtp file"
+                /><button id="chooseReceiveTarget">Choose…</button>
+              </div></label
+            ><label
+              >Pairing descriptor output
+              <div class="row">
+                <input
+                  id="pairingOutput"
+                  placeholder="Choose a new protected JSON descriptor"
+                /><button id="choosePairingOutput">Choose…</button>
+              </div></label
+            >
+            <p class="hint">
+              For another Mac, bind to this Mac’s LAN IP or 0.0.0.0 and enter a
+              reachable advertised address. Default 127.0.0.1 is for same-Mac
+              tests only. Resume requires a new pairing descriptor.
+            </p>
+            <label
+              >Bind address<input
+                id="bind"
+                value="127.0.0.1"
+                aria-label="Receiver bind address" /></label
+            ><label
+              >Address the other Mac will use<input
+                id="advertise"
+                placeholder="For LAN, enter this Mac’s local IP or .local hostname" /></label
+            ><label class="check"
+              ><input id="approveReceive" type="checkbox" />Approve receiving an
+              encrypted file into this new destination</label
+            ><label class="check"
+              ><input id="resumeTransfer" type="checkbox" />Resume an
+              interrupted transfer to this destination</label
+            ><button id="receiveButton" class="primary">
+              Start approved receiver
+            </button>
+          </article>
+          <article class="card">
+            <h2>Send from this Mac</h2>
+            <label
+              >Snapshot
+              <div class="row">
+                <input
+                  id="sendSnapshot"
+                  placeholder="Choose the encrypted archive"
+                /><button id="chooseSendSnapshot">Choose…</button>
+              </div></label
+            ><label
+              >Receiver pairing descriptor
+              <div class="row">
+                <input
+                  id="pairing"
+                  placeholder="Select the descriptor shared by the receiver"
+                /><button id="choosePairing">Choose…</button>
+              </div></label
+            ><button id="pairingInfo">Review receiving identity</button>
+            <pre id="transferInfo">No receiver identity has been loaded.</pre>
+            <label
+              >Snapshot passphrase<input
+                id="sendPassword"
+                type="password"
+                autocomplete="current-password" /></label
+            ><label class="check"
+              ><input id="approvePeer" type="checkbox" />I compared and approve
+              this receiver fingerprint</label
+            ><button id="sendButton" class="primary">
+              Send encrypted snapshot
+            </button>
+          </article>
+        </div>
+      </section>
+      <section data-pane="settings" hidden>
+        <div class="two">
+          <article class="card">
+            <h2>Make it yours.</h2>
+            <label
+              >Appearance<select id="theme">
+                <option value="system">Follow macOS</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select></label
+            ><label
+              >Default editor<select id="editor">
+                <option value="">
+                  Automatic native installation discovery
+                </option>
+              </select></label
+            ><label
+              >Capture exclusions, one relative path prefix per line<textarea
+                id="exclusions"
+                rows="4"
+                placeholder="coverage&#10;dist"
+              ></textarea></label
+            ><label class="check"
+              ><input id="notifications" type="checkbox" />Show local completion
+              notifications</label
+            ><label class="check"
+              ><input id="startAtLogin" type="checkbox" />Open DevTeleport at
+              login</label
+            ><label
+              >Trusted signer public key, optional<input
+                id="trustedPublicKey"
+                placeholder="Path to an independently trusted Ed25519 public key"
+            /></label>
+            <p class="hint">
+              Encryption is always enabled. Database and Docker connections use
+              explicit project configuration and protected environment
+              variables, not stored passwords.
+            </p>
+          </article>
+          <article class="card">
+            <h2>Tools, without assumptions.</h2>
+            <label
+              >Additional trusted executable directories, one absolute path per
+              line<textarea id="toolDirectories" rows="5"></textarea>
+            </label>
+            <p class="hint">
+              Homebrew, PATH and common version managers are discovered. No
+              software is installed automatically. Paths can contain spaces and
+              Unicode.
+            </p>
+            <div class="row wrap">
+              <button id="saveSettings" class="primary">Save settings</button
+              ><button data-action="diagnostics">
+                Check tool compatibility</button
+              ><button id="exportDiagnostics">
+                Export redacted diagnostics
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section data-pane="about" hidden>
+        <article class="card">
+          <span class="eyebrow">DEVTELEPORT</span>
+          <h2>Your development environment. Anywhere.</h2>
+          <p id="versionInfo">Loading version information…</p>
+          <p>
+            Local-first software under the MIT license. No telemetry or
+            analytics is collected. Diagnostics export is manual and excludes
+            snapshot contents, connection URLs, passphrases and pairing tokens.
+          </p>
+          <div class="callout" id="updateStatus">
+            Automatic executable updates are disabled until signed release
+            infrastructure is available.
+          </div>
+          <details>
+            <summary>Signed release feed configuration</summary>
+            <label
+              >Manifest HTTPS URL<input
+                id="updateManifestUrl"
+                type="url"
+                placeholder="Approved GitHub release source" /></label
+            ><label
+              >Signature HTTPS URL<input
+                id="updateSignatureUrl"
+                type="url" /></label
+            ><label
+              >Trusted release public key path<input
+                id="updatePublicKey" /></label
+            ><button id="checkUpdates">
+              Save & check signed release metadata
+            </button>
+          </details>
+          <p>
+            Reconstructs supported saved state. No live process memory, open TCP
+            connections, unsaved editor buffers, debugger execution or arbitrary
+            extension-state migration.
+          </p>
+          <p>
+            Installers are development builds unless signing/notarization is
+            independently verified. No independent security audit or physical
+            two-Mac certification is implied.
+          </p>
+          <details>
+            <summary>MIT license</summary>
+            <pre id="licenseText">Loading bundled license…</pre>
+          </details>
+          <button id="showWelcome">Show welcome guide</button>
+        </article>
+      </section>
+      <section class="activity" aria-live="polite">
         <div class="row">
           <h2>Activity & diagnostics</h2>
           <span id="status">Ready</span
           ><button id="cancel" disabled>Cancel operation</button>
         </div>
         <pre id="result">
-Choose a workspace, then inspect or capture it. No snapshots have been loaded.</pre>
+Choose a workspace or an encrypted snapshot to begin.</pre>
       </section>
       <footer>
-        Reconstructs saved files and supported context. Live processes and
-        unsaved buffers are not migrated.
+        Local data. Explicit approvals. A new destination for every restore.
       </footer>
     </main>
+    <dialog id="welcome">
+      <div class="welcome-mark">◈</div>
+      <h2>Your workspace is going places.</h2>
+      <p>1. Choose a saved project and inspect what can travel.</p>
+      <p>2. Review exclusions and create a passphrase-encrypted snapshot.</p>
+      <p>
+        3. Transfer it, restore into a new folder, and approve only the tools
+        you trust.
+      </p>
+      <p class="hint">
+        Live processes and unsaved buffers cannot travel. Never delete the
+        original until you verify the restored copy.
+      </p>
+      <button id="welcomeDone" class="primary">Start with a workspace</button>
+    </dialog>
+    <dialog id="inputDialog">
+      <form method="dialog">
+        <h2 id="inputTitle">Enter value</h2>
+        <input
+          id="inputValue"
+          aria-labelledby="inputTitle"
+          autocomplete="off"
+        />
+        <div class="row">
+          <button value="cancel">Cancel</button
+          ><button value="ok" class="primary">Continue</button>
+        </div>
+      </form>
+    </dialog>
     <script src="renderer.js"></script>
   </body>
 </html>

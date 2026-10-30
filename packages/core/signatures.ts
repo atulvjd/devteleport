@@ -1,3 +1,4 @@
+import { hashFile, V2_LIMITS } from "./stream-v2.ts";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -48,8 +49,17 @@ export async function signSnapshot(
   keyPath: string,
   password: string,
 ) {
-  const bytes = await bounded(snapshot, 128 * 1024 * 1024 + 48);
-  if (bytes.subarray(0, 4).toString() !== "DTP1")
+  const info = await fs.stat(snapshot);
+  if (info.size > V2_LIMITS.total + V2_LIMITS.metadata + 52)
+    throw new Error("Signature input exceeds size limit");
+  const handle = await fs.open(snapshot, "r"),
+    magic = Buffer.alloc(4);
+  try {
+    await handle.read(magic, 0, 4, 0);
+  } finally {
+    await handle.close();
+  }
+  if (!["DTP1", "DTP2"].includes(magic.toString()))
     throw new Error("Invalid snapshot format");
   const key = crypto.createPrivateKey({
     key: await bounded(keyPath, 16384),
@@ -58,7 +68,7 @@ export async function signSnapshot(
   });
   if (key.asymmetricKeyType !== "ed25519")
     throw new Error("Only Ed25519 signing keys are supported");
-  const snapshotSha256 = hash(bytes);
+  const snapshotSha256 = await hashFile(snapshot);
   const signature = crypto
     .sign(null, Buffer.from("DevTeleport.signature.v1\0" + snapshotSha256), key)
     .toString("base64");
@@ -82,7 +92,12 @@ export async function verifySignature(snapshot: string, publicPath: string) {
   const metadata = JSON.parse(
     (await bounded(snapshot + ".sig", 8192)).toString("utf8"),
   );
-  const digest = hash(await bounded(snapshot, 128 * 1024 * 1024 + 48));
+  if (
+    (await fs.stat(snapshot)).size >
+    V2_LIMITS.total + V2_LIMITS.metadata + 52
+  )
+    throw new Error("Signature input exceeds size limit");
+  const digest = await hashFile(snapshot);
   if (
     metadata.formatVersion !== 1 ||
     metadata.algorithm !== "Ed25519" ||

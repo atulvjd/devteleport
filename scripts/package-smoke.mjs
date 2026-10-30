@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+const version = JSON.parse(await fs.readFile("package.json", "utf8")).version;
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), "dtp-install-"));
 try {
   execFileSync(
@@ -18,7 +19,7 @@ try {
       path.resolve("dist/.npm-cache"),
       "--prefix",
       temp,
-      path.resolve("dist/devteleport-0.1.0.tgz"),
+      path.resolve(`dist/devteleport-${version}.tgz`),
     ],
     { stdio: "pipe" },
   );

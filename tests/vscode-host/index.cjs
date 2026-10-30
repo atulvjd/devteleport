@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 exports.run = async () => {
+  assert.equal(process.arch, process.env.DTP_TEST_EXPECT_ARCH);
   const root = vscode.workspace.workspaceFolders[0].uri.fsPath,
     temp = path.dirname(root);
   const cfg = vscode.workspace.getConfiguration("devteleport");
@@ -84,6 +85,24 @@ exports.run = async () => {
     vscode.window.activeTextEditor.document.getText(),
     "saved dirty host",
   );
+  await fs.writeFile(
+    path.join(root, "cancel.bin"),
+    require("node:crypto").randomBytes(16 * 1024 * 1024),
+  );
+  api.setDialogResponses({
+    showInputBox: ["cancel-in-flight", "extension host test password"],
+    showOpenDialog: [[vscode.Uri.file(temp)]],
+    showInformationMessage: ["Capture"],
+  });
+  const cancelled = vscode.commands.executeCommand("devteleport.capture");
+  for (let i = 0; i < 200 && !api.isBusy(); i++)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  assert(api.isBusy());
+  await vscode.commands.executeCommand("devteleport.cancel");
+  await cancelled;
+  assert.match(api.getLastError(), /cancelled/);
+  await assert.rejects(fs.stat(path.join(temp, "cancel-in-flight.dtp")));
+  await fs.unlink(path.join(root, "cancel.bin"));
   await call("history");
   api.setDialogResponses({});
   const verified = await vscode.commands.executeCommand(

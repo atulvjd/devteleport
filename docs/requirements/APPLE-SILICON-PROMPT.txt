@@ -1,0 +1,966 @@
+# DEVTELEPORT — APPLE SILICON PRODUCTION EDITION
+
+## YOUR ROLE
+
+You are the principal architect, senior macOS engineer, Electron engineer, TypeScript engineer, DevOps specialist, application security engineer, test engineer, and product designer responsible for completing DevTeleport.
+
+This is an EXISTING, FUNCTIONAL application.
+
+Your task is NOT to start over.
+
+Your task is to inspect, improve, extend, optimize, and finalize the existing DevTeleport repository into a polished, reliable, native Apple Silicon developer product.
+
+Work directly in the existing repository.
+
+Do not stop at writing an implementation plan. Execute the work, verify your changes, fix failures, and continue through the milestones.
+
+Do not claim a feature works unless it has been implemented and tested.
+
+---
+
+# 1. CURRENT PROJECT STATUS
+
+The application reportedly already contains:
+
+- Working local-first CLI.
+- Encrypted snapshot capture and restoration.
+- Versioned snapshot format.
+- Git working-tree preservation.
+- PostgreSQL integration.
+- Docker Compose and named-volume integration.
+- VS Code extension.
+- Electron desktop application.
+- Local snapshot history.
+- Integrity verification and recovery inspection.
+- Strict TypeScript.
+- Security tests.
+- Real PostgreSQL, Docker, editor and desktop integration tests.
+- macOS arm64 and x64 DMG builds.
+
+The implementation report states that the Apple Silicon application and its packaged Electron workflow have already passed local tests.
+
+These are reported facts, not a substitute for your own audit.
+
+First verify them against the actual source and available test environment.
+
+DO NOT delete, replace, or unnecessarily rewrite working modules.
+
+Preserve existing working tests and product functionality.
+
+---
+
+# 2. PRIMARY TARGET: APPLE SILICON
+
+DevTeleport must be developed and optimized primarily for:
+
+- Apple M1
+- Apple M2
+- Apple M3
+- Apple M4
+- Future compatible Apple Silicon processors
+
+Reference development device:
+
+**Apple M4 MacBook with 16 GB unified memory.**
+
+Primary architecture:
+
+`darwin-arm64`
+
+Intel compatibility may remain available, but Apple Silicon is the primary release target.
+
+### Mandatory architecture requirements
+
+1. Desktop Electron application must use native ARM64 binaries.
+2. Bundled backend must run natively on ARM64.
+3. CLI must execute in a native Apple Silicon environment.
+4. All native Node modules must be compatible with ARM64.
+5. All packaged helper executables must use compatible architecture.
+6. No hardcoded `/usr/local` dependency paths.
+7. Support Apple Silicon Homebrew under `/opt/homebrew`.
+8. Correctly detect PostgreSQL tools installed through Homebrew.
+9. Correctly detect Docker Desktop on Apple Silicon.
+10. Support native ARM64 VS Code extension host.
+11. Avoid accidental x64 child processes and Rosetta dependencies.
+12. Verify application packaging and runtime architecture.
+
+Inspect the real system using commands such as:
+
+```bash
+uname -m
+node -p "process.arch"
+file "$(which node)"
+brew --prefix
+```
+
+Use appropriate system tools to inspect packaged binaries.
+
+Check whether the application is native ARM64, universal, or accidentally Intel-only.
+
+Do not assume that generating an arm64 DMG proves the entire application runs natively.
+
+Inspect Electron helpers, native modules, bundled utilities, and subprocess execution.
+
+Provide explicit evidence.
+
+---
+
+# 3. COMPLETE REPOSITORY AUDIT
+
+Before changing functionality:
+
+1. Inspect repository structure.
+2. Inspect Git status.
+3. Review package scripts.
+4. Review TypeScript configuration.
+5. Review Electron build configuration.
+6. Review VS Code extension configuration.
+7. Review CLI entry points.
+8. Review platform-specific code.
+9. Review native dependencies.
+10. Review existing tests.
+11. Review security architecture.
+12. Review archive format.
+13. Review database adapters.
+14. Review Docker implementation.
+15. Review installation and distribution logic.
+
+Create an internal audit report identifying:
+
+- Working features.
+- Broken features.
+- Missing features.
+- Architecture incompatibilities.
+- User-experience issues.
+- Performance bottlenecks.
+- Security risks.
+- Packaging problems.
+- Missing tests.
+- Release blockers.
+
+Prioritize the findings.
+
+Then begin implementing fixes.
+
+Do not perform a large destructive refactor without a clear technical reason.
+
+---
+
+# 4. NATIVE APPLE SILICON DISTRIBUTION
+
+Make the Apple Silicon application fully installable.
+
+Required release artifacts:
+
+- Native ARM64 desktop application.
+- Native ARM64 DMG.
+- Optional ARM64 ZIP release.
+- Working CLI npm package.
+- Installable VS Code VSIX.
+- Optional Homebrew formula.
+
+Ensure the desktop application includes its required backend.
+
+The installed application must not depend on a separately installed Node.js runtime unless explicitly documented as a dependency.
+
+The desktop app should open normally from the macOS Applications folder.
+
+Verify:
+
+- Dock appearance.
+- Application name.
+- Application icon.
+- Menu bar behavior.
+- Application launch.
+- Window restoration.
+- File open dialogs.
+- File save dialogs.
+- Keyboard shortcuts.
+- Notifications where appropriate.
+- Error dialogs.
+- Application shutdown.
+- No orphaned subprocesses.
+- No dependency on developer-machine absolute paths.
+
+Preserve the existing application bundle identifier if one is already in use.
+
+Do not change stable application identifiers without considering migration of existing user settings.
+
+---
+
+# 5. PREMIUM MACOS USER EXPERIENCE
+
+Transform DevTeleport into a polished application.
+
+The UI should feel native to macOS and be suitable for public distribution.
+
+Design principles:
+
+- Clean typography.
+- Modern macOS-inspired layout.
+- Consistent spacing.
+- Minimal visual clutter.
+- Excellent dark mode.
+- Excellent light mode.
+- Smooth transitions.
+- Accessible controls.
+- Keyboard navigation.
+- Clear progress feedback.
+- Consistent iconography.
+- No fake functionality.
+
+Implement a complete interface with these sections:
+
+## Dashboard
+
+Show:
+
+- Recent development workspaces.
+- Recent snapshots.
+- Last successful capture.
+- Last restoration result.
+- Available local storage.
+- Runtime compatibility.
+- Quick capture action.
+- Quick restore action.
+
+Use real local data.
+
+## Workspace Inspector
+
+Show:
+
+- Project name.
+- Project location.
+- Git branch.
+- Working tree status.
+- Runtime version.
+- Package manager.
+- Database configuration.
+- Docker services.
+- VS Code integration availability.
+- Sensitive-data warnings.
+- Unsupported features.
+
+## Capture Wizard
+
+Create a guided workflow:
+
+1. Select workspace.
+2. Inspect compatibility.
+3. Select components.
+4. Review sensitive files.
+5. Select destination.
+6. Configure encryption.
+7. Capture snapshot.
+8. Verify archive.
+9. Show result.
+
+Include meaningful progress and cancel controls.
+
+## Restore Wizard
+
+Create a guided workflow:
+
+1. Choose snapshot.
+2. Authenticate/decrypt.
+3. Inspect contents.
+4. Check target machine compatibility.
+5. Select destination.
+6. Review database and Docker actions.
+7. Approve potentially destructive steps.
+8. Restore.
+9. Verify.
+10. Open project.
+
+Never execute commands from an untrusted snapshot without approval.
+
+## Snapshot Library
+
+Allow users to:
+
+- View snapshots.
+- Inspect metadata.
+- Verify integrity.
+- See file sizes.
+- Rename display labels safely.
+- Export snapshots.
+- Delete local snapshots with confirmation.
+- Identify incompatible formats.
+- Inspect recovery journals.
+
+Keep the snapshot contents encrypted.
+
+## Settings
+
+Include:
+
+- Default snapshot destination.
+- Capture exclusions.
+- Encryption preferences.
+- Theme.
+- Notification preferences.
+- Startup preferences.
+- Default editor.
+- Database adapter settings.
+- Docker integration settings.
+- Diagnostic logging controls.
+
+Do not store plaintext passwords.
+
+---
+
+# 6. IMPROVE THE CORE SNAPSHOT ENGINE
+
+The existing format 1 implementation has documented size limitations.
+
+Design and implement a new compatible snapshot format supporting larger real-world workspaces.
+
+Goals:
+
+- Streaming file processing.
+- Bounded memory usage.
+- Incremental hashing.
+- Streaming encryption.
+- Streaming archive writing.
+- Streaming archive reading.
+- Secure temporary storage.
+- Reliable failure cleanup.
+- Interruption recovery.
+- Detailed progress reporting.
+
+Avoid loading entire projects or databases into memory.
+
+Design format version 2 where required.
+
+Maintain read compatibility with existing version 1 snapshots.
+
+Do not break previously generated snapshots.
+
+Use strong authenticated encryption.
+
+Ensure authentication and integrity are verified before restored data is trusted.
+
+Prevent unsafe extraction paths and archive expansion attacks.
+
+Test large archives using generated fixture data.
+
+Do not invent benchmark results.
+
+On a 16 GB Apple Silicon Mac, keep memory consumption reasonable and explicitly measure peak memory usage during representative tests.
+
+---
+
+# 7. SECURE MAC-TO-MAC TRANSFER
+
+Implement a functional local-network transfer feature.
+
+Goal:
+
+A developer should be able to transfer a snapshot between two Macs without using a USB drive or manually uploading the archive.
+
+Desired commands:
+
+```bash
+devteleport send snapshot.dtp
+```
+
+```bash
+devteleport receive
+```
+
+Desktop experience:
+
+- Send snapshot.
+- Discover or enter destination Mac.
+- Pair devices.
+- Review destination identity.
+- Confirm transfer.
+- Show progress.
+- Verify completion.
+- Offer restore.
+
+Security requirements:
+
+- Encrypted transport.
+- Authenticated device pairing.
+- Explicit receiving-device approval.
+- No unauthenticated network receiver.
+- No remote command execution.
+- Integrity verification.
+- Connection failure handling.
+- Interrupted transfer recovery.
+- Transfer resume when supported.
+- Clear timeout behavior.
+- Safe temporary-file handling.
+- No cloud requirement.
+
+Prefer established, audited cryptographic protocols instead of designing custom cryptography.
+
+Local-network discovery may use Bonjour/mDNS where appropriate.
+
+Support manual address-based pairing if discovery fails.
+
+Do not require users to disable the macOS firewall.
+
+If transfer cannot be proven reliable, preserve the functional file-based workflow and mark network transfer experimental.
+
+---
+
+# 8. APPLE SILICON DEVELOPMENT ENVIRONMENT SUPPORT
+
+Improve native macOS tool discovery.
+
+Recognize:
+
+- Homebrew.
+- Node.js version managers.
+- npm.
+- pnpm.
+- yarn.
+- Git.
+- Docker Desktop.
+- PostgreSQL.
+- VS Code.
+- VS Code Insiders.
+
+Avoid assuming that every Apple Silicon Mac has the same installed directory structure.
+
+Support common environments using:
+
+- `/opt/homebrew`
+- User-configured paths.
+- Correctly resolved executables on PATH.
+- Environment variables.
+- Version-manager-managed binaries.
+
+Handle spaces in paths.
+
+Handle Unicode paths.
+
+Handle macOS filesystem case-sensitivity differences.
+
+Handle external volumes appropriately.
+
+Support architecture diagnostics when a dependency exists only for x64.
+
+Offer safe, actionable recommendations.
+
+Do not silently install software through Homebrew.
+
+Require explicit user approval for package installation.
+
+---
+
+# 9. COMPLETE POSTGRESQL INTEGRATION
+
+Preserve the existing real database backup/restore functionality.
+
+Improve:
+
+- PostgreSQL tool discovery.
+- Version compatibility reporting.
+- Supported backup formats.
+- Database size reporting.
+- Restore planning.
+- Connection diagnostics.
+- Progress output.
+- Error reporting.
+- Target database validation.
+
+Ensure:
+
+- No automatic production database backup.
+- No automatic overwrite of existing nonempty targets.
+- No exposure of database passwords.
+- No unnecessary logging of connection strings.
+- Correct backup consistency behavior.
+- Clear handling of unsupported database versions.
+
+Add integration tests for supported versions.
+
+Use real PostgreSQL instances rather than mocks for critical restoration behavior.
+
+---
+
+# 10. COMPLETE DOCKER SUPPORT
+
+Preserve current named-volume and Docker Compose functionality.
+
+Improve:
+
+- Docker Desktop detection.
+- Compose service discovery.
+- ARM64 image compatibility diagnostics.
+- Volume backup progress.
+- Volume restore progress.
+- Ownership preservation.
+- Unsupported mount warnings.
+- Container restart review.
+- Service health verification.
+
+Avoid unsafe automatic volume overwrites.
+
+Do not claim that a Docker service's data is consistent if it was captured while being modified.
+
+Add real tests for volume capture and restore.
+
+Make architecture incompatibility visible when Docker images lack ARM64 support.
+
+---
+
+# 11. VS CODE INTEGRATION
+
+Polish the existing VS Code extension.
+
+Required functionality:
+
+- Inspect current workspace.
+- Capture current workspace.
+- Restore saved workspace.
+- Verify snapshot.
+- View history.
+- Open desktop application when installed.
+- Display current capture status.
+- Surface relevant diagnostics.
+- Restore supported open editor files.
+- Handle cancellation properly.
+
+Ensure VS Code can invoke the installed CLI reliably.
+
+Support native Apple Silicon extension hosts.
+
+Avoid unnecessary native dependencies.
+
+Test packaged VSIX installation.
+
+Test against an actual VS Code extension host.
+
+Do not rely only on mocked APIs.
+
+Preserve workspace trust protections.
+
+---
+
+# 12. RELIABILITY AND RECOVERY
+
+Improve recovery for interrupted operations.
+
+Test interruptions during:
+
+- Snapshot file enumeration.
+- Archive creation.
+- Encryption.
+- Database export.
+- Docker volume backup.
+- Transfer.
+- Decryption.
+- File restoration.
+- Database restoration.
+- Service startup.
+
+Use durable operation journals.
+
+Detect incomplete work safely.
+
+Show users what succeeded and what failed.
+
+Provide options to:
+
+- Inspect incomplete operations.
+- Retry safe stages.
+- Continue supported resumable operations.
+- Preserve recovery evidence.
+- Clean up user-approved temporary artifacts.
+
+Never silently delete existing project directories or database data.
+
+Implement rollback only where it can be made reliable and is covered by tests.
+
+Do not claim complete transactional rollback across filesystem, PostgreSQL, Docker, and external processes.
+
+---
+
+# 13. SECURITY HARDENING
+
+Perform a thorough security review.
+
+Review:
+
+- Archive extraction.
+- Symlinks.
+- Path traversal.
+- TOCTOU vulnerabilities.
+- Credential storage.
+- Encryption.
+- Authentication.
+- Manifest validation.
+- Network pairing.
+- Snapshot provenance.
+- Database commands.
+- Docker commands.
+- Electron IPC.
+- Electron preload APIs.
+- VS Code workspace trust.
+- Arbitrary code execution.
+- Log redaction.
+- Unsafe temporary files.
+- Resource exhaustion.
+- Malicious snapshots.
+
+Follow Electron security best practices.
+
+Use:
+
+- Context isolation.
+- Sandboxed renderers where compatible.
+- Narrow IPC interfaces.
+- No unrestricted Node.js exposure to renderer code.
+- Strict Content Security Policy.
+- Safe URL handling.
+- Secure update validation.
+
+Do not disable macOS protections to make the application easier to install.
+
+Run dependency audits and review vulnerabilities.
+
+Fix confirmed actionable vulnerabilities.
+
+Record unresolved findings accurately.
+
+---
+
+# 14. PERFORMANCE OPTIMIZATION
+
+Measure:
+
+- Cold application startup time.
+- Idle memory usage.
+- Peak snapshot memory usage.
+- Capture throughput.
+- Restore throughput.
+- Encryption overhead.
+- File enumeration performance.
+- Database backup performance.
+- Desktop responsiveness.
+
+Optimize specifically for the Apple M4 with 16 GB unified memory while retaining compatibility with other Apple Silicon processors.
+
+Avoid unnecessary background CPU activity.
+
+Avoid blocking the Electron renderer.
+
+Use appropriate worker or utility processes.
+
+Keep progress reporting responsive.
+
+Do not introduce excessive polling.
+
+Provide reproducible benchmark scripts and real measured results.
+
+---
+
+# 15. macOS SIGNING AND NOTARIZATION
+
+Prepare production distribution.
+
+Implement support for:
+
+- Developer ID Application signing.
+- Hardened Runtime.
+- Correct entitlements.
+- Apple notarization.
+- Stapling.
+- Gatekeeper verification.
+- Release artifact checksums.
+
+Do not embed Apple credentials in source code.
+
+Use secure environment variables or authorized credential storage.
+
+If Developer ID credentials are unavailable:
+
+- Generate unsigned development builds.
+- Mark them clearly.
+- Record signing as pending.
+- Do not claim production notarization succeeded.
+
+Do not bypass signing or Gatekeeper checks.
+
+---
+
+# 16. AUTOMATIC UPDATES
+
+Add a secure update mechanism suitable for the selected distribution strategy.
+
+Requirements:
+
+- Version checking.
+- Update availability notification.
+- Verified release source.
+- Signed update verification when supported.
+- Explicit restart behavior.
+- Error recovery.
+- Release-channel support if justified.
+
+Never silently replace executable files using untrusted network content.
+
+If the signing infrastructure is unavailable, implement and test the update infrastructure but do not activate an unsafe production update path.
+
+---
+
+# 17. TESTING AND RELEASE VALIDATION
+
+Preserve all existing tests.
+
+Add missing test coverage.
+
+Required:
+
+- Strict TypeScript checks.
+- Unit tests.
+- Security regression tests.
+- Real PostgreSQL tests.
+- Real Docker tests.
+- Independent restore tests.
+- CLI installed-package tests.
+- Actual VS Code extension-host tests.
+- Actual Electron desktop tests.
+- Packaged ARM64 application tests.
+- Snapshot format 1 backward-compatibility tests.
+- Snapshot format 2 tests.
+- Large-file tests.
+- Interruption tests.
+- Local-network transfer tests.
+- Architecture verification.
+
+Create an Apple Silicon-specific verification command:
+
+```bash
+npm run verify:apple-silicon
+```
+
+It must check:
+
+- Host architecture.
+- Node architecture.
+- Electron architecture.
+- Packaged helper architectures.
+- Native dependency compatibility.
+- Bundle integrity.
+- CLI functionality.
+- Core test results.
+- Desktop launch.
+- Supported integration tests.
+
+Never make the command report success when required checks were skipped.
+
+Distinguish PASS, FAIL, SKIPPED, and BLOCKED.
+
+---
+
+# 18. GITHUB CI/CD
+
+Inspect existing workflows.
+
+Create or improve:
+
+- Apple Silicon build workflow.
+- Linux test workflow.
+- TypeScript validation.
+- Unit tests.
+- Integration tests.
+- Application packaging.
+- VSIX packaging.
+- npm tarball packaging.
+- Artifact checksums.
+- Release candidate generation.
+
+Use available ARM64 CI runners when supported by the chosen CI provider and account.
+
+If remote runners are unavailable, configure the workflow and report the missing execution evidence.
+
+Do not push code, publish packages, create public releases, or upload data without authorization.
+
+---
+
+# 19. PRODUCT POLISH
+
+Complete the elements expected of a professional application.
+
+Include:
+
+- Unique application icon.
+- Consistent branding.
+- Welcome screen.
+- First-run onboarding.
+- Helpful empty states.
+- Keyboard shortcuts.
+- Native macOS menu commands.
+- Accessibility labels.
+- Confirmation dialogs.
+- Human-readable errors.
+- Diagnostics export with secret redaction.
+- About screen.
+- Version information.
+- License information.
+- Documentation links.
+- Update status.
+- Release notes.
+- Support information.
+- Privacy explanation.
+
+Do not invent legal claims or imply the application has completed an independent audit.
+
+Avoid unnecessary analytics or telemetry.
+
+Any telemetry must be opt-in, transparent, and configurable.
+
+---
+
+# 20. FINAL ACCEPTANCE SCENARIO
+
+Build and validate this workflow.
+
+### Computer A
+
+1. Open an Express application.
+2. Modify tracked files.
+3. Add untracked files.
+4. Stage selected changes.
+5. Prepare PostgreSQL development records.
+6. Configure Docker Compose.
+7. Open relevant files in VS Code.
+8. Capture an encrypted DevTeleport snapshot.
+9. Verify the snapshot.
+10. Export or transfer the snapshot.
+
+### Computer B
+
+1. Install DevTeleport.
+2. Import or receive the snapshot.
+3. Review compatibility.
+4. Approve restoration.
+5. Restore files.
+6. Restore Git state.
+7. Restore PostgreSQL data.
+8. Restore supported Docker configuration.
+9. Install dependencies with approval.
+10. Reopen VS Code.
+11. Start the application.
+12. Verify application behavior.
+
+The restored application must not depend on the original computer being online.
+
+Use isolated test environments to prove as much of this as possible.
+
+A genuine two-Mac transfer test requires two physical Macs or suitably independent Mac hosts.
+
+Never claim physical-device validation based solely on directories or containers on one computer.
+
+---
+
+# 21. EXECUTION PRIORITIES
+
+Work in this order:
+
+P0 — Verify and fix native Apple Silicon execution.
+
+P0 — Preserve all existing working functionality.
+
+P0 — Fix security and reliability defects.
+
+P1 — Polish the desktop application and onboarding.
+
+P1 — Implement streaming snapshot format v2.
+
+P1 — Improve restoration and recovery.
+
+P1 — Implement secure local-network transfer.
+
+P1 — Complete VS Code and Docker integration.
+
+P1 — Add Apple Silicon-specific automated validation.
+
+P2 — Prepare signing and notarization.
+
+P2 — Prepare secure updates and distribution.
+
+P2 — Complete release documentation.
+
+Do not spend time implementing low-priority cosmetic features while critical functionality is broken.
+
+---
+
+# 22. EXECUTION BEHAVIOR
+
+You are working as the lead engineer.
+
+Do the work in the repository, not just in chat.
+
+For each milestone:
+
+1. Inspect existing implementation.
+2. Identify necessary changes.
+3. Implement changes.
+4. Run relevant tests.
+5. Diagnose failures.
+6. Fix actual defects.
+7. Run regression tests.
+8. Update documentation.
+9. Record evidence and limitations.
+10. Continue to the next milestone.
+
+Avoid unnecessary questions.
+
+Make reasonable, safe technical decisions independently.
+
+Ask permission only for actions requiring authorization, unavailable secrets, destructive operations, external publication, or access to additional hardware.
+
+Do not stop after producing a plan.
+
+Do not replace working code with a new scaffold.
+
+Do not skip tests to make results appear successful.
+
+Do not weaken safety validations for convenience.
+
+Do not fabricate successful builds, measurements, or device tests.
+
+If the execution session ends before all milestones are complete, leave a working repository and a precise continuation document showing the next actions.
+
+---
+
+# 23. FINAL OUTPUT
+
+At the end, provide:
+
+1. Summary of actual code changes.
+2. Apple Silicon compatibility verification.
+3. Features implemented.
+4. Features retained from the MVP.
+5. Features not yet completed.
+6. Security improvements.
+7. Test results with exact commands.
+8. Performance measurements.
+9. Generated installation artifacts.
+10. Signing and notarization status.
+11. Physical Mac transfer test status.
+12. CI execution status.
+13. Known limitations.
+14. Reproduction commands.
+15. Release readiness assessment.
+
+Provide exact file paths for generated artifacts.
+
+Only describe DevTeleport as production-ready if all critical release gates have actually passed.
+
+## FINAL INSTRUCTION
+
+**Turn the existing DevTeleport into an excellent native Apple Silicon application that a real developer can install, understand, trust, and use every day.**
+
+Preserve everything that already works.
+
+Make improvements incrementally, verify them with real evidence, and deliver the strongest functional product possible.
+
+BEGIN BY AUDITING THE EXISTING REPOSITORY AND VERIFYING NATIVE ARM64 EXECUTION. THEN START IMPLEMENTING.

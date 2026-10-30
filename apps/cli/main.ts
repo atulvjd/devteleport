@@ -20,6 +20,15 @@ import {
   signSnapshot,
   verifySignature,
 } from "../../packages/core/signatures.ts";
+import { snapshotMetadata } from "../../packages/core/stream-v2.ts";
+import {
+  receiveSnapshot,
+  sendSnapshot,
+  readPairing,
+} from "../../packages/core/transfer.ts";
+import { diagnostics } from "../../packages/core/platform.ts";
+import { shutdownChildren } from "../../packages/core/processes.ts";
+import { cleanupRecovery } from "../../packages/core/recovery.ts";
 import * as fs from "node:fs/promises";
 import readline from "node:readline";
 import { Writable } from "node:stream";
@@ -46,6 +55,13 @@ async function password(): Promise<string> {
     }),
   );
 }
+let stopping = false;
+for (const signal of ["SIGTERM", "SIGINT"] as const)
+  process.on(signal, () => {
+    if (stopping) return;
+    stopping = true;
+    shutdownChildren().finally(() => process.exit(130));
+  });
 const raw = process.argv.slice(2),
   command = raw.shift(),
   options: CliOptions = {},
@@ -59,6 +75,15 @@ const valued = new Set([
   "snapshot",
   "key",
   "verify-key",
+  "format",
+  "cleanup",
+  "exclude",
+  "pairing",
+  "pairing-output",
+  "bind",
+  "advertise",
+  "port",
+  "timeout",
 ]);
 const flags = new Set([
   "dry-run",
@@ -67,6 +92,10 @@ const flags = new Set([
   "restore-volumes",
   "approve-volumes",
   "start",
+  "approve-cleanup",
+  "approve-receive",
+  "approve-peer",
+  "resume",
   "restore-db",
   "install",
   "approve-execution",
@@ -81,14 +110,23 @@ try {
         throw new Error(`Unknown option: ${a}`);
       if (valued.has(k) && (!raw[i + 1] || raw[i + 1].startsWith("--")))
         throw new Error(`Missing value: ${a}`);
+      if (k === "exclude") {
+        options.exclusions ??= [];
+        options.exclusions.push(raw[++i]);
+        continue;
+      }
       (options as Record<string, string | boolean>)[
         k.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
       ] = valued.has(k) ? raw[++i] : true;
     } else positional.push(a);
   }
-  if (process.env.DEVTELEPORT_PROGRESS === "1")
-    options.onProgress = (phase) =>
-      process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ phase }) + "\n");
+  if(process.env.DEVTELEPORT_PROGRESS==="1"){let last=0;options.onProgress=phase=>{const now=Date.now();if(now-last<100&&(phase.startsWith("Staging ")||phase.startsWith("Restoring ")))return;last=now;process.stderr.write("DTP_PROGRESS:"+JSON.stringify({phase})+"\n");};}
+  if (options.format !== undefined) {
+    const format = Number(options.format);
+    if (format !== 1 && format !== 2)
+      throw new Error("--format must be 1 or 2");
+    options.format = format;
+  }
   let result;
   switch (command) {
     case "keygen":
@@ -109,10 +147,95 @@ try {
         throw new Error("Provide snapshot and --key trusted-public.pem");
       result = await verifySignature(positional[0], options["key"]);
       break;
+    case "snapshot-info":
+      if (!positional[0]) throw new Error("Provide a snapshot path");
+      {
+        const metadata = await snapshotMetadata(
+          positional[0],
+          await password(),
+        );
+        result = {
+          ...metadata,
+          files: metadata.files.map(({ data, ...f }) => f),
+          databases: metadata.databases.map(({ data, ...d }) => d),
+          volumes: (metadata.volumes ?? []).map(({ data, ...v }) => v),
+        };
+      }
+      break;
+    case "pairing-info":
+      if (!options.pairing)
+        throw new Error("Provide --pairing descriptor.json");
+      {
+        const pairing = await readPairing(options.pairing);
+        result = {
+          receiver: pairing.receiver,
+          host: pairing.host,
+          port: pairing.port,
+          fingerprint: pairing.fingerprint,
+          expiresAt: pairing.expiresAt,
+        };
+      }
+      break;
+    case "receive":
+      if (!options.target || !options.pairingOutput)
+        throw new Error(
+          "Provide --target new-snapshot.dtp and --pairing-output descriptor.json",
+        );
+      {
+        const receiver = await receiveSnapshot({
+          target: options.target,
+          pairingFile: options.pairingOutput,
+          approve: Boolean(options.approveReceive),
+          bind: options.bind,
+          advertise: options.advertise,
+          port: options.port ? Number(options.port) : undefined,
+          timeoutMs: options.timeout
+            ? Number(options.timeout) * 1000
+            : undefined,
+          resume: options.resume,
+          onReady: (ready) =>
+            process.stderr.write(
+              "DTP_PROGRESS:" +
+                JSON.stringify({
+                  phase:
+                    "Receiver ready; share the protected pairing descriptor out of band",
+                  ready,
+                }) +
+                "\n",
+            ),
+        });
+        try {
+          result = await receiver.completion;
+        } finally {
+          await receiver.close();
+        }
+      }
+      break;
+    case "send":
+      if (!positional[0] || !options.pairing)
+        throw new Error("Provide a snapshot and --pairing descriptor.json");
+      {
+        let last = 0;
+        result = await sendSnapshot(positional[0], options.pairing, {
+          approve: Boolean(options.approvePeer),
+          password: await password(),
+          onProgress: (bytes) => {
+            if (Date.now() - last > 200) {
+              options.onProgress?.("Transferred " + bytes + " bytes");
+              last = Date.now();
+            }
+          },
+        });
+      }
+      break;
+    case "diagnostics":
+      result = await diagnostics();
+      break;
     case "inspect":
       result = await inspect(options.root ?? positional[0] ?? ".");
       break;
     case "capture":
+      options.format ??= 2;
       if (!options.dryRun) {
         const review = await capture({ ...options, dryRun: true });
         process.stderr.write(
@@ -150,7 +273,12 @@ try {
       if (!result.ok) process.exitCode = 2;
       break;
     case "recover":
-      result = await recover(positional[0] ?? ".");
+      result = options.cleanup
+        ? await cleanupRecovery(
+            options.cleanup,
+            Boolean(options.approveCleanup),
+          )
+        : await recover(positional[0] ?? ".");
       break;
     case "history":
       result = await history(positional[0] ?? ".");
@@ -168,7 +296,7 @@ try {
       if (!positional[0] || !options.target)
         throw new Error("Provide a snapshot and --target destination.dtp");
       const { readSnapshot } = await import("../../packages/core/index.ts");
-      await readSnapshot(positional[0], await password());
+      await snapshotMetadata(positional[0], await password());
       await fs.copyFile(
         positional[0],
         options.target,

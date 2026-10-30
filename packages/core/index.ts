@@ -1,3 +1,10 @@
+import { boundedRead, publishNoReplace } from "./atomic.ts";
+import {
+  execText,
+  trackChild,
+  registerCleanup,
+  throwIfCancelled,
+} from "./processes.ts";
 import { verifyLfsCompleteness } from "./lfs.ts";
 import { captureVolume, restoreVolume } from "./docker.ts";
 import type {
@@ -17,7 +24,7 @@ import crypto from "node:crypto";
 import { promisify } from "node:util";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { execFile } from "node:child_process";
-const exec = promisify(execFile);
+const exec = execText;
 const scrypt = (
   password: string,
   salt: Buffer,
@@ -37,7 +44,7 @@ export const LIMITS = {
 };
 const sha = (data: string | Uint8Array) =>
   crypto.createHash("sha256").update(data).digest("hex");
-const excluded = new Set([
+export const excluded = new Set([
   "node_modules",
   ".devteleport",
   ".DS_Store",
@@ -56,7 +63,7 @@ const excluded = new Set([
   ".yarnrc",
   ".yarnrc.yml",
 ]);
-const sensitive = (p: string) =>
+export const sensitive = (p: string) =>
   /(^|\/)(\.env(?:\..*)?|.*\.(?:pem|key|p12|pfx)|credentials(?:\.json)?|id_rsa|id_ed25519|\.npmrc|\.netrc|\.pypirc)$/i.test(
     p,
   );
@@ -86,7 +93,7 @@ async function exists(p: string) {
     throw e;
   }
 }
-async function run(
+export async function run(
   tool: string,
   args: string[],
   cwd: string,
@@ -131,14 +138,14 @@ async function run(
     );
   }
 }
-async function optional(tool: string, args: string[], cwd: string) {
+export async function optional(tool: string, args: string[], cwd: string) {
   try {
     return await run(tool, args, cwd);
   } catch {
     return null;
   }
 }
-async function config(root: string): Promise<WorkspaceConfig> {
+export async function config(root: string): Promise<WorkspaceConfig> {
   const p = path.join(root, "devteleport.json");
   if (!(await exists(p))) return {};
   const c = JSON.parse(await fs.readFile(p, "utf8"));
@@ -322,7 +329,11 @@ export async function inspect(directory = ".") {
     },
   };
 }
-async function enumerate(root: string, c: WorkspaceConfig) {
+export async function enumerate(
+  root: string,
+  c: WorkspaceConfig,
+  metadataOnly = false,
+) {
   const files: SnapshotEntry[] = [],
     omitted: string[] = [];
   let total = 0;
@@ -346,6 +357,7 @@ async function enumerate(root: string, c: WorkspaceConfig) {
       }
       if (
         p === ".git/objects/info" ||
+        p === ".git/modules" ||
         p === ".git/worktrees" ||
         p === ".git/config" ||
         p === ".git/config.worktree" ||
@@ -383,9 +395,22 @@ async function enumerate(root: string, c: WorkspaceConfig) {
           throw new Error(`Symlink escapes workspace: ${p}`);
         files.push({ path: p, type: "symlink", target, mode: st.mode & 0o777 });
       } else if (st.isFile()) {
+        if (metadataOnly) {
+          files.push({
+            path: p,
+            type: "file",
+            mode: st.mode & 0o777,
+            size: st.size,
+            data: "",
+            checksum: "",
+          });
+          if (files.length > 50000)
+            throw new Error("Too many workspace entries");
+          continue;
+        }
         if (st.size > LIMITS.file || (total += st.size) > LIMITS.archive)
           throw new Error("Capture exceeds size limits; configure exclusions.");
-        const data = await fs.readFile(abs),
+        const data = await boundedRead(abs, LIMITS.file),
           after = await fs.stat(abs);
         if (
           st.size !== after.size ||
@@ -460,16 +485,30 @@ function localConnection(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
     PGSSLMODE: u.searchParams.get("sslmode") || "prefer",
   };
 }
-async function dbEnv(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
+export async function dbEnv(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
   const cleanEnv = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("PG")),
   );
   return { ...cleanEnv, ...localConnection(c, d) };
 }
 export async function capture(options: CaptureOptions = {}) {
+  if (options.format === 2)
+    return (await import("./stream-v2.ts")).captureV2(options);
   options.onProgress?.("Analyzing workspace");
   const report = await inspect(options.root ?? ".");
+  if (
+    report.git?.indexEntries
+      .split("\0")
+      .some((entry) => entry.startsWith("160000 "))
+  )
+    throw new Error(
+      "Submodules require separate complete captures; partial submodule snapshots are refused.",
+    );
   const c = await config(report.root);
+  for (const prefix of options.exclusions ?? []) {
+    safePath(prefix);
+    c.exclude = [...(c.exclude ?? []), prefix];
+  }
   const ignored = await optional(
     "git",
     [
@@ -617,7 +656,7 @@ export async function capture(options: CaptureOptions = {}) {
           report.root,
           { env },
         );
-        const data = await fs.readFile(file);
+        const data = await boundedRead(file, LIMITS.file);
         if (data.length > LIMITS.file)
           throw new Error("Database dump exceeds size limit");
         await run("pg_restore", ["--list", file], report.root);
@@ -708,7 +747,8 @@ export async function capture(options: CaptureOptions = {}) {
     await handle.close();
   }
   try {
-    await fs.link(partial, output);
+    throwIfCancelled();
+    await publishNoReplace(partial, output);
   } catch (caught) {
     const error = caught as NodeJS.ErrnoException;
     if (error.code === "EEXIST")
@@ -873,7 +913,7 @@ export async function readSnapshot(file: string, password: string | undefined) {
   const st = await fs.stat(file);
   if (st.size > LIMITS.archive + 48 || st.size < 48)
     throw new Error("Invalid snapshot size");
-  const bytes = await fs.readFile(file);
+  const bytes = await boundedRead(file, LIMITS.archive + 48);
   if (bytes.subarray(0, 4).toString() !== "DTP1")
     throw new Error("Unsupported snapshot format");
   if (typeof password !== "string")
@@ -911,6 +951,8 @@ export async function readSnapshot(file: string, password: string | undefined) {
   );
 }
 export async function restore(file: string, options: RestoreOptions = {}) {
+  if (await (await import("./stream-v2.ts")).isV2(file))
+    return (await import("./stream-v2.ts")).restoreV2(file, options);
   options.onProgress?.("Authenticating and validating snapshot");
   const m = await readSnapshot(file, options.password);
   const target = path.resolve(options.target ?? m.name);
@@ -1029,6 +1071,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
       { mode: 0o600 },
     );
     // mkdir is the no-clobber claim: a concurrent creator cannot be overwritten by rename.
+    throwIfCancelled();
     await fs.mkdir(target, { mode: 0o700 });
     claimed = true;
     await fs.rename(
@@ -1199,7 +1242,7 @@ export async function verify(
         ),
       );
   const problems = [];
-  if (m.formatVersion !== 1 || !Array.isArray(m.files))
+  if (![1, 2].includes(m.formatVersion) || !Array.isArray(m.files))
     throw new Error("Invalid verification inventory");
   for (const f of m.files) {
     safePath(f.path);
@@ -1213,7 +1256,9 @@ export async function verify(
       }
       const st = await fs.lstat(p);
       if (f.type === "file") {
-        let matches = st.isFile() && sha(await fs.readFile(p)) === f.checksum;
+        let matches =
+          st.isFile() &&
+          (await (await import("./stream-v2.ts")).hashFile(p)) === f.checksum;
         // Git refreshes inode/timestamp caches after an independent restore.
         // Compare actual staged entries, never ignore staged content changes.
         if (
@@ -1245,12 +1290,25 @@ export async function history(directory = ".") {
   const output = [];
   for (const f of await fs.readdir(directory)) {
     if (f.endsWith(".dtp")) {
-      const st = await fs.stat(path.join(directory, f));
+      const file = path.join(directory, f),
+        st = await fs.lstat(file);
+      if (!st.isFile()) continue;
+      const handle = await fs.open(file, "r"),
+        magic = Buffer.alloc(4);
+      try {
+        await handle.read(magic, 0, 4, 0);
+      } finally {
+        await handle.close();
+      }
+      const format = magic.toString();
       output.push({
         file: path.resolve(directory, f),
         bytes: st.size,
         modifiedAt: st.mtime.toISOString(),
-        status: "encrypted; unlock to inspect",
+        status: ["DTP1", "DTP2"].includes(format)
+          ? "encrypted format " + format.slice(3) + "; unlock to verify"
+          : "unrecognized or incompatible snapshot",
+        formatVersion: format === "DTP1" ? 1 : format === "DTP2" ? 2 : null,
       });
     }
   }
@@ -1270,9 +1328,35 @@ export async function composePlan(root = ".") {
     ),
   );
   const services: Record<string, ComposeService> = c.services ?? {};
+  const images = new Map<string, string | null>();
+  for (const image of new Set(
+    Object.values(services)
+      .map((s) => s.image)
+      .filter((s): s is string => Boolean(s)),
+  ))
+    images.set(
+      image,
+      await optional(
+        "docker",
+        ["image", "inspect", "--format", "{{.Architecture}}", image],
+        report.root,
+      ),
+    );
   return {
     files: report.compose,
     services: Object.entries(services).map(([name, s]) => ({
+      platform: s.platform ?? null,
+      imageArchitecture: s.image ? images.get(s.image) : null,
+      architectureStatus:
+        process.arch === "arm64" &&
+        (s.platform?.includes("amd64") || images.get(s.image ?? "") === "amd64")
+          ? "incompatible with native ARM64; would require emulation"
+          : s.image && images.get(s.image) === "arm64"
+            ? "native ARM64 image installed"
+            : "unknown; inspect or pull the selected image explicitly before startup",
+      unsupportedMounts: (s.volumes ?? [])
+        .filter((v) => v.type !== "volume")
+        .map((v) => v.type),
       name,
       image: s.image ?? null,
       ports: s.ports ?? [],
@@ -1293,7 +1377,29 @@ export async function startServices(root: string, approved = false) {
       "Review the services plan, then pass --approve-execution to start containers.",
     );
   const plan = await composePlan(root);
-  await run("docker", plan.command.slice(1), path.resolve(root));
+  if (
+    process.arch === "arm64" &&
+    plan.services.some((service) =>
+      service.architectureStatus.startsWith("incompatible"),
+    )
+  )
+    throw new Error(
+      "Choose native ARM64 service images; DevTeleport will not silently enable emulation.",
+    );
+  await run(
+    "docker",
+    [...plan.command.slice(1), "--wait", "--wait-timeout", "120"],
+    path.resolve(root),
+    {
+      timeout: 180000,
+      env: {
+        ...process.env,
+        ...(process.arch === "arm64"
+          ? { DOCKER_DEFAULT_PLATFORM: "linux/arm64" }
+          : {}),
+      },
+    },
+  );
   return { status: "started", plan };
 }
 
@@ -1332,6 +1438,8 @@ export async function verifyFromSnapshot(
   snapshot: string,
   password: string,
 ) {
-  const manifest = await readSnapshot(snapshot, password);
+  const manifest = await (
+    await import("./stream-v2.ts")
+  ).snapshotMetadata(snapshot, password);
   return verify(directory, manifest);
 }

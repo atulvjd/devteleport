@@ -1,4 +1,5 @@
-import { execFile } from "node:child_process";
+import { trackChild, spawnBuffered } from "./processes.ts";
+
 import crypto from "node:crypto";
 import type { SnapshotEntry } from "./types.ts";
 async function git(
@@ -7,11 +8,12 @@ async function git(
   input?: string,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const child = execFile(
+    const child = spawnBuffered(
       "git",
       args,
       {
         cwd: root,
+        detached: process.platform !== "win32",
         env: {
           ...Object.fromEntries(
             Object.entries(process.env).filter(
@@ -86,10 +88,7 @@ export async function verifyLfsCompleteness(
         !object ||
         object.type !== "file" ||
         object.size !== Number(pointer[2]) ||
-        crypto
-          .createHash("sha256")
-          .update(Buffer.from(object.data, "base64"))
-          .digest("hex") !== hash
+        object.checksum !== hash
       )
         throw new Error(
           `Git LFS object ${hash} is missing or corrupt. Fetch all LFS objects before capture; an incomplete archive was refused.`,

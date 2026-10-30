@@ -10,6 +10,12 @@ Electron was selected over Tauri for a shared JavaScript engine and native Node 
 
 The VS Code extension calls a trusted configured CLI, uses public workspace/document/tab APIs, respects workspace trust, and records only saved relative file paths. A test-only dialog driver is exposed exclusively in ExtensionMode.Test so actual extension-host tests can approve/cancel dialogues while retaining real filesystem, editor APIs and backend processes. Production behavior uses native VS Code dialogs. Workspace-containing saved session files trigger activation and a reviewed reopening offer.
 
+## Format 2 and native runtime
+
+The CLI and desktop default to streaming format 2; the public core capture API retains its compatible format 1 default unless explicitly selected. `stream-v2.ts` stages bounded metadata and streamed bodies, authenticates the complete archive before extraction, and validates lengths and hashes. `postgres-stream.ts` handles streamed database dumps. See [FORMAT-2.md](FORMAT-2.md).
+
+`platform.ts` discovers native tools, `processes.ts` supervises process groups and cancellation, `recovery.ts` validates private inactive stages before approved cleanup, `transfer.ts` implements TLS pairing/resume, and `updates.ts` validates signed release metadata without installing application updates. The desktop bundles this backend and runs it through native Electron utility processes.
+
 ## Format 1
 
 Binary envelope: ASCII `DTP1`, 16 random salt bytes, 12 random nonce bytes, 16-byte GCM tag, encrypted gzip UTF-8 JSON. AES-256-GCM authenticates the payload and fixed format identifier. Scrypt uses fixed N=32768, r=8, p=1 and a 32-byte key. There is no attacker-selected KDF cost.
