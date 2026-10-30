@@ -122,6 +122,7 @@ Signatures are optional detached Ed25519 sidecars (`project.dtp.sig`). Transfer 
 | `capture --name NAME` | `--root`, `--output`, `--dry-run`, `--include-db`, `--include-volumes` |
 | `restore FILE --target DIR` | Plan or restore new destination; optional explicitly approved post-actions |
 | `verify DIR [--snapshot FILE]` | Check expected files and Git staged state; exit 2 on mismatch |
+| `diff FILE [DIR \| --snapshot NEWER]` | Show files added, removed or changed since a snapshot; `--include-git` lists Git internals; exit 2 when different. A second snapshot with another passphrase reads `DEVTELEPORT_NEWER_PASSWORD` |
 | `history [DIR]` | List real encrypted snapshot files without unlocking |
 | `recover DIR` | Read-only partial/staging/journal inspection |
 | `services DIR [--start --approve-execution]` | Compose plan or approved startup |
@@ -135,7 +136,7 @@ JSON results go to stdout; diagnostics go to stderr. Unknown commands/options fa
 ```sh
 npm ci
 npm run check              # strict TypeScript + application syntax checks
-npm test                   # 22 core/security tests
+npm test                   # 29 core/security/diff tests
 npm run test:postgres      # isolated PostgreSQL cluster; source DB removed before restore
 npm run test:docker        # real Compose analysis, no daemon needed
 npm run test:docker:live   # actual volumes, malicious archive refusal, Compose startup

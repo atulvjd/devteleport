@@ -20,6 +20,10 @@ import {
   signSnapshot,
   verifySignature,
 } from "../../packages/core/signatures.ts";
+import {
+  diffSnapshots,
+  diffSnapshotWithDirectory,
+} from "../../packages/core/diff.ts";
 import * as fs from "node:fs/promises";
 import readline from "node:readline";
 import { Writable } from "node:stream";
@@ -71,6 +75,7 @@ const flags = new Set([
   "install",
   "approve-execution",
   "approve-db",
+  "include-git",
 ]);
 try {
   for (let i = 0; i < raw.length; i++) {
@@ -149,6 +154,30 @@ try {
         : await verify(positional[0] ?? ".");
       if (!result.ok) process.exitCode = 2;
       break;
+    case "diff": {
+      if (!positional[0])
+        throw new Error(
+          "Provide a snapshot, then a folder or --snapshot NEWER.dtp",
+        );
+      const pass = await password();
+      const opts = { includeGit: Boolean(options["includeGit"]) };
+      result = options["snapshot"]
+        ? await diffSnapshots(
+            positional[0],
+            options["snapshot"],
+            pass,
+            process.env.DEVTELEPORT_NEWER_PASSWORD ?? pass,
+            opts,
+          )
+        : await diffSnapshotWithDirectory(
+            positional[0],
+            positional[1] ?? ".",
+            pass,
+            opts,
+          );
+      if (!result.identical) process.exitCode = 2;
+      break;
+    }
     case "recover":
       result = await recover(positional[0] ?? ".");
       break;
@@ -182,7 +211,7 @@ try {
         throw new Error("Unknown command: " + command);
       result = {
         usage:
-          "devteleport inspect | capture --name NAME [--include-db] [--include-volumes] [--dry-run] | restore FILE --target DIR [--dry-run] | verify DIR [--snapshot FILE] | recover DIR | history DIR | services DIR [--start --approve-execution] | export/import FILE --target FILE | keygen --target PREFIX | sign FILE --key PRIVATE | check-signature FILE --key PUBLIC",
+          "devteleport inspect | capture --name NAME [--include-db] [--include-volumes] [--dry-run] | restore FILE --target DIR [--dry-run] | verify DIR [--snapshot FILE] | diff FILE [DIR | --snapshot NEWER] [--include-git] | recover DIR | history DIR | services DIR [--start --approve-execution] | export/import FILE --target FILE | keygen --target PREFIX | sign FILE --key PRIVATE | check-signature FILE --key PUBLIC",
         security:
           "Encrypted snapshots require a passphrase. Never put passphrases in command arguments. Use interactive input or DEVTELEPORT_PASSWORD.",
         database:
