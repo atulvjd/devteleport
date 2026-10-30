@@ -254,18 +254,57 @@ function activate(context) {
       dialogResponses = value;
     };
   async function reopenSavedFiles(root) {
-    if(!vscode.workspace.isTrusted)throw new Error("Trust the workspace before reopening saved files.");
-    const state=JSON.parse(await fs.readFile(path.join(root,".vscode","devteleport-session.json"),"utf8"));
-    if(!Array.isArray(state.tabs)||state.tabs.some(p=>typeof p!=="string")||(state.active!==null&&typeof state.active!=="string"))throw new Error("Invalid editor session metadata");
-    if(await ui.showInformationMessage("DevTeleport saved editor context found. Reopen saved files?","Reopen")!=="Reopen")return [];
-    const paths=[...state.tabs.filter(p=>p!==state.active),state.active].filter(Boolean).slice(0,50),opened=[];
-    const realRoot=await fs.realpath(root);
-    for(const p of paths){const absolute=path.resolve(root,p);if(!absolute.startsWith(path.resolve(root)+path.sep))continue;try{const real=await fs.realpath(absolute);if(!real.startsWith(realRoot+path.sep))continue;await vscode.window.showTextDocument(vscode.Uri.file(real),{preview:false,preserveFocus:p!==state.active});opened.push(real);}catch{}}
+    if (!vscode.workspace.isTrusted)
+      throw new Error("Trust the workspace before reopening saved files.");
+    const state = JSON.parse(
+      await fs.readFile(
+        path.join(root, ".vscode", "devteleport-session.json"),
+        "utf8",
+      ),
+    );
+    if (
+      !Array.isArray(state.tabs) ||
+      state.tabs.some((p) => typeof p !== "string") ||
+      (state.active !== null && typeof state.active !== "string")
+    )
+      throw new Error("Invalid editor session metadata");
+    if (
+      (await ui.showInformationMessage(
+        "DevTeleport saved editor context found. Reopen saved files?",
+        "Reopen",
+      )) !== "Reopen"
+    )
+      return [];
+    const paths = [
+        ...state.tabs.filter((p) => p !== state.active),
+        state.active,
+      ]
+        .filter(Boolean)
+        .slice(0, 50),
+      opened = [];
+    const realRoot = await fs.realpath(root);
+    for (const p of paths) {
+      const absolute = path.resolve(root, p);
+      if (!absolute.startsWith(path.resolve(root) + path.sep)) continue;
+      try {
+        const real = await fs.realpath(absolute);
+        if (!real.startsWith(realRoot + path.sep)) continue;
+        await vscode.window.showTextDocument(vscode.Uri.file(real), {
+          preview: false,
+          preserveFocus: p !== state.active,
+        });
+        opened.push(real);
+      } catch {}
+    }
     return opened;
   }
-  api.reopenSavedFiles=reopenSavedFiles;
-  const root=vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if(root&&vscode.workspace.isTrusted)reopenSavedFiles(root).catch(error=>{if(error.code!=="ENOENT")out.appendLine("Editor session: "+error.message);});
+  api.reopenSavedFiles = reopenSavedFiles;
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (root && vscode.workspace.isTrusted)
+    reopenSavedFiles(root).catch((error) => {
+      if (error.code !== "ENOENT")
+        out.appendLine("Editor session: " + error.message);
+    });
   return api;
 }
-module.exports={activate};
+module.exports = { activate };

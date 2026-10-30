@@ -51,6 +51,8 @@ try {
   const target = path.join(temp, "restored");
   await page.locator("#target").fill(target);
   await page.locator("#restorePassword").fill("desktop passphrase for testing");
+  await page.locator('[data-action="restore"][data-dry="true"]').click();
+  await done();
   await page.locator('[data-action="restore"].primary').click();
   await done();
   assert.equal(
@@ -61,6 +63,26 @@ try {
   await page.locator('[data-action="verify"]').click();
   await done();
   assert((await page.locator("#result").textContent()).includes('"ok": true'));
+  const settings = JSON.parse(
+    await fs.readFile(
+      path.join(temp, "user-data", "workspace-settings.json"),
+      "utf8",
+    ),
+  );
+  assert.equal(settings.source, target);
+  assert(!JSON.stringify(settings).includes("password"));
+  await page.locator("#name").fill("cancelled");
+  await page.locator('[data-action="capture"][data-dry="true"]').click();
+  await done();
+  await page.evaluate(() =>
+    window.teleport.onProgress(() => document.getElementById("cancel").click()),
+  );
+  await page.locator('[data-action="capture"].primary').click();
+  await page.waitForFunction(
+    () => document.getElementById("status").textContent === "Needs attention",
+  );
+  assert((await page.locator("#result").textContent()).includes("cancelled"));
+  await assert.rejects(fs.stat(path.join(temp, "cancelled.dtp")));
   await fs.mkdir("dist", { recursive: true });
   await page.screenshot({ path: "dist/desktop-smoke.png", fullPage: true });
   console.log(

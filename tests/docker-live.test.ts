@@ -47,7 +47,7 @@ test("live named-volume capture and independent restore; existing-volume refusal
     "python:3.13-alpine",
     "python",
     "-c",
-    "open('/data/record.txt','w').write('volume data survived independently')",
+    "import os;open('/data/record.txt','w').write('volume data survived independently');os.chown('/data/record.txt',1000,1000);os.chmod('/data/record.txt',0o600)",
   );
   const root = path.join(temp, "project");
   await fs.mkdir(root);
@@ -92,6 +92,21 @@ test("live named-volume capture and independent restore; existing-volume refusal
     ),
     "volume data survived independently",
   );
+  assert.equal(
+    docker(
+      "run",
+      "--rm",
+      "--network",
+      "none",
+      "--mount",
+      `type=volume,src=${dest},dst=/data,readonly`,
+      "python:3.13-alpine",
+      "python",
+      "-c",
+      "import os;print(os.stat('/data/record.txt').st_uid)",
+    ),
+    "1000",
+  );
   await assert.rejects(
     restore(a.output, {
       password,
@@ -119,4 +134,15 @@ test("live named-volume capture and independent restore; existing-volume refusal
       "--services",
     ).includes("worker"),
   );
+});
+test("malicious volume symlinks are rejected and the newly owned target volume is removed", async () => {
+  const { restoreVolume } = await import("../packages/core/docker.ts");
+  const { execFileSync } = await import("node:child_process");
+  const volume = "dtp-malicious-" + crypto.randomBytes(6).toString("hex");
+  const data = execFileSync("python3", [
+    "-c",
+    "import tarfile,io,sys;buf=io.BytesIO();t=tarfile.open(fileobj=buf,mode='w:gz');m=tarfile.TarInfo('escape');m.type=tarfile.SYMTYPE;m.linkname='/etc';t.addfile(m);t.close();sys.stdout.buffer.write(buf.getvalue())",
+  ]);
+  await assert.rejects(restoreVolume(volume, data), /adapter failed/);
+  assert.throws(() => docker("volume", "inspect", volume));
 });

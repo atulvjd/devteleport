@@ -96,3 +96,138 @@ test("malformed or unknown configuration is refused", async (t) => {
     /Unknown adapter field/,
   );
 });
+test("missing Git LFS objects are refused; complete objects survive capture and restore", async (t) => {
+  const { execFileSync } = await import("node:child_process");
+  const crypto = await import("node:crypto");
+  const { root, temp } = await fixture(t);
+  const git = (...args) =>
+    execFileSync("git", args, {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  git("init", "-q");
+  git("config", "user.name", "Test");
+  git("config", "user.email", "test@example.invalid");
+  const content = Buffer.from("actual binary content"),
+    hash = crypto.createHash("sha256").update(content).digest("hex");
+  await fs.writeFile(
+    path.join(root, "asset.bin"),
+    `version https://git-lfs.github.com/spec/v1\noid sha256:${hash}\nsize ${content.length}\n`,
+  );
+  git("add", ".");
+  git("commit", "-qm", "LFS pointer");
+  await assert.rejects(capture({ root, dryRun: true }), /LFS object.*missing/);
+  const object = path.join(
+    root,
+    ".git",
+    "lfs",
+    "objects",
+    hash.slice(0, 2),
+    hash.slice(2, 4),
+    hash,
+  );
+  await fs.mkdir(path.dirname(object), { recursive: true });
+  await fs.writeFile(object, content);
+  const a = await capture({ root, name: "lfs", output: temp, password });
+  const target = path.join(temp, "restored");
+  await restore(a.output, { target, password });
+  assert.deepEqual(
+    await fs.readFile(
+      path.join(
+        target,
+        ".git",
+        "lfs",
+        "objects",
+        hash.slice(0, 2),
+        hash.slice(2, 4),
+        hash,
+      ),
+    ),
+    content,
+  );
+});
+
+test("abrupt capture interruption never publishes a damaged final snapshot", async (t) => {
+  const { spawn } = await import("node:child_process");
+  const crypto = await import("node:crypto");
+  const { readSnapshot } = await import("../packages/core/index.ts");
+  const { root, temp } = await fixture(t);
+  await fs.writeFile(
+    path.join(root, "random.bin"),
+    crypto.randomBytes(16 * 1024 * 1024),
+  );
+  const child = spawn(
+    process.execPath,
+    [
+      path.resolve("apps/cli/main.ts"),
+      "capture",
+      "--root",
+      root,
+      "--name",
+      "interrupted",
+      "--output",
+      temp,
+    ],
+    {
+      env: { ...process.env, DEVTELEPORT_PASSWORD: password },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  let interrupted = false;
+  const watcher = setInterval(async () => {
+    const files = await fs.readdir(temp).catch(() => []);
+    if (files.some((file) => file.includes(".dtp.partial-"))) {
+      interrupted = true;
+      child.kill("SIGKILL");
+    }
+  }, 1);
+  let stderr = "";
+  child.stderr.on("data", (data) => (stderr += data));
+  child.stdout.resume();
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("capture interruption timeout"));
+    }, 30000);
+    child.once("error", reject);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve(undefined);
+    });
+  });
+  clearInterval(watcher);
+  assert(interrupted, stderr);
+  try {
+    const final = await readSnapshot(
+      path.join(temp, "interrupted.dtp"),
+      password,
+    );
+    assert(final.files.some((f) => f.path === "random.bin"));
+  } catch (error) {
+    assert.equal(error.code, "ENOENT");
+  }
+});
+test("CLI signing and archive-backed verification execute through strict command parsing", async (t) => {
+  const { execFileSync } = await import("node:child_process");
+  const { root, temp } = await fixture(t);
+  await fs.writeFile(path.join(root, "a"), "cli signed");
+  const a = await capture({ root, name: "cli-signed", output: temp, password });
+  const cli = path.resolve("apps/cli/main.ts"),
+    env = { ...process.env, DEVTELEPORT_PASSWORD: password };
+  const call = (...args) =>
+    JSON.parse(
+      execFileSync(process.execPath, [cli, ...args], {
+        env,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }),
+    );
+  const keys = call("keygen", "--target", path.join(temp, "key"));
+  call("sign", a.output, "--key", keys.privateKey);
+  assert(call("check-signature", a.output, "--key", keys.publicKey).verified);
+  const target = path.join(temp, "restored");
+  call("restore", a.output, "--target", target, "--verify-key", keys.publicKey);
+  assert(call("verify", target, "--snapshot", a.output).ok);
+  assert.throws(() => call("unknown-command"));
+});

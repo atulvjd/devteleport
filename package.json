@@ -24,7 +24,8 @@
     "test:full": "node --test tests/full.e2e.ts",
     "build:backend": "node scripts/build-backend.mjs",
     "test:docker:live": "node --test tests/docker-live.test.ts",
-    "test:vscode": "node scripts/vscode-test.mjs"
+    "test:vscode": "node scripts/vscode-test.mjs",
+    "test:pg-versions": "node --test tests/postgres-versions.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

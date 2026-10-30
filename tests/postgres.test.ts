@@ -62,7 +62,7 @@ if (process.env.DEVTELEPORT_TEST_POSTGRES === "1")
         "-v",
         "ON_ERROR_STOP=1",
         "-c",
-        "CREATE TABLE records(id integer PRIMARY KEY, message text); INSERT INTO records VALUES(1,'independent restore');",
+        "CREATE TABLE records(id integer PRIMARY KEY, message text); INSERT INTO records VALUES(1,'independent restore'); CREATE TABLE private_data(secret text); INSERT INTO private_data VALUES('excluded');",
       ],
       env,
     );
@@ -71,7 +71,13 @@ if (process.env.DEVTELEPORT_TEST_POSTGRES === "1")
     await fs.writeFile(
       path.join(root, "devteleport.json"),
       JSON.stringify({
-        databases: [{ name: "app", connectionEnv: "DTP_SOURCE_DB" }],
+        databases: [
+          {
+            name: "app",
+            connectionEnv: "DTP_SOURCE_DB",
+            excludeTables: ["public.private_data"],
+          },
+        ],
       }),
     );
     process.env.DTP_SOURCE_DB = `postgresql://${env.PGUSER}@127.0.0.1:${port}/source_dev`;
@@ -117,6 +123,21 @@ if (process.env.DEVTELEPORT_TEST_POSTGRES === "1")
         dbConfig: cfg,
       }),
       /not empty/,
+    );
+    assert.equal(
+      run(
+        "psql",
+        [
+          "-d",
+          "target_dev",
+          "-A",
+          "-t",
+          "-c",
+          "SELECT to_regclass('public.private_data') IS NULL",
+        ],
+        env,
+      ),
+      "t",
     );
     delete process.env.DTP_SOURCE_DB;
     delete process.env.DTP_TARGET_DB;

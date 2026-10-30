@@ -1,3 +1,4 @@
+import { verifyLfsCompleteness } from "./lfs.ts";
 import { captureVolume, restoreVolume } from "./docker.ts";
 import type {
   CaptureOptions,
@@ -266,6 +267,12 @@ export async function inspect(directory = ".") {
     },
     git,
     compose,
+    volumes: (c.volumes ?? []).map((v) => ({
+      name: v.name,
+      volume: v.volume,
+      status:
+        "explicit opt-in local named-volume adapter; stop writers before capture",
+    })),
     databases: (c.databases ?? []).map((d) => ({
       name: d.name,
       connectionEnv: d.connectionEnv,
@@ -275,7 +282,8 @@ export async function inspect(directory = ".") {
       files: "supported",
       git: "standalone repositories; linked worktrees, submodules and nested repositories rejected",
       database: "explicit local PostgreSQL; opt in",
-      docker: "Compose files and reviewed startup; volume data not captured",
+      docker:
+        "Compose analysis and approved startup; explicit plain local named-volume adapter",
       editor: "workspace files; saved tabs through extension",
       processes: "not supported",
     },
@@ -393,6 +401,10 @@ function localConnection(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
       `Set ${d.connectionEnv} to the local development database URL.`,
     );
   const u = new URL(value);
+  if (!u.pathname || u.pathname === "/")
+    throw new Error(
+      "Specify an explicit development database name in the connection URL.",
+    );
   if (
     !["postgres:", "postgresql:"].includes(u.protocol) ||
     !["localhost", "127.0.0.1", "[::1]"].includes(u.hostname) ||
@@ -422,6 +434,7 @@ async function dbEnv(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
   return { ...cleanEnv, ...localConnection(c, d) };
 }
 export async function capture(options: CaptureOptions = {}) {
+  options.onProgress?.("Analyzing workspace");
   const report = await inspect(options.root ?? ".");
   const c = await config(report.root);
   const ignored = await optional(
@@ -456,8 +469,12 @@ export async function capture(options: CaptureOptions = {}) {
     throw new Error(
       "Shallow repositories are not supported; unshallow before capture.",
     );
+  options.onProgress?.("Enumerating and checking files");
   const firstStatus = report.git?.status;
   const { files, omitted } = await enumerate(report.root, c);
+  const lfs = report.git
+    ? await verifyLfsCompleteness(report.root, files)
+    : null;
   const name = options.name ?? path.basename(report.root);
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(name))
     throw new Error(
@@ -466,6 +483,7 @@ export async function capture(options: CaptureOptions = {}) {
   if (options.dryRun)
     return {
       report,
+      lfs,
       name,
       fileCount: files.length,
       omitted,
@@ -477,6 +495,7 @@ export async function capture(options: CaptureOptions = {}) {
     };
   if (typeof options.password !== "string" || options.password.length < 12)
     throw new Error("Use an encryption passphrase of at least 12 characters.");
+  options.onProgress?.("Backing up selected databases and volumes");
   const databases = [];
   const volumes = [];
   if (options.includeVolumes) {
@@ -586,7 +605,9 @@ export async function capture(options: CaptureOptions = {}) {
     git: report.git,
     services: report.compose.map((file) => ({
       file,
-      status: "configuration only; volumes excluded",
+      status: options.includeVolumes
+        ? "configuration and explicitly selected volume backups"
+        : "configuration only; volumes excluded",
     })),
     databases,
     volumes,
@@ -596,6 +617,7 @@ export async function capture(options: CaptureOptions = {}) {
     files,
   };
   validateManifest(manifest);
+  options.onProgress?.("Validating and encrypting archive");
   const packed = gzipSync(Buffer.from(JSON.stringify(manifest)));
   if (packed.length > LIMITS.archive)
     throw new Error("Snapshot exceeds archive size limit");
@@ -613,6 +635,7 @@ export async function capture(options: CaptureOptions = {}) {
   key.fill(0);
   const output = path.resolve(options.output ?? ".", name + ".dtp");
   await fs.mkdir(path.dirname(output), { recursive: true });
+  options.onProgress?.("Publishing encrypted snapshot");
   const partial = path.join(
     path.dirname(output),
     "." + name + ".dtp.partial-" + crypto.randomUUID(),
@@ -648,6 +671,7 @@ export async function capture(options: CaptureOptions = {}) {
     output,
     fileCount: files.length,
     databases: databases.map((d) => d.name),
+    volumes: volumes.map((v) => v.name),
     omitted,
   };
 }
@@ -835,6 +859,7 @@ export async function readSnapshot(file: string, password: string | undefined) {
   );
 }
 export async function restore(file: string, options: RestoreOptions = {}) {
+  options.onProgress?.("Authenticating and validating snapshot");
   const m = await readSnapshot(file, options.password);
   const target = path.resolve(options.target ?? m.name);
   if (await exists(target))
@@ -868,13 +893,6 @@ export async function restore(file: string, options: RestoreOptions = {}) {
           .map((tool) => tool.tool)
           .join(", "),
     );
-  if (
-    !options.dryRun &&
-    tools.some((tool) => !tool.available && tool.tool !== "git")
-  )
-    throw new Error(
-      "Install missing tools before requesting post-restore operations.",
-    );
   const plan = {
     target,
     tools,
@@ -900,7 +918,15 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     throw new Error(
       "Database restore requires --approve-db and an explicitly configured empty local destination.",
     );
+  if (
+    !options.dryRun &&
+    tools.some((tool) => !tool.available && tool.tool !== "git")
+  )
+    throw new Error(
+      "Install missing tools before requesting post-restore operations.",
+    );
   await fs.mkdir(path.dirname(target), { recursive: true });
+  options.onProgress?.("Restoring source and Git files");
   const stage = await fs.mkdtemp(
     path.join(path.dirname(target), ".devteleport-"),
   );
@@ -985,6 +1011,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
   } finally {
     await fs.rm(stage, { recursive: true, force: true });
   }
+  options.onProgress?.("Running explicitly approved post-restore actions");
   const postActions = [];
   if (options.restoreDb) {
     // Never trust database connection configuration from the snapshot.
@@ -1103,6 +1130,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     }),
     { mode: 0o600 },
   );
+  options.onProgress?.("Verifying restored workspace");
   return { ...plan, verification: await verify(target), postActions };
 }
 export async function verify(

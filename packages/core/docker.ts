@@ -42,6 +42,8 @@ async function helper(
           "--read-only",
           "--cap-drop",
           "ALL",
+          "--cap-add","DAC_OVERRIDE",
+          ...(!readonly?["--cap-add","CHOWN"]:[]),
           "--security-opt",
           "no-new-privileges",
           "-i",
@@ -69,6 +71,14 @@ async function helper(
   }
 }
 export async function captureVolume(volume: string) {
+  if (
+    String(
+      await docker(["ps", "--filter", "volume=" + volume, "--quiet"]),
+    ).trim()
+  )
+    throw new Error(
+      "Stop containers using the source volume before capture to avoid inconsistent backups.",
+    );
   const info = JSON.parse(
     String(await docker(["volume", "inspect", volume])),
   )[0];
@@ -126,7 +136,10 @@ with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
  for m in members:
   if m.name.startswith('/') or '..' in m.name.split('/') or not (m.isfile() or m.isdir() or m.issym() or m.islnk()): raise RuntimeError('unsafe archive entry')
   tarfile.data_filter(m,'/data')
- archive.extractall('/data',members=members,filter='data')
+ def safe_member(member,destination):
+  safe=tarfile.data_filter(member,destination)
+  return safe.replace(uid=member.uid,gid=member.gid,uname=None,gname=None)
+ archive.extractall('/data',members=members,filter=safe_member)
 `,
       data,
     );

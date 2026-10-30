@@ -86,6 +86,9 @@ try {
       ] = valued.has(k) ? raw[++i] : true;
     } else positional.push(a);
   }
+  if (process.env.DEVTELEPORT_PROGRESS === "1")
+    options.onProgress = (phase) =>
+      process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ phase }) + "\n");
   let result;
   switch (command) {
     case "keygen":
@@ -175,9 +178,11 @@ try {
       break;
     }
     default:
+      if (command && command !== "help" && command !== "--help")
+        throw new Error("Unknown command: " + command);
       result = {
         usage:
-          "devteleport inspect | capture --name NAME [--dry-run] | restore FILE [--target DIR] [--dry-run] | verify DIR | history [DIR] | services [DIR] | export/import FILE --target FILE",
+          "devteleport inspect | capture --name NAME [--include-db] [--include-volumes] [--dry-run] | restore FILE --target DIR [--dry-run] | verify DIR [--snapshot FILE] | recover DIR | history DIR | services DIR [--start --approve-execution] | export/import FILE --target FILE | keygen --target PREFIX | sign FILE --key PRIVATE | check-signature FILE --key PUBLIC",
         security:
           "Encrypted snapshots require a passphrase. Never put passphrases in command arguments. Use interactive input or DEVTELEPORT_PASSWORD.",
         database:

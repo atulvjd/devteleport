@@ -1,6 +1,7 @@
 /** Trusted caller options. Snapshot data is separately validated before extraction. */
 export interface CaptureOptions {
   root?: string;
+  onProgress?: (phase: string) => void;
   name?: string;
   output?: string;
   password?: string;
@@ -10,6 +11,7 @@ export interface CaptureOptions {
 }
 export interface RestoreOptions {
   target?: string;
+  onProgress?: (phase: string) => void;
   password?: string;
   dryRun?: boolean;
   restoreDb?: boolean;

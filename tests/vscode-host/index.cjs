@@ -21,7 +21,16 @@ exports.run = async () => {
   );
   assert(extension);
   const api = await extension.activate();
-  if(process.env.DTP_TEST_UNTRUSTED==="1") {api.setDialogResponses({});await vscode.commands.executeCommand("devteleport.capture");assert.match(api.getLastError(),/Trust the workspace/);await fs.writeFile(path.join(temp,"host-result.json"),JSON.stringify({passed:true,untrustedCaptureRefused:true}));return;}
+  if (process.env.DTP_TEST_UNTRUSTED === "1") {
+    api.setDialogResponses({});
+    await vscode.commands.executeCommand("devteleport.capture");
+    assert.match(api.getLastError(), /Trust the workspace/);
+    await fs.writeFile(
+      path.join(temp, "host-result.json"),
+      JSON.stringify({ passed: true, untrustedCaptureRefused: true }),
+    );
+    return;
+  }
 
   const call = async (action, responses = {}) => {
     api.setDialogResponses(responses);
@@ -36,12 +45,18 @@ exports.run = async () => {
   await vscode.window.showTextDocument(
     vscode.Uri.file(path.join(root, "hello.txt")),
   );
-  const edit=new vscode.WorkspaceEdit();edit.replace(vscode.Uri.file(path.join(root,"hello.txt")),new vscode.Range(0,0,0,9),"saved dirty host");assert(await vscode.workspace.applyEdit(edit));
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(
+    vscode.Uri.file(path.join(root, "hello.txt")),
+    new vscode.Range(0, 0, 0, 9),
+    "saved dirty host",
+  );
+  assert(await vscode.workspace.applyEdit(edit));
   await call("capture", {
     showInputBox: ["host-test", "extension host test password"],
     showOpenDialog: [[vscode.Uri.file(temp)]],
     showInformationMessage: ["Capture"],
-    showWarningMessage:["Save all"],
+    showWarningMessage: ["Save all"],
   });
   await fs.stat(path.join(temp, "host-test.dtp"));
   const session = JSON.parse(
@@ -62,7 +77,13 @@ exports.run = async () => {
     await fs.readFile(path.join(target, "hello.txt"), "utf8"),
     "saved dirty host",
   );
-  api.setDialogResponses({showInformationMessage:["Reopen"]});const opened=await api.reopenSavedFiles(target);assert(opened.includes(await fs.realpath(path.join(target,"hello.txt"))));assert.equal(vscode.window.activeTextEditor.document.getText(),"saved dirty host");
+  api.setDialogResponses({ showInformationMessage: ["Reopen"] });
+  const opened = await api.reopenSavedFiles(target);
+  assert(opened.includes(await fs.realpath(path.join(target, "hello.txt"))));
+  assert.equal(
+    vscode.window.activeTextEditor.document.getText(),
+    "saved dirty host",
+  );
   await call("history");
   api.setDialogResponses({});
   const verified = await vscode.commands.executeCommand(

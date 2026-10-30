@@ -15,7 +15,8 @@ try {
       "chat.disableAIFeatures": true,
       "telemetry.telemetryLevel": "off",
       "update.mode": "none",
-      "extensions.autoUpdate": false, "security.workspace.trust.startupPrompt":"never",
+      "extensions.autoUpdate": false,
+      "security.workspace.trust.startupPrompt": "never",
     }),
   );
   const binary =
@@ -23,7 +24,8 @@ try {
     "/Applications/Visual Studio Code - Insiders.app/Contents/MacOS/Code - Insiders";
   const env = {
     ...process.env,
-    DTP_TEST_NODE: process.execPath, DTP_TEST_UNTRUSTED:process.env.DTP_TEST_UNTRUSTED||"0",
+    DTP_TEST_NODE: process.execPath,
+    DTP_TEST_UNTRUSTED: process.env.DTP_TEST_UNTRUSTED || "0",
     DTP_TEST_CLI: path.resolve("apps/cli/main.ts"),
   };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -37,7 +39,9 @@ try {
       path.join(temp, "extensions"),
       "--extensionDevelopmentPath=" + path.resolve("apps/vscode-extension"),
       "--extensionTestsPath=" + path.resolve("tests/vscode-host/index.cjs"),
-      ...(process.env.DTP_TEST_UNTRUSTED==="1"?[]:["--disable-workspace-trust"]),
+      ...(process.env.DTP_TEST_UNTRUSTED === "1"
+        ? []
+        : ["--disable-workspace-trust"]),
       "--skip-welcome",
       "--skip-release-notes",
       root,

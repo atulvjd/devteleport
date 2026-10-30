@@ -71,7 +71,7 @@
             ><input id="includeDb" type="checkbox" /> Include configured local
             PostgreSQL databases</label
           >
-          <div class="row">
+          <label class="check"><input id="includeVolumes" type="checkbox"> Include explicitly configured local Docker volumes</label><div class="row">
             <button data-action="capture" data-dry="true">Review capture</button
             ><button data-action="capture" class="primary">
               Create encrypted snapshot
@@ -98,10 +98,11 @@
               type="password"
               autocomplete="current-password"
           /></label>
-          <p class="hint">
-            Existing destinations are protected. Dependency scripts, databases
-            and services require separate CLI approval.
-          </p>
+          <label>Trusted destination mapping<div class="row"><input id="dbConfig" placeholder="External JSON mapping for database/volume targets"><button id="chooseConfig">Browse</button></div></label>
+          <label class="check"><input id="restoreDb" type="checkbox"> Approve SQL execution into an empty development database</label>
+          <label class="check"><input id="restoreVolumes" type="checkbox"> Approve restoring configured volumes into new names</label>
+          <label class="check"><input id="install" type="checkbox"> Approve npm ci, including package lifecycle scripts</label>
+          <p class="hint">Review the plan after changing options. Existing directories, databases and volumes remain protected.</p>
           <div class="row">
             <button data-action="restore" data-dry="true">Review restore</button
             ><button data-action="restore" class="primary">

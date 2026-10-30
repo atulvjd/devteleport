@@ -71,6 +71,7 @@ ipcMain.handle("operation", async (event, input) => {
     );
     if (input.dryRun) args.push("--dry-run");
     if (input.includeDb) args.push("--include-db");
+    if(input.includeVolumes)args.push("--include-volumes");
   } else {
     args.push(input.source);
     if (input.action === "restore") {
@@ -78,10 +79,14 @@ ipcMain.handle("operation", async (event, input) => {
         throw new Error("Use an absolute destination path");
       args.push("--target", input.target);
       if (input.dryRun) args.push("--dry-run");
+      if(input.restoreDb||input.restoreVolumes){if(typeof input.dbConfig!=="string"||!path.isAbsolute(input.dbConfig))throw new Error("Select a trusted external destination mapping");args.push("--db-config",input.dbConfig);}
+      if(input.restoreDb)args.push("--restore-db","--approve-db");
+      if(input.restoreVolumes)args.push("--restore-volumes","--approve-volumes");
+      if(input.install)args.push("--install","--approve-execution");
     }
   }
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, DEVTELEPORT_PASSWORD: input.password || "" };
+    const env = { ...process.env, DEVTELEPORT_PASSWORD: input.password || "", DEVTELEPORT_PROGRESS:"1" };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.NODE_OPTIONS;
     const child = utilityProcess.fork(cli, args, {
@@ -106,7 +111,9 @@ ipcMain.handle("operation", async (event, input) => {
       stdout += data;
       if (stdout.length > 24 * 1024 * 1024) child.cancel();
     });
+    let progressBuffer="";
     child.stderr.on("data", (data) => {
+      progressBuffer+=data.toString();const lines=progressBuffer.split("\n");progressBuffer=lines.pop();for(const line of lines)if(line.startsWith("DTP_PROGRESS:")){try{win.webContents.send("progress",{action:input.action,...JSON.parse(line.slice(13))});}catch{}}
       stderr += data;
       if (stderr.length > 24 * 1024 * 1024) child.cancel();
     });
