@@ -92,6 +92,10 @@ try {
   );
   assert.equal(backend.architecture, native.architecture);
   native.backendArchitecture = backend.architecture;
+  const crypto=await import('node:crypto'),{pathToFileURL}=await import('node:url');const keys=crypto.generateKeyPairSync('ed25519'),release=Buffer.from(JSON.stringify({version:'9.0.0',channel:'stable',notes:'runtime test',artifacts:[{platform:'darwin',architecture:'arm64',url:'https://github.com/atulvjd/devteleport/releases/download/v9.0.0/app.zip',sha256:'a'.repeat(64)}]})),signature=crypto.sign(null,release,keys.privateKey).toString('base64');
+  const updatesUrl=await app.evaluate(({app})=>require('node:url').pathToFileURL(require('node:path').join(app.isPackaged?require('node:path').join(process.resourcesPath,'backend'):require('node:path').resolve('dist/backend'),'packages/core/updates.js')).href);
+  const updateState=await app.evaluate(async(_electron,input)=>{const module=await import(input.url);return module.validateRelease(Buffer.from(input.manifest,'base64'),Buffer.from(input.signature,'base64'),input.publicKey,'0.2.0').state;},{url:updatesUrl,manifest:release.toString('base64'),signature,publicKey:keys.publicKey.export({type:'spki',format:'pem'}).toString()});assert.equal(updateState,'available');native.signedMetadataVerification=updateState;
+
   await page.locator('[data-view="capture"]').click();
   await page.locator("#name").fill("cancelled");
   await page.locator('[data-action="capture"][data-dry="true"]').click();

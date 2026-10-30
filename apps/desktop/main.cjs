@@ -448,6 +448,7 @@ ipcMain.handle("settings", async (event, value) => {
     "theme",
     "exclusions",
     "trustedPublicKey",
+    "editor",
     "updateManifestUrl",
     "updateSignatureUrl",
     "updatePublicKey",
@@ -508,6 +509,7 @@ async function desktopData() {
     ...data,
     version: applicationVersion,
     architecture: process.arch,
+    editors:await (await platformModule()).editorPaths(),
     electron: process.versions.electron,
     platform: process.platform,
     storage: { available: Number(storage.bavail) * Number(storage.bsize) },
@@ -608,11 +610,13 @@ ipcMain.handle("open-project", async (event) => {
   if (!target || !(await fs.stat(target)).isDirectory())
     throw new Error("No successfully restored project is available");
   const system = await (await platformModule()).diagnostics();
-  if (system.editors.length) {
+  let preferences={};try{preferences=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'workspace-settings.json'),'utf8'));}catch{}
+  const editor=system.editors.includes(preferences.editor)?preferences.editor:system.editors[0];
+  if (editor) {
     await require("node:util").promisify(
       require("node:child_process").execFile,
-    )("/usr/bin/open", ["-a", system.editors[0], target]);
-    return { opened: target, editor: system.editors[0] };
+    )("/usr/bin/open", ["-a", editor, target]);
+    return { opened: target, editor };
   }
   shell.showItemInFolder(target);
   return { revealed: target };

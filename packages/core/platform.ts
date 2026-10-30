@@ -169,3 +169,5 @@ export async function diagnostics(configured: string[] = []) {
       "TLS pairing; manual address; experimental until physical two-Mac validation",
   };
 }
+
+export async function editorPaths(){const editors:string[]=[];if(process.platform==='darwin')for(const base of ['/Applications',path.join(os.homedir(),'Applications')])for(const name of ['Visual Studio Code.app','Visual Studio Code - Insiders.app']){const file=path.join(base,name);try{if((await fs.stat(file)).isDirectory())editors.push(file);}catch{}}return editors;}

@@ -71,7 +71,7 @@ function settingsValue() {
     name: $("name").value,
     target: $("target").value,
     toolDirectories: $("toolDirectories").value,
-    theme: $("theme").value,
+    theme: $("theme").value,editor:$("editor").value,
     exclusions: $("exclusions").value,
     trustedPublicKey: $("trustedPublicKey").value,
     updateManifestUrl: $("updateManifestUrl").value,
@@ -111,6 +111,7 @@ function row(title, detail) {
 }
 async function refreshData() {
   lastData = await window.teleport.data();
+  const editor=$('editor');editor.replaceChildren();const automatic=document.createElement('option');automatic.value='';automatic.textContent='Automatic discovery / reveal in Finder';editor.append(automatic);for(const file of lastData.editors??[]){const option=document.createElement('option');option.value=file;option.textContent=file.split('/').pop();editor.append(option);}editor.value=preferences.editor||'';
   $("storage").textContent = size(lastData.storage.available);
   $("architecture").textContent =
     lastData.architecture === "arm64"
