@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { waitForNumberLine } from "./wait-for-port.ts";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -21,15 +22,9 @@ test("cancellation terminates a supervised tool and its descendant process group
     () => finish(),
   );
   child.stdin.end();
-  const descendant = await new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("child startup timeout")),
-      5000,
-    );
-    child.stdout.once("data", (bytes) => {
-      clearTimeout(timer);
-      resolve(Number(bytes.toString().trim()));
-    });
+  t.after(() => shutdownChildren());
+  const descendant = await waitForNumberLine(child, "Descendant PID", {
+    ms: 5000,
   });
   assert(Number.isInteger(descendant));
   await shutdownChildren();

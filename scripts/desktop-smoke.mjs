@@ -52,8 +52,18 @@ try {
   await page.locator("#name").fill("desktop");
   await page.locator("#output").fill(temp);
   await page.locator("#capturePassword").fill("desktop passphrase for testing");
-  await page.locator("#includeDb").check();
-  await page.locator("#includeVolumes").check();
+  assert(await page.locator("#includeDb").isDisabled());
+  assert(await page.locator("#includeVolumes").isDisabled());
+  assert(
+    (await page.locator("#databaseAvailability").textContent()).includes(
+      "Not configured",
+    ),
+  );
+  // Preserve the preflight regression even if renderer state is manipulated.
+  await page.evaluate(() => {
+    document.getElementById("includeDb").checked = true;
+    document.getElementById("includeVolumes").checked = true;
+  });
   await page.locator('[data-action="capture"][data-dry="true"]').click();
   await page.waitForFunction(
     () => document.getElementById("status").textContent === "Needs attention",
@@ -66,10 +76,29 @@ try {
   await assert.rejects(fs.stat(path.join(temp, "desktop.dtp")), {
     code: "ENOENT",
   });
-  await page.locator("#includeDb").uncheck();
-  await page.locator("#includeVolumes").uncheck();
-  await page.locator('[data-action="capture"][data-dry="true"]').click();
+  // Unavailable selections are reset after the failed preflight.
+  assert(!(await page.locator("#includeDb").isChecked()));
+  assert(!(await page.locator("#includeVolumes").isChecked()));
+  const lockedImmediately = await page.evaluate(() => {
+    const button = document.querySelector(
+      '[data-action="capture"][data-dry="true"]',
+    );
+    button.click();
+    return (
+      button.disabled &&
+      document.getElementById("status").textContent === "Working…"
+    );
+  });
+  assert(
+    lockedImmediately,
+    "Review must immediately enter a busy state before saving preferences",
+  );
   await done();
+  assert(await page.locator("#captureReview").isVisible());
+  assert(!(await page.locator('[data-action="capture"].primary').isDisabled()));
+  await page.locator("#name").fill("changed-after-review");
+  assert(await page.locator('[data-action="capture"].primary').isDisabled());
+  await page.locator("#name").fill("desktop");
   await page.locator('[data-action="capture"].primary').click();
   await done();
   const archive = path.join(temp, "desktop.dtp");
@@ -216,7 +245,14 @@ try {
       : { args: ["apps/desktop/main.cjs"] }),
     env,
   });
-  await app.firstWindow();
+  const reopened = await app.firstWindow();
+  await reopened.waitForFunction(
+    () => document.documentElement.dataset.theme === "light",
+  );
+  assert.equal(
+    await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+    "light",
+  );
   const restoredBounds = await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].getBounds(),
   );

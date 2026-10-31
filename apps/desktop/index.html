@@ -11,102 +11,283 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <svg
+      class="svg-definitions"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <defs>
+        <symbol id="i-grid" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24">
+          <path
+            d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"
+          />
+        </symbol>
+        <symbol id="i-capture" viewBox="0 0 24 24">
+          <path
+            d="M12 16V3m-5 5 5-5 5 5M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"
+          />
+        </symbol>
+        <symbol id="i-restore" viewBox="0 0 24 24">
+          <path
+            d="M12 3v13m-5-5 5 5 5-5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"
+          />
+        </symbol>
+        <symbol id="i-layers" viewBox="0 0 24 24">
+          <path d="m12 3 10 5-10 5L2 8Zm-9 9 9 5 9-5M3 16l9 5 9-5" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M4 12h16m-6-6 6 6-6 6" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L19 6" />
+        </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+          <path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z" />
+          <path d="m8 11 3 3 5-5" />
+        </symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24">
+          <rect x="5" y="10" width="14" height="11" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+        </symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24">
+          <path d="M3 6h7m4 0h7M3 18h11m4 0h3M3 12h2m4 0h12" />
+          <circle cx="12" cy="6" r="2" />
+          <circle cx="7" cy="12" r="2" />
+          <circle cx="16" cy="18" r="2" />
+        </symbol>
+        <symbol id="i-info" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11v6m0-10v.1" />
+        </symbol>
+        <symbol id="i-database" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="5" rx="8" ry="3" />
+          <path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0" />
+        </symbol>
+        <symbol id="i-box" viewBox="0 0 24 24">
+          <path
+            d="m12 2 9 5v10l-9 5-9-5V7Zm0 10L3 7m9 5 9-5m-9 5v10M7.5 4.5l9 5"
+          />
+        </symbol>
+        <symbol id="i-code" viewBox="0 0 24 24">
+          <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 20" />
+        </symbol>
+        <symbol id="i-drive" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <path d="M3 14h18m-5 3h2" />
+        </symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24">
+          <path d="M20 7v5h-5M4 17v-5h5" />
+          <path d="M6 6a8 8 0 0 1 13 2M5 16a8 8 0 0 0 13 2" />
+        </symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24">
+          <path d="m9 5 7 7-7 7" />
+        </symbol>
+        <symbol id="i-git" viewBox="0 0 24 24">
+          <circle cx="6" cy="5" r="2" />
+          <circle cx="6" cy="19" r="2" />
+          <circle cx="18" cy="5" r="2" />
+          <path d="M6 7v10m0-5h6a6 6 0 0 0 6-5" />
+        </symbol>
+        <symbol id="i-mac" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="13" rx="2" />
+          <path d="M8 21h8m-4-5v5" />
+        </symbol>
+        <symbol id="i-transfer" viewBox="0 0 24 24">
+          <path d="M3 7h17m-4-4 4 4-4 4M21 17H4m4-4-4 4 4 4" />
+        </symbol>
+      </defs>
+    </svg>
     <aside>
-      <div class="brand"><span class="mark">◈</span> DevTeleport</div>
-      <p class="caption">YOUR WORKSPACE, ANYWHERE</p>
+      <a class="brand" href="#" aria-label="DevTeleport overview"
+        ><span class="brand-mark"
+          ><svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="m16 3 13 13-13 13L3 16Z" />
+            <path d="m16 10 6 6-6 6-6-6Z" /></svg></span
+        ><span>DevTeleport<small>Workspace continuity</small></span></a
+      >
+      <div class="sidebar-section-label">WORKSPACE</div>
       <nav aria-label="Main navigation">
-        <button data-view="dashboard" class="selected">
-          ◷ <span>Overview</span></button
+        <button data-view="dashboard" class="selected" aria-current="page">
+          <svg class="icon" aria-hidden="true"><use href="#i-grid" /></svg
+          ><span>Overview</span><span class="nav-shortcut">⌘1</span></button
         ><button data-view="workspace">
-          ⌘ <span>Workspace inspector</span></button
-        ><button data-view="capture">↗ <span>Capture workspace</span></button
-        ><button data-view="restore">↙ <span>Restore workspace</span></button
-        ><button data-view="library">▤ <span>Snapshot library</span></button
+          <svg class="icon" aria-hidden="true"><use href="#i-folder" /></svg
+          ><span>Workspace</span></button
+        ><button data-view="capture">
+          <svg class="icon" aria-hidden="true"><use href="#i-capture" /></svg
+          ><span>Capture</span></button
+        ><button data-view="restore">
+          <svg class="icon" aria-hidden="true"><use href="#i-restore" /></svg
+          ><span>Restore</span></button
+        ><button data-view="library">
+          <svg class="icon" aria-hidden="true"><use href="#i-layers" /></svg
+          ><span>Snapshot library</span></button
         ><button data-view="transfer">
-          ⇄ <span>Mac-to-Mac transfer</span>
+          <svg class="icon" aria-hidden="true"><use href="#i-transfer" /></svg
+          ><span>Mac-to-Mac transfer</span>
         </button>
         <div class="nav-divider"></div>
-        <button data-view="settings">⚙ <span>Settings</span></button
-        ><button data-view="about">ⓘ <span>About & privacy</span></button>
+        <div class="sidebar-section-label">PREFERENCES</div>
+        <button data-view="settings">
+          <svg class="icon" aria-hidden="true"><use href="#i-sliders" /></svg
+          ><span>Settings</span></button
+        ><button data-view="about">
+          <svg class="icon" aria-hidden="true"><use href="#i-info" /></svg
+          ><span>About & privacy</span>
+        </button>
       </nav>
       <div class="sidebar-bottom">
-        <span class="dot"></span> Local-first. Encrypted.<br /><small
-          id="sideArchitecture"
-          >Checking native runtime…</small
-        >
+        <div class="local-status">
+          <span class="dot"></span>Local-first & encrypted
+        </div>
+        <small id="sideArchitecture">Checking native runtime…</small
+        ><span class="build-label">DEVELOPMENT RELEASE</span>
       </div>
     </aside>
     <main>
+      <div class="topbar">
+        <span id="breadcrumb">DevTeleport / Overview</span
+        ><span class="privacy-tag"
+          ><svg class="icon" aria-hidden="true"><use href="#i-shield" /></svg>
+          Your data stays yours</span
+        >
+      </div>
       <header>
         <div>
-          <span class="eyebrow">DEVTELEPORT FOR MAC</span>
-          <h1 id="pageTitle">A new place. The same workspace.</h1>
+          <span class="eyebrow" id="pageEyebrow">YOUR WORKSPACE, ANYWHERE</span>
+          <h1 id="pageTitle">Workspace overview</h1>
           <p id="pageSubtitle">
-            Capture your saved development environment. Continue on another Mac.
+            Everything you need to pick up where you left off.
           </p>
         </div>
-        <span class="architecture" id="architecture">—</span>
+        <span class="architecture" id="architecture">Checking runtime…</span>
       </header>
       <div class="workspace-bar">
-        <label for="source">Current workspace</label>
+        <div class="workspace-label">
+          <svg class="icon" aria-hidden="true"><use href="#i-folder" /></svg
+          ><label for="source">Current workspace</label
+          ><span class="workspace-context" id="workspaceContext"
+            >Choose a project to get started</span
+          >
+        </div>
         <div class="row">
           <input
             id="source"
             placeholder="Select a development project"
             aria-label="Current workspace path"
-          /><button id="chooseWorkspace">Choose…</button
+          /><button id="chooseWorkspace">Browse…</button
           ><button data-action="inspect">Inspect</button
-          ><button data-action="verify">Verify files</button>
+          ><button data-action="verify" class="quiet">
+            <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg
+            >Verify files
+          </button>
         </div>
       </div>
       <section data-pane="dashboard">
-        <div class="stats">
-          <article>
-            <span>Available local storage</span
-            ><strong id="storage">Checking…</strong
-            ><small>Secure staging needs additional free space</small>
-          </article>
-          <article>
-            <span>Last successful capture</span
-            ><strong id="lastCapture">No captures yet</strong
-            ><small id="lastCaptureDetail"
-              >Your first snapshot will appear here.</small
+        <article class="hero">
+          <div class="hero-content">
+            <span class="pill"
+              ><svg class="icon" aria-hidden="true"><use href="#i-lock" /></svg>
+              ENCRYPTED BY DEFAULT</span
             >
-          </article>
-          <article>
-            <span>Last restoration</span
-            ><strong id="lastRestore">No restores yet</strong
-            ><small id="lastRestoreDetail"
-              >Every restore uses a new destination.</small
-            >
-          </article>
-        </div>
-        <div class="two">
-          <article class="card">
-            <h2>Your next workspace starts here.</h2>
+            <h2>Your workspace.<br />Ready for its next Mac.</h2>
             <p>
-              Saved files, Git changes, development records and supported
-              services. Encrypted before they leave your Mac.
+              Take your files, Git changes and configured development data with
+              you. Resume with a verified copy.
             </p>
-            <div class="row">
+            <div class="row wrap">
               <button class="primary" data-go="capture">
-                Capture a workspace</button
-              ><button data-go="restore">Restore a snapshot</button>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-capture" /></svg
+                >Capture workspace</button
+              ><button data-go="restore">
+                Restore a snapshot<svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow" />
+                </svg>
+              </button>
             </div>
-          </article>
-          <article class="card">
-            <h2>Recent workspaces</h2>
-            <div id="recentWorkspaces" class="empty">
-              Inspect a workspace to add it here.
+          </div>
+          <div class="journey" aria-label="Capture, encrypt and restore">
+            <div class="journey-node">
+              <svg class="icon" aria-hidden="true"><use href="#i-folder" /></svg
+              ><span>Your project</span><small>Saved files & Git</small>
             </div>
-          </article>
-        </div>
-        <article class="card">
-          <h2>Recent snapshots</h2>
-          <div id="recentSnapshots" class="empty">
-            No captured snapshots have been recorded.
+            <span class="journey-connector"></span>
+            <div class="journey-node snapshot-node">
+              <svg class="icon" aria-hidden="true"><use href="#i-lock" /></svg
+              ><span>Encrypted snapshot</span><small>.dtp archive</small>
+            </div>
+            <span class="journey-connector"></span>
+            <div class="journey-node">
+              <svg class="icon" aria-hidden="true"><use href="#i-mac" /></svg
+              ><span>A fresh start</span><small>Restore & verify</small>
+            </div>
+            <div class="journey-caption">
+              <span class="dot"></span>One checkpoint. Your next workspace.
+            </div>
           </div>
         </article>
+        <div class="stats">
+          <article>
+            <div class="stat-heading">
+              <svg class="icon" aria-hidden="true"><use href="#i-drive" /></svg
+              ><span>Available storage</span>
+            </div>
+            <strong id="storage">Checking…</strong
+            ><small>Space available on this Mac</small>
+          </article>
+          <article>
+            <div class="stat-heading">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-capture" /></svg
+              ><span>Latest capture</span>
+            </div>
+            <strong id="lastCapture">No captures yet</strong
+            ><small id="lastCaptureDetail"
+              >Create your first encrypted checkpoint.</small
+            >
+          </article>
+          <article>
+            <div class="stat-heading">
+              <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg
+              ><span>Latest restoration</span>
+            </div>
+            <strong id="lastRestore">No restores yet</strong
+            ><small id="lastRestoreDetail"
+              >A new folder. A verified copy.</small
+            >
+          </article>
+        </div>
+        <div class="two dashboard-lists">
+          <article class="card">
+            <div class="section-heading">
+              <h2>Recent workspaces</h2>
+              <span class="subtle-tag">ON THIS MAC</span>
+            </div>
+            <div id="recentWorkspaces" class="empty">
+              Inspect a project and it will appear here.
+            </div>
+          </article>
+          <article class="card">
+            <div class="section-heading">
+              <h2>Recent snapshots</h2>
+              <button class="text-button" data-go="library">
+                View library<svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow" />
+                </svg>
+              </button>
+            </div>
+            <div id="recentSnapshots" class="empty">
+              Your captured snapshots will appear here.
+            </div>
+          </article>
+        </div>
       </section>
       <section data-pane="workspace" hidden>
         <article class="card">
@@ -119,18 +300,40 @@
             databases, Compose files, omissions and unsupported components. No
             project commands are executed by inspection.
           </p>
-          <pre id="inspectorResult">
+          <div id="workspaceSummary" class="inspector-grid" hidden></div>
+          <details class="inspection-details">
+            <summary>Full inspection report</summary>
+            <pre id="inspectorResult">
 Choose a project above, then select Inspect.</pre>
+          </details>
+          <div class="row inspector-actions">
+            <button class="primary" data-go="capture">
+              Continue to capture<svg class="icon" aria-hidden="true">
+                <use href="#i-arrow" />
+              </svg>
+            </button>
+          </div>
         </article>
       </section>
       <section data-pane="capture" hidden>
         <div class="steps" aria-label="Capture steps">
-          <span>1 · Choose project</span><span>2 · Select components</span
-          ><span>3 · Review</span><span>4 · Encrypt & verify</span>
+          <span><b>1</b>Choose project</span
+          ><span><b>2</b>Select components</span
+          ><span data-review-step="capture"><b>3</b>Review</span
+          ><span><b>4</b>Encrypt & verify</span>
         </div>
-        <div class="two">
+        <div class="two flow-grid">
           <article class="card">
-            <h2>What comes with you?</h2>
+            <div class="section-heading">
+              <div>
+                <span class="section-number">01 / SNAPSHOT</span>
+                <h2>What comes with you?</h2>
+              </div>
+              <svg class="icon heading-icon" aria-hidden="true">
+                <use href="#i-capture" />
+              </svg>
+            </div>
+            <p class="card-intro">A portable checkpoint of your saved work.</p>
             <label
               >Snapshot name<input
                 id="name"
@@ -138,116 +341,272 @@ Choose a project above, then select Inspect.</pre>
                 maxlength="100"
                 aria-label="Snapshot name" /></label
             ><label
-              >Destination folder
+              >Save snapshot to
               <div class="row">
                 <input
                   id="output"
-                  placeholder="Choose where encrypted snapshots are saved"
-                /><button id="chooseOutput">Choose…</button>
+                  placeholder="Select a folder for your encrypted archive"
+                /><button id="chooseOutput">Browse…</button>
               </div></label
-            ><label class="check"
-              ><input id="includeDb" type="checkbox" />Include configured
-              development PostgreSQL databases</label
-            ><label class="check"
-              ><input id="includeVolumes" type="checkbox" />Include configured
-              stopped local Docker volumes</label
             >
-            <p class="hint">
-              Database and Docker options require entries in the project’s
-              devteleport.json. Leave them unchecked for a files-and-Git
-              snapshot. Files, offline Git context and saved editor files are
-              included by default. Secrets and dependencies are excluded with
-              review records.
+            <div class="field-heading">
+              Included components<span class="subtle-tag"
+                >YOU’RE IN CONTROL</span
+              >
+            </div>
+            <div class="component included">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-folder" />
+              </svg>
+              <div>
+                <strong>Project files & Git</strong
+                ><small
+                  >Saved code, local history and uncommitted changes</small
+                >
+              </div>
+              <span class="component-badge">Included</span>
+            </div>
+            <label class="component selectable"
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-database" /></svg
+              ><span
+                ><strong>PostgreSQL databases</strong
+                ><small id="databaseAvailability"
+                  >Inspect your workspace to check configuration</small
+                ></span
+              ><input id="includeDb" type="checkbox" disabled
+            /></label>
+            <label class="component selectable"
+              ><svg class="icon" aria-hidden="true"><use href="#i-box" /></svg
+              ><span
+                ><strong>Docker volumes</strong
+                ><small id="volumeAvailability"
+                  >Inspect your workspace to check configuration</small
+                ></span
+              ><input id="includeVolumes" type="checkbox" disabled
+            /></label>
+            <p class="hint" id="componentHint">
+              Files and Git work on their own. Optional components need entries
+              in your project’s devteleport.json.
             </p>
           </article>
           <article class="card">
-            <h2>Private by default.</h2>
-            <label
-              >Encryption passphrase<input
-                id="capturePassword"
-                type="password"
-                autocomplete="new-password"
-                placeholder="At least 12 characters"
-                aria-label="Capture encryption passphrase"
-            /></label>
-            <div class="callout">
-              AES-256-GCM · streaming format 2<br /><small
-                >Passphrases stay out of settings and logs. Keep yours safe:
-                there is no password recovery.</small
-              >
+            <div class="section-heading">
+              <div>
+                <span class="section-number">02 / PROTECTION</span>
+                <h2>Keep your work private.</h2>
+              </div>
+              <svg class="icon heading-icon" aria-hidden="true">
+                <use href="#i-lock" />
+              </svg>
             </div>
-            <div class="row wrap">
-              <button data-action="capture" data-dry="true">
-                Review capture</button
-              ><button data-action="capture" class="primary">
-                Create encrypted snapshot
-              </button>
-            </div>
-            <p class="hint">
-              Review again after changing paths, options or exclusions. The
-              archive is authenticated after capture before success is reported.
+            <p class="card-intro">
+              Encrypted on this Mac, before your snapshot leaves it.
             </p>
+            <label
+              >Encryption passphrase
+              <div class="password-field">
+                <input
+                  id="capturePassword"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="At least 12 characters"
+                  aria-label="Capture encryption passphrase"
+                /><button
+                  class="text-button"
+                  type="button"
+                  data-toggle-password="capturePassword"
+                  aria-label="Show capture passphrase"
+                  aria-pressed="false"
+                >
+                  Show
+                </button>
+              </div></label
+            >
+            <div class="security-note">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-shield" />
+              </svg>
+              <div>
+                <strong>Only your passphrase unlocks it.</strong>
+                <p>
+                  It stays out of settings and logs. Keep it somewhere
+                  safe—there’s no password recovery.
+                </p>
+              </div>
+            </div>
+            <div class="review-summary" id="captureReview" hidden></div>
+            <div class="action-panel">
+              <div class="review-state">
+                <span class="review-dot"></span
+                ><span id="captureReviewState"
+                  >Review your snapshot before creating it</span
+                >
+              </div>
+              <div class="row wrap">
+                <button data-action="capture" data-dry="true">
+                  Review capture</button
+                ><button data-action="capture" class="primary" disabled>
+                  Create snapshot<svg class="icon" aria-hidden="true">
+                    <use href="#i-arrow" />
+                  </svg>
+                </button>
+              </div>
+              <p class="hint">
+                Your archive is authenticated after capture before success is
+                reported.
+              </p>
+            </div>
+            <div class="technical-caption">
+              AES-256-GCM<span>·</span>Streaming format 2
+            </div>
           </article>
         </div>
       </section>
       <section data-pane="restore" hidden>
-        <div class="steps">
-          <span>1 · Choose snapshot</span><span>2 · Authenticate & inspect</span
-          ><span>3 · Approve</span><span>4 · Restore & verify</span>
+        <div class="steps" aria-label="Restore steps">
+          <span><b>1</b>Choose snapshot</span><span><b>2</b>Unlock</span
+          ><span data-review-step="restore"><b>3</b>Review</span
+          ><span><b>4</b>Restore & verify</span>
         </div>
-        <div class="two">
+        <div class="two flow-grid">
           <article class="card">
-            <h2>Resume independently.</h2>
+            <div class="section-heading">
+              <div>
+                <span class="section-number">01 / YOUR SNAPSHOT</span>
+                <h2>Pick up where you left off.</h2>
+              </div>
+              <svg class="icon heading-icon" aria-hidden="true">
+                <use href="#i-restore" />
+              </svg>
+            </div>
+            <p class="card-intro">
+              Unlock your checkpoint and choose its new home.
+            </p>
             <label
               >Encrypted snapshot
               <div class="row">
                 <input
                   id="snapshot"
-                  placeholder="Select a .dtp archive"
-                /><button id="chooseSnapshot">Choose…</button>
+                  placeholder="Choose a .dtp snapshot"
+                /><button id="chooseSnapshot">Browse…</button>
               </div></label
             ><label
-              >Passphrase<input
-                id="restorePassword"
-                type="password"
-                autocomplete="current-password"
-                aria-label="Restore encryption passphrase" /></label
+              >Snapshot passphrase
+              <div class="password-field">
+                <input
+                  id="restorePassword"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="The passphrase used at capture"
+                  aria-label="Restore encryption passphrase"
+                /><button
+                  class="text-button"
+                  type="button"
+                  data-toggle-password="restorePassword"
+                  aria-label="Show restore passphrase"
+                  aria-pressed="false"
+                >
+                  Show
+                </button>
+              </div></label
             ><label
               >New destination path<input
                 id="target"
-                placeholder="/Users/you/Projects/restored-project" /></label
-            ><label
-              >Trusted external database/volume mapping
-              <div class="row">
-                <input
-                  id="dbConfig"
-                  placeholder="Only needed for database or volume restoration"
-                /><button id="chooseConfig">Choose…</button>
-              </div></label
-            >
+                placeholder="/Users/you/Projects/restored-project"
+                aria-describedby="targetHelp"
+            /></label>
+            <p class="field-help" id="targetHelp">
+              Enter a new folder name. DevTeleport creates it for you; existing
+              folders are never overwritten.
+            </p>
+            <details class="mapping-details">
+              <summary>
+                Database & volume destinations <span>Optional</span>
+              </summary>
+              <label
+                >Trusted external mapping
+                <div class="row">
+                  <input
+                    id="dbConfig"
+                    placeholder="Choose a trusted JSON mapping file"
+                  /><button id="chooseConfig">Browse…</button>
+                </div></label
+              >
+              <p class="hint">
+                Required only when restoring database or Docker data. Source
+                credentials aren’t copied into a new target.
+              </p>
+            </details>
           </article>
           <article class="card">
-            <h2>Review before anything runs.</h2>
-            <label class="check"
-              ><input id="restoreDb" type="checkbox" />Approve SQL execution
-              into a configured empty development database</label
-            ><label class="check"
-              ><input id="restoreVolumes" type="checkbox" />Approve configured
-              volumes restored into new volume names</label
-            ><label class="check"
-              ><input id="install" type="checkbox" />Approve npm ci, including
-              lifecycle scripts</label
-            >
-            <div class="callout">
-              Existing directories and volumes are never overwritten. Nonempty
-              database targets are refused.
+            <div class="section-heading">
+              <div>
+                <span class="section-number">02 / REVIEW & RESTORE</span>
+                <h2>Files first. You approve the rest.</h2>
+              </div>
+              <svg class="icon heading-icon" aria-hidden="true">
+                <use href="#i-shield" />
+              </svg>
             </div>
-            <div class="row wrap">
-              <button data-action="restore" data-dry="true">
-                Review restore</button
-              ><button data-action="restore" class="primary">
-                Restore files</button
-              ><button id="openProject">Open restored project</button>
+            <p class="card-intro">
+              Leave optional actions off for a files-and-Git restore.
+            </p>
+            <div class="component included">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-folder" />
+              </svg>
+              <div>
+                <strong>Restore files & Git</strong
+                ><small>Into a new destination, then verify</small>
+              </div>
+              <span class="component-badge">Included</span>
+            </div>
+            <label class="component selectable"
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-database" /></svg
+              ><span
+                ><strong>Restore PostgreSQL data</strong
+                ><small>Runs SQL into a configured empty database</small></span
+              ><input id="restoreDb" type="checkbox" /></label
+            ><label class="component selectable"
+              ><svg class="icon" aria-hidden="true"><use href="#i-box" /></svg
+              ><span
+                ><strong>Restore Docker volumes</strong
+                ><small>Creates new volumes using your mapping</small></span
+              ><input id="restoreVolumes" type="checkbox" /></label
+            ><label class="component selectable"
+              ><svg class="icon" aria-hidden="true"><use href="#i-code" /></svg
+              ><span
+                ><strong>Install npm dependencies</strong
+                ><small
+                  >Runs npm ci and lifecycle scripts; npm lockfile
+                  required</small
+                ></span
+              ><input id="install" type="checkbox"
+            /></label>
+            <div class="review-summary" id="restoreReview" hidden></div>
+            <div class="action-panel">
+              <div class="review-state">
+                <span class="review-dot"></span
+                ><span id="restoreReviewState"
+                  >Review your snapshot before restoring it</span
+                >
+              </div>
+              <div class="row wrap">
+                <button data-action="restore" data-dry="true">
+                  Review restore</button
+                ><button data-action="restore" class="primary" disabled>
+                  Restore files<svg class="icon" aria-hidden="true">
+                    <use href="#i-arrow" />
+                  </svg>
+                </button>
+              </div>
+              <button id="openProject" class="text-button open-project">
+                Open restored project<svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow" />
+                </svg>
+              </button>
             </div>
           </article>
         </div>
@@ -361,7 +720,7 @@ Choose a project above, then select Inspect.</pre>
       <section data-pane="settings" hidden>
         <div class="two">
           <article class="card">
-            <h2>Make it yours.</h2>
+            <h2>Appearance & preferences.</h2>
             <label
               >Appearance<select id="theme">
                 <option value="system">Follow macOS</option>
@@ -468,28 +827,64 @@ Choose a project above, then select Inspect.</pre>
           <button id="showWelcome">Show welcome guide</button>
         </article>
       </section>
-      <section class="activity" aria-live="polite">
-        <div class="row">
-          <h2>Activity & diagnostics</h2>
-          <span id="status">Ready</span
-          ><button id="cancel" disabled>Cancel operation</button>
+      <section
+        class="activity"
+        data-state="idle"
+        aria-label="Operation activity"
+      >
+        <div class="activity-top">
+          <span class="activity-icon"
+            ><svg class="icon" aria-hidden="true"><use href="#i-info" /></svg
+          ></span>
+          <div class="activity-copy">
+            <h2 id="activityTitle">Ready when you are.</h2>
+            <p id="activitySummary">
+              Choose a workspace to capture, or a snapshot to restore.
+            </p>
+          </div>
+          <span id="status" role="status" aria-live="polite">Ready</span
+          ><button id="cancel" disabled hidden>Cancel</button>
         </div>
-        <pre id="result">
+        <div class="progress-track" hidden><span></span></div>
+        <details id="activityDetails">
+          <summary>Technical details</summary>
+          <pre id="result">
 Choose a workspace or an encrypted snapshot to begin.</pre>
+        </details>
       </section>
       <footer>
-        Local data. Explicit approvals. A new destination for every restore.
+        <span
+          ><svg class="icon" aria-hidden="true"><use href="#i-lock" /></svg>
+          Local data. Explicit approvals.</span
+        ><span>A new destination for every restore.</span>
       </footer>
     </main>
     <dialog id="welcome">
-      <div class="welcome-mark">◈</div>
-      <h2>Your workspace is going places.</h2>
-      <p>1. Choose a saved project and inspect what can travel.</p>
-      <p>2. Review exclusions and create a passphrase-encrypted snapshot.</p>
-      <p>
-        3. Transfer it, restore into a new folder, and approve only the tools
-        you trust.
-      </p>
+      <div class="welcome-mark">
+        <svg class="icon" aria-hidden="true"><use href="#i-capture" /></svg>
+      </div>
+      <h2>Your next Mac. Your same workspace.</h2>
+      <div class="welcome-step">
+        <b>1</b>
+        <div>
+          <strong>Choose your workspace</strong>
+          <p>Inspect saved files, Git and configured components.</p>
+        </div>
+      </div>
+      <div class="welcome-step">
+        <b>2</b>
+        <div>
+          <strong>Capture an encrypted checkpoint</strong>
+          <p>Review what’s included and set a passphrase.</p>
+        </div>
+      </div>
+      <div class="welcome-step">
+        <b>3</b>
+        <div>
+          <strong>Restore and continue</strong>
+          <p>Transfer the snapshot, restore into a new folder, then verify.</p>
+        </div>
+      </div>
       <p class="hint">
         Live processes and unsaved buffers cannot travel. Never delete the
         original until you verify the restored copy.

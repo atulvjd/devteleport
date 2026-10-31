@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import os from "node:os";
+import { stripVTControlCharacters } from "node:util";
 const version = JSON.parse(await fs.readFile("package.json", "utf8")).version;
 const evidence = path.resolve("dist/evidence");
 await fs.mkdir(evidence, { recursive: true });
@@ -30,7 +31,7 @@ async function stage(name, cmd, args, env = {}) {
     child.on("close", (code) => resolve({ code }));
   });
   await fs.writeFile(file, Buffer.concat(output));
-  const log = Buffer.concat(output).toString("utf8");
+  const log = stripVTControlCharacters(Buffer.concat(output).toString("utf8"));
   const status =
     result.code === 0
       ? /\bskipped [1-9]|\bSKIP(?:PED)?\b/.test(log)
@@ -93,6 +94,9 @@ if (checks[0].status === "PASS") {
   await stage("bundle-architecture-and-integrity", process.execPath, [
     "scripts/architecture.mjs",
   ]);
+  await stage("distributed-dmg-integrity", process.execPath, [
+    "scripts/verify-distribution.mjs",
+  ]);
   await stage(
     "packaged-desktop",
     process.execPath,
@@ -100,6 +104,14 @@ if (checks[0].status === "PASS") {
     {
       DEVTELEPORT_APP_BINARY: path.join(bundle, "Contents/MacOS/DevTeleport"),
       DEVTELEPORT_EXPECT_ARCH: "arm64",
+    },
+  );
+  await stage(
+    "desktop-visual-layout",
+    process.execPath,
+    ["scripts/desktop-visual.mjs"],
+    {
+      DEVTELEPORT_APP_BINARY: path.join(bundle, "Contents/MacOS/DevTeleport"),
     },
   );
 }

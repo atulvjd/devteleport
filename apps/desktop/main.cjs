@@ -41,7 +41,21 @@ async function createWindow() {
   creatingWindow = true;
   try {
     discoveredDirectories = await (await platformModule()).searchDirectories();
+    let savedAppearance = "system";
+    try {
+      const settings = JSON.parse(
+        await fs.readFile(
+          path.join(app.getPath("userData"), "workspace-settings.json"),
+          "utf8",
+        ),
+      );
+      if (["system", "light", "dark"].includes(settings.theme))
+        savedAppearance = settings.theme;
+    } catch {}
+    nativeTheme.themeSource = savedAppearance;
     win = new BrowserWindow({
+      show: false,
+      backgroundColor: nativeTheme.shouldUseDarkColors ? "#111419" : "#f4f6fa",
       width: 1140,
       height: 820,
       minWidth: 800,
@@ -53,6 +67,7 @@ async function createWindow() {
         sandbox: true,
       },
     });
+    win.once("ready-to-show", () => win.show());
     app.setName("DevTeleport");
     if (app.isPackaged && !process.env.DEVTELEPORT_USER_DATA)
       app.setAsDefaultProtocolClient("devteleport");
@@ -118,6 +133,11 @@ async function createWindow() {
         {
           label: "View",
           submenu: [
+            {
+              label: "Overview",
+              accelerator: "CmdOrCtrl+1",
+              click: () => route("dashboard"),
+            },
             { role: "resetZoom" },
             { role: "zoomIn" },
             { role: "zoomOut" },
@@ -407,7 +427,11 @@ ipcMain.handle("operation", async (event, input) => {
         const result = JSON.parse(stdout);
         if (input.action === "history")
           for (const item of result) libraryPaths.add(item.file);
-        if(!input.dryRun&&["capture","restore","receive"].includes(input.action))notifyCompletion(input.action);
+        if (
+          !input.dryRun &&
+          ["capture", "restore", "receive"].includes(input.action)
+        )
+          notifyCompletion(input.action);
         if (
           !input.dryRun &&
           ["inspect", "capture", "restore", "receive"].includes(input.action)
@@ -510,7 +534,7 @@ async function desktopData() {
     ...data,
     version: applicationVersion,
     architecture: process.arch,
-    editors:await (await platformModule()).editorPaths(),
+    editors: await (await platformModule()).editorPaths(),
     electron: process.versions.electron,
     platform: process.platform,
     storage: { available: Number(storage.bavail) * Number(storage.bsize) },
@@ -611,8 +635,18 @@ ipcMain.handle("open-project", async (event) => {
   if (!target || !(await fs.stat(target)).isDirectory())
     throw new Error("No successfully restored project is available");
   const system = await (await platformModule()).diagnostics();
-  let preferences={};try{preferences=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'workspace-settings.json'),'utf8'));}catch{}
-  const editor=system.editors.includes(preferences.editor)?preferences.editor:system.editors[0];
+  let preferences = {};
+  try {
+    preferences = JSON.parse(
+      await fs.readFile(
+        path.join(app.getPath("userData"), "workspace-settings.json"),
+        "utf8",
+      ),
+    );
+  } catch {}
+  const editor = system.editors.includes(preferences.editor)
+    ? preferences.editor
+    : system.editors[0];
   if (editor) {
     await require("node:util").promisify(
       require("node:child_process").execFile,
@@ -673,7 +707,17 @@ function awaitSummary(input, result) {
         ...data.workspaces.filter((w) => w.root !== result.root),
       ].slice(0, 12);
     }
-    if(input.action==="receive"){data.snapshots=[{file:result.target,bytes:result.bytes,receivedAt:timestamp,completedAt:timestamp},...data.snapshots.filter(s=>s.file!==result.target)].slice(0,30);}
+    if (input.action === "receive") {
+      data.snapshots = [
+        {
+          file: result.target,
+          bytes: result.bytes,
+          receivedAt: timestamp,
+          completedAt: timestamp,
+        },
+        ...data.snapshots.filter((s) => s.file !== result.target),
+      ].slice(0, 30);
+    }
     if (input.action === "capture") {
       data.lastCapture = {
         file: result.output,
@@ -747,4 +791,23 @@ app.on("open-file", async (event, file) => {
   } catch {}
 });
 
-async function notifyCompletion(action){try{const settings=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'workspace-settings.json'),'utf8'));if(settings.notifications&&Notification.isSupported())new Notification({title:'DevTeleport',body:action==='capture'?'Encrypted snapshot captured.':action==='restore'?'Workspace restored and verified.':'Encrypted snapshot received; restore approval is still required.'}).show();}catch{}}
+async function notifyCompletion(action) {
+  try {
+    const settings = JSON.parse(
+      await fs.readFile(
+        path.join(app.getPath("userData"), "workspace-settings.json"),
+        "utf8",
+      ),
+    );
+    if (settings.notifications && Notification.isSupported())
+      new Notification({
+        title: "DevTeleport",
+        body:
+          action === "capture"
+            ? "Encrypted snapshot captured."
+            : action === "restore"
+              ? "Workspace restored and verified."
+              : "Encrypted snapshot received; restore approval is still required.",
+      }).show();
+  } catch {}
+}

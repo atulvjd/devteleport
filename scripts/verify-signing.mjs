@@ -26,6 +26,20 @@ for (const [name, tool, args] of [
     detail: (r.stdout || "") + (r.stderr || ""),
   });
 }
+const identity = spawnSync("/usr/bin/codesign", ["-d", "--verbose=2", app], {
+  encoding: "utf8",
+});
+const identityDetails = (identity.stdout || "") + (identity.stderr || "");
+checks.push({
+  name: "Developer-ID-identity",
+  status:
+    identity.status === 0 &&
+    /^Authority=Developer ID Application:/m.test(identityDetails) &&
+    /^TeamIdentifier=(?!not set$).+/m.test(identityDetails)
+      ? "PASS"
+      : "BLOCKED",
+  detail: identityDetails,
+});
 await fs.mkdir("dist/evidence", { recursive: true });
 await fs.writeFile(
   "dist/evidence/signing.json",
