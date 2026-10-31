@@ -256,8 +256,8 @@ try {
       const window = BrowserWindow.getAllWindows()[0];
       const workArea = screen.getDisplayMatching(window.getBounds()).workArea;
       const [minWidth, minHeight] = window.getMinimumSize();
-      // Hosted macOS can have a 1024 x 684 work area. Exercise that size even
-      // on a larger local display, and keep the requested bounds fully visible.
+      // Hosted macOS can have a 1024 x 684 work area. Use bounds that fit it
+      // even on a larger local display, without extending beyond any work area.
       const width = Math.max(minWidth, Math.min(980, workArea.width));
       const height = Math.max(minHeight, Math.min(640, workArea.height));
       if (width > workArea.width || height > workArea.height)

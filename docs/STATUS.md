@@ -14,7 +14,7 @@ Native Apple Silicon release candidate implemented; **not production certified**
 | Packaging                           | Native ARM64 DMG/ZIP, CLI tarball and VSIX; unsigned development artifacts                                                                                                                                                                      |
 | Verification | Latest rebuilt candidate: 46 core/security/diff/parser tests and all 19 native stages PASS; 32 dark/light layout combinations PASS with zero renderer errors. See UI-REFRESH.md and dist/evidence. |
 | Performance                         | Actual Apple M4 / 16 GiB: generated 1 GiB fixture captured in 2.707 s and restored in 2.176 s; peak capture RSS 191,520 KiB. Method/caveats in release report                                                                                   |
-| CI                                  | Workflows prepared; origin configured; no agent push, publication or remote run performed                                                                                                                                                       |
+| CI | Hosted main run #23 at dc2faa4: all five jobs PASS, including native applications, packaged smoke, distribution checks and 32 UI layout combinations. |
 
 ## Evidence
 
@@ -25,8 +25,7 @@ Machine-readable local evidence lives in `dist/evidence/`. `apple-silicon-verifi
 1. Developer ID signing, notarization and Gatekeeper acceptance require authorized credentials. Current artifacts remain explicitly unsigned.
 2. Physical two-Mac transfer and fresh-install OS permission/notification acceptance require real devices and manual acceptance. Localhost tests do not substitute for them.
 3. Signed update installation/restart recovery needs a trusted feed and signed/notarized artifacts before enabling executable replacement.
-4. Remote CI requires an authorized push/run; local results do not imply remote certification.
-5. Exhaustive interruption coverage across every external-tool phase and an independent security audit remain outstanding.
+4. Exhaustive interruption coverage across every external-tool phase and an independent security audit remain outstanding.
 
 See [continuation instructions](CONTINUATION.md), [format limits](FORMAT-2.md), [network transfer](NETWORK-TRANSFER.md) and [security model](SECURITY.md). Windows, arbitrary volume drivers/bind mounts, universal secret detection and live process migration are outside the certified scope.
 
@@ -71,3 +70,17 @@ Public npm release update: the user explicitly approved publication of the revie
 ## Public npm CLI release — 31 October 2026
 
 **Published and independently verified:** `devteleport@0.2.0` is public at https://www.npmjs.com/package/devteleport with latest tag `0.2.0`. Anyone with Node.js 24+ on macOS/Linux can run `npm install -g devteleport`; no repository or desktop is required. Exact registry SHA-512 matched the approved tarball. A fresh public-registry global install with an empty cache passed help/inspect/capture/diff/source-removal/restore/original-archive verification. See [NPM-RELEASE.md](NPM-RELEASE.md) and `dist/evidence/npm-public-install.json`. Earlier pending/authentication-blocked statements are historical and superseded. No desktop publication, Git push, remote merge or remote CI execution occurred. Future CLI changes need a new package version; do not republish 0.2.0.
+
+## GitHub release and desktop CI follow-up — 31 October 2026
+
+The final DMG was subsequently published as the sole asset of the [v0.2.0 prerelease](https://github.com/atulvjd/devteleport/releases/tag/v0.2.0), using source checkpoint `11923f028e4ec88df9bfd271b8f593aa27a491f3`. At publication, only the release tag was pushed and remote `main` was `9c721b99bce90c0c8e895732d24fe767db0b7e1e`. Earlier statements that no Git push, desktop release or hosted CI occurred are historical.
+
+The supplied screenshot matches the older main-branch smoke test at line 72. Its retry can observe the previous configuration error because the renderer awaits settings persistence before entering the busy state. The current release source already enters that state synchronously and completes this capture/retry scenario. The missing-database/volume safeguard remains in place.
+
+Inspection of the actual [release-tag workflow run #22](https://github.com/atulvjd/devteleport/actions/runs/41168015465) found **three core jobs and Linux integrations passing**. Applications failed later: the smoke test requested a 1080-pixel window on a 1024-pixel hosted display, then compared that size with the OS-clamped reopened window. Later application steps were skipped, not passed.
+
+Updated `scripts/desktop-smoke.mjs` to wait until controls are released, deliberately hold settings persistence during the error/retry regression, and choose bounds inside the current display's work area (at most 980 × 640). It still asserts exact saved and reopened native bounds. A disposable regression with the old await-before-busy ordering failed at the intended immediate-lock assertion. Fresh `npm run check`, source `npm run test:desktop`, and the same smoke against the existing packaged ARM64 app passed on local Node 24.21.0 / Electron 45.2.0. See `dist/evidence/desktop-ci-followup.json` and `dist/native-runtime.json`.
+
+During this work, main advanced to `dc2faa4b40092ccaf8e5ade1b567c78563b32c24`, including the implementation and smoke corrections, and triggered [hosted run #23](https://github.com/atulvjd/devteleport/actions/runs/41169471448). **All five jobs passed**, completed at `2026-10-31T04:42:48Z`: core on ARM64 macOS, Intel macOS and Ubuntu; Linux PostgreSQL/Docker integrations; and native applications. Applications passed source desktop smoke, two-app TLS transfer, trusted/untrusted VS Code hosts, packaging, actual-DMG validation, architecture checks, packaged desktop smoke, and all 32 dark/light layout combinations. The workflow uploaded the `unsigned-applications` artifact (ID `13031020126`). No further hosted rerun is required for this correction.
+
+This follow-up changes the test and documentation only; the renderer already contains the retry fix. The published DMG is unchanged (SHA-256 `37266add384ab4deca93cb53f29a0bbba6951ace0876223ed398568a698d4519`); no tag replacement or new publication was performed. The previous local 19-stage result remains its historical checkpoint, while the green hosted run is new independent evidence for commit `dc2faa4`. Signing/notarization, physical-device acceptance and secure update installation remain separate gates.
