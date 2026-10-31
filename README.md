@@ -13,7 +13,7 @@ Use the unsigned ARM64 DMG/ZIP only as a development artifact. Development build
 The [public CLI package](https://www.npmjs.com/package/devteleport) requires native Node.js 24 or newer:
 
 ```sh
-npm install -g devteleport
+npm install --global devteleport
 devteleport diagnostics
 devteleport inspect /path/to/project
 devteleport capture --root /path/to/project --name my-project --output /path/to/snapshots --dry-run
