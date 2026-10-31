@@ -152,7 +152,8 @@ test("oversized volume members are refused before archive expansion", async () =
   const volume = "dtp-expansion-" + crypto.randomBytes(6).toString("hex");
   const data = execFileSync("python3", [
     "-c",
-    "import tarfile,io,sys;buf=io.BytesIO();t=tarfile.open(fileobj=buf,mode='w:gz');m=tarfile.TarInfo('huge');m.size=134217729;t.addfile(m);t.close();sys.stdout.buffer.write(buf.getvalue())",
+    // Header only: Python 3.13+ refuses addfile() without data for a nonzero size.
+    "import tarfile,gzip,sys;m=tarfile.TarInfo('huge');m.size=134217729;sys.stdout.buffer.write(gzip.compress(m.tobuf()))",
   ]);
   await assert.rejects(restoreVolume(volume, data), /adapter failed/);
   assert.throws(() => docker("volume", "inspect", volume));

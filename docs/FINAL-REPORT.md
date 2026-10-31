@@ -1,6 +1,6 @@
 # DevTeleport 0.2.0 — final local release report
 
-Report date: 2026-10-31. **Native Apple Silicon development release candidate; not production certified.** No push, package publication, public release, notarization upload or remote CI run was performed.
+Report date: 2026-10-31. This describes the original candidate checkpoint; subsequent fixes and current 46-test verification are documented in [TEST-REPORT-FOLLOWUP.md](TEST-REPORT-FOLLOWUP.md). **Native Apple Silicon development release candidate; not production certified.** No push, package publication, public release, notarization upload or remote CI run was performed.
 
 ## 1. Actual code changes
 

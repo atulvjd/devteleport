@@ -2,43 +2,55 @@ const $ = (id) => document.getElementById(id),
   reviews = new Map();
 let preferences = {},
   busy = false,
-  lastData = {};
+  lastData = {},
+  workspaceInfo = null;
 const titles = {
   dashboard: [
-    "A new place. The same workspace.",
-    "Capture saved development state. Continue independently on another Mac.",
+    "Workspace overview",
+    "Everything you need to pick up where you left off.",
   ],
   workspace: [
-    "Know what will travel.",
-    "Real compatibility, Git context, services and support boundaries.",
+    "Workspace inspector",
+    "Understand your files, Git state and configured components.",
   ],
   capture: [
-    "Take your workspace with you.",
-    "Review first. Encrypt locally. Verify before you leave.",
+    "Capture your workspace",
+    "One encrypted checkpoint. Ready for another Mac.",
   ],
   restore: [
-    "Continue where you left off.",
-    "Authenticate, approve, and restore into a new destination.",
+    "Restore your workspace",
+    "Unlock your saved work and give it a new home.",
   ],
   library: [
-    "A library that stays private.",
-    "Encrypted snapshots, local labels and explicit file operations.",
+    "Snapshot library",
+    "Your encrypted checkpoints, kept on your Mac.",
   ],
   transfer: [
-    "From this Mac to the next.",
-    "Authenticated TLS pairing with explicit receiving approval.",
+    "Mac-to-Mac transfer",
+    "Move an encrypted snapshot directly to another Mac.",
   ],
   settings: [
-    "Your tools. Your preferences.",
-    "No plaintext passwords. No background telemetry.",
+    "Settings",
+    "Appearance, trusted tools and your local preferences.",
   ],
   about: [
-    "Built for the way you work.",
-    "A transparent local-first developer tool.",
+    "About DevTeleport",
+    "Built for local, private workspace continuity.",
   ],
+};
+const navLabels = {
+  dashboard: "Overview",
+  workspace: "Workspace",
+  capture: "Capture",
+  restore: "Restore",
+  library: "Snapshot library",
+  transfer: "Transfer",
+  settings: "Settings",
+  about: "About & privacy",
 };
 function navigate(view) {
   if (!titles[view]) return;
+  window.scrollTo({ top: 0, behavior: "instant" });
   for (const pane of document.querySelectorAll("[data-pane]"))
     pane.hidden = pane.dataset.pane !== view;
   for (const button of document.querySelectorAll("[data-view]")) {
@@ -48,8 +60,11 @@ function navigate(view) {
       button.dataset.view === view ? "page" : "false",
     );
   }
+  document.querySelector("main").dataset.view = view;
+  $("breadcrumb").textContent = "DevTeleport / " + navLabels[view];
   $("pageTitle").textContent = titles[view][0];
   $("pageSubtitle").textContent = titles[view][1];
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 for (const button of document.querySelectorAll("[data-view]"))
   button.onclick = () => {
@@ -59,9 +74,188 @@ for (const button of document.querySelectorAll("[data-view]"))
 for (const button of document.querySelectorAll("[data-go]"))
   button.onclick = () => navigate(button.dataset.go);
 window.teleport.onNavigate(navigate);
+document.querySelector(".brand").onclick = (event) => {
+  event.preventDefault();
+  navigate("dashboard");
+};
+function activity(state, title, summary, status) {
+  document.querySelector(".activity").dataset.state = state;
+  $("activityTitle").textContent = title;
+  $("activitySummary").textContent = summary;
+  $("status").textContent = status;
+  document.querySelector(".progress-track").hidden = state !== "working";
+}
 function showError(error) {
-  $("status").textContent = "Needs attention";
-  $("result").textContent = error.message || String(error);
+  const message = (error.message || String(error))
+    .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
+    .replace(/^DevTeleport:\s*/, "");
+  activity("error", "Let’s get this sorted.", message, "Needs attention");
+  $("result").textContent = message;
+}
+function reviewKey(input) {
+  return JSON.stringify({ ...input, password: undefined, dryRun: undefined });
+}
+function syncReviewActions() {
+  for (const action of ["capture", "restore"]) {
+    const valid = reviews.get(action) === reviewKey(inputFor(action));
+    const button = document.querySelector(`[data-action="${action}"].primary`);
+    button.disabled = busy || !valid;
+    const panel = button.closest(".action-panel");
+    panel.dataset.reviewed = String(valid);
+    $(action + "ReviewState").textContent = valid
+      ? "Review complete. Ready when you are."
+      : "Review " +
+        (action === "capture"
+          ? "your snapshot before creating it"
+          : "your snapshot before restoring it");
+    $(action + "Review").dataset.stale = String(!valid);
+    document
+      .querySelector(`[data-review-step="${action}"]`)
+      .classList.toggle("is-reviewed", valid);
+  }
+  $("openProject").disabled =
+    busy ||
+    !lastData.lastRestore?.verified ||
+    lastData.lastRestore.target !== $("target").value;
+}
+function syncComponents() {
+  const current =
+    workspaceInfo?.source === $("source").value ? workspaceInfo.report : null;
+  for (const [id, field, label] of [
+    ["includeDb", "databases", "databaseAvailability"],
+    ["includeVolumes", "volumes", "volumeAvailability"],
+  ]) {
+    const count = current?.[field]?.length || 0;
+    $(id).disabled = busy || !count;
+    if (!count) $(id).checked = false;
+    $(label).textContent = !current
+      ? "Inspect workspace to check configuration"
+      : !count
+        ? "Not configured · not included"
+        : `${count} configured · include only if needed`;
+  }
+  $("workspaceContext").textContent = current
+    ? "Inspected · " + (current.project?.name || current.root.split("/").pop())
+    : "Choose a project, then inspect it";
+}
+function renderInspector(report) {
+  const container = $("workspaceSummary");
+  container.replaceChildren();
+  for (const [label, value, detail] of [
+    [
+      "Git repository",
+      report.git
+        ? report.git.branch || "Detached / unborn HEAD"
+        : "No repository",
+      report.git
+        ? "Local history and saved changes"
+        : "Project files can still be captured",
+    ],
+    [
+      "Package manager",
+      report.runtime?.packageManager || "Not detected",
+      report.runtime?.lockfiles?.join(", ") || "No lockfile detected",
+    ],
+    [
+      "PostgreSQL",
+      String(report.databases?.length || 0) + " configured",
+      "Requires opt-in capture",
+    ],
+    [
+      "Docker volumes",
+      String(report.volumes?.length || 0) + " configured",
+      "Stop writers before capture",
+    ],
+  ]) {
+    const card = document.createElement("div"),
+      title = document.createElement("span"),
+      strong = document.createElement("strong"),
+      small = document.createElement("small");
+    card.className = "inspector-stat";
+    title.textContent = label;
+    strong.textContent = value;
+    small.textContent = detail;
+    card.append(title, strong, small);
+    container.append(card);
+  }
+  container.hidden = false;
+}
+function renderReview(action, result, input) {
+  const target = $(action + "Review");
+  target.replaceChildren();
+  const heading = document.createElement("h3");
+  heading.textContent = "Your " + action + " plan";
+  const list = document.createElement("dl");
+  const rows = [
+    ["Entries", String(result.fileCount ?? "—")],
+    ["Payload size", size(result.bytes)],
+    [
+      action === "capture" ? "Snapshot" : "New destination",
+      action === "capture" ? input.name + ".dtp" : input.target,
+    ],
+    [
+      "Databases",
+      action === "capture"
+        ? input.includeDb
+          ? "Included as configured"
+          : "Not selected"
+        : input.restoreDb
+          ? "Approved"
+          : "Not selected",
+    ],
+    [
+      "Docker volumes",
+      action === "capture"
+        ? input.includeVolumes
+          ? "Included as configured"
+          : "Not selected"
+        : input.restoreVolumes
+          ? "Approved"
+          : "Not selected",
+    ],
+  ];
+  if (action === "capture")
+    rows.push(["Excluded entries", String(result.omitted?.length ?? 0)]);
+  else
+    rows.push([
+      "Install dependencies",
+      input.install ? "npm ci approved" : "Manual, after restore",
+    ]);
+  for (const [label, value] of rows) {
+    const dt = document.createElement("dt"),
+      dd = document.createElement("dd");
+    dt.textContent = label;
+    dd.textContent = value;
+    list.append(dt, dd);
+  }
+  target.append(heading, list);
+  for (const warning of result.warnings || []) {
+    const note = document.createElement("p");
+    note.className = "review-warning";
+    note.textContent = warning;
+    target.append(note);
+  }
+  target.hidden = false;
+}
+function emptyState(container, iconName, title, copy, actionLabel, view) {
+  const empty = document.createElement("div");
+  empty.className = "empty-state";
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"),
+    use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  svg.classList.add("icon");
+  svg.setAttribute("aria-hidden", "true");
+  use.setAttribute("href", "#i-" + iconName);
+  svg.append(use);
+  const strong = document.createElement("strong"),
+    p = document.createElement("p"),
+    button = document.createElement("button");
+  strong.textContent = title;
+  p.textContent = copy;
+  button.textContent = actionLabel;
+  button.className = "text-button";
+  button.onclick = () => navigate(view);
+  empty.append(svg, strong, p, button);
+  container.append(empty);
 }
 function settingsValue() {
   return {
@@ -139,7 +333,7 @@ async function refreshData() {
     ? lastData.lastCapture.file.split("/").pop()
     : "No captures yet";
   $("lastCaptureDetail").textContent = lastData.lastCapture
-    ? `${lastData.lastCapture.fileCount} entries · ${new Date(lastData.lastCapture.completedAt).toLocaleString()}`
+    ? `${lastData.lastCapture.fileCount} ${lastData.lastCapture.fileCount === 1 ? "entry" : "entries"} · ${new Date(lastData.lastCapture.completedAt).toLocaleString()}`
     : "Your first snapshot will appear here.";
   $("lastRestore").textContent = lastData.lastRestore
     ? lastData.lastRestore.verified
@@ -152,13 +346,22 @@ async function refreshData() {
   const workspaces = $("recentWorkspaces");
   workspaces.replaceChildren();
   if (!lastData.workspaces.length)
-    workspaces.textContent = "Inspect a workspace to add it here.";
+    emptyState(
+      workspaces,
+      "folder",
+      "A place for your projects",
+      "Inspect a workspace to see it here next time.",
+      "Inspect a workspace →",
+      "workspace",
+    );
   for (const workspace of lastData.workspaces) {
     const item = row(workspace.name, workspace.root);
     const button = document.createElement("button");
     button.textContent = "Select";
     button.onclick = () => {
       $("source").value = workspace.root;
+      syncComponents();
+      syncReviewActions();
       navigate("workspace");
     };
     item.append(button);
@@ -167,7 +370,14 @@ async function refreshData() {
   const snapshots = $("recentSnapshots");
   snapshots.replaceChildren();
   if (!lastData.snapshots.length)
-    snapshots.textContent = "No captured snapshots have been recorded.";
+    emptyState(
+      snapshots,
+      "layers",
+      "Your first checkpoint awaits",
+      "Capture your workspace to create a private, encrypted snapshot.",
+      "Create a snapshot →",
+      "capture",
+    );
   for (const snapshot of lastData.snapshots.slice(0, 5)) {
     const item = row(
       lastData.labels?.[snapshot.file] || snapshot.file.split("/").pop(),
@@ -177,6 +387,7 @@ async function refreshData() {
     button.textContent = "Restore…";
     button.onclick = () => {
       $("snapshot").value = snapshot.file;
+      syncReviewActions();
       navigate("restore");
     };
     item.append(button);
@@ -194,7 +405,10 @@ for (const [button, field, kind] of [
   $(button).onclick = async () => {
     try {
       const chosen = await window.teleport.choose(kind);
-      if (chosen) $(field).value = chosen;
+      if (chosen) {
+        $(field).value = chosen;
+        $(field).dispatchEvent(new Event("input", { bubbles: true }));
+      }
     } catch (error) {
       showError(error);
     }
@@ -206,7 +420,10 @@ for (const [button, field, kind] of [
   $(button).onclick = async () => {
     try {
       const chosen = await window.teleport.savePath({ kind });
-      if (chosen) $(field).value = chosen;
+      if (chosen) {
+        $(field).value = chosen;
+        $(field).dispatchEvent(new Event("input", { bubbles: true }));
+      }
     } catch (error) {
       showError(error);
     }
@@ -239,25 +456,29 @@ function inputFor(action, dryRun = false) {
 }
 function setBusy(value) {
   busy = value;
+  $("cancel").hidden = !value;
   for (const button of document.querySelectorAll("button"))
     if (!button.dataset.view && !button.dataset.go)
       button.disabled = value ? button.id !== "cancel" : button.id === "cancel";
+  syncComponents();
+  syncReviewActions();
 }
 async function execute(input) {
   if (busy) throw new Error("An operation is already running.");
-  await persist();
   setBusy(true);
-  $("status").textContent = "Working…";
+  activity(
+    "working",
+    input.dryRun ? "Reviewing your workspace…" : "Working on it…",
+    "You can leave this window open. Progress will appear here.",
+    "Working…",
+  );
   try {
-    const reviewKey = JSON.stringify({
-      ...input,
-      password: undefined,
-      dryRun: undefined,
-    });
+    await persist();
+    const key = reviewKey(input);
     if (
       ["capture", "restore"].includes(input.action) &&
       !input.dryRun &&
-      reviews.get(input.action) !== reviewKey
+      reviews.get(input.action) !== key
     )
       throw new Error(
         "Review the capture or restore plan first, after selecting your final options.",
@@ -285,7 +506,12 @@ async function execute(input) {
     }
     let result = await window.teleport.operation(input);
     if (input.action === "capture" && !input.dryRun) {
-      $("status").textContent = "Authenticating created archive…";
+      activity(
+        "working",
+        "Checking your new snapshot…",
+        "Authenticating the encrypted archive before reporting success.",
+        "Authenticating created archive…",
+      );
       await window.teleport.operation({
         action: "snapshot-info",
         source: result.output,
@@ -294,7 +520,7 @@ async function execute(input) {
       });
       result.archiveVerified = true;
     }
-    if (input.dryRun) reviews.set(input.action, reviewKey);
+    if (input.dryRun) reviews.set(input.action, key);
     else reviews.delete(input.action);
     const rendered = JSON.stringify(result, null, 2);
     $("result").textContent =
@@ -302,8 +528,37 @@ async function execute(input) {
         ? rendered.slice(0, 1024 * 1024) +
           "\n[Display truncated at 1 MiB; use the CLI for the complete report.]"
         : rendered;
-    $("status").textContent = "Completed";
+    const summary = input.dryRun
+      ? "Check the plan above. Change any options, then review again before continuing."
+      : input.action === "capture"
+        ? "Your encrypted snapshot was created and authenticated. Find it in your snapshot library."
+        : input.action === "restore"
+          ? "Your files were restored and verified. Open the project to configure credentials and install any remaining dependencies."
+          : input.action === "verify"
+            ? result.ok
+              ? "The workspace verification completed successfully."
+              : "Some entries differ. Review the technical details."
+            : "The operation completed. Technical details are available below.";
+    activity(
+      result.ok === false ? "error" : "success",
+      input.dryRun
+        ? "Your review is ready."
+        : input.action === "capture"
+          ? "Your snapshot is ready."
+          : input.action === "restore"
+            ? "Welcome back to your workspace."
+            : input.action === "inspect"
+              ? "Workspace inspected."
+              : "All done.",
+      summary,
+      "Completed",
+    );
+    if (input.dryRun && ["capture", "restore"].includes(input.action))
+      renderReview(input.action, result, input);
     if (input.action === "inspect") {
+      workspaceInfo = { source: input.source, report: result };
+      renderInspector(result);
+      syncComponents();
       $("inspectorResult").textContent = JSON.stringify(result, null, 2);
       navigate("workspace");
     }
@@ -405,12 +660,18 @@ async function renderLibrary(items) {
 $("saveSettings").onclick = () =>
   persist()
     .then(() => {
-      $("status").textContent = "Completed";
+      activity(
+        "success",
+        "Preferences saved.",
+        "Your appearance and nonsecret settings are saved on this Mac.",
+        "Completed",
+      );
       $("result").textContent = "Nonsecret preferences saved.";
     })
     .catch(showError);
 $("theme").onchange = () => {
   document.documentElement.dataset.theme = $("theme").value;
+  persist().catch(showError);
 };
 $("exportDiagnostics").onclick = () =>
   window.teleport
@@ -456,6 +717,7 @@ $("receiveButton").onclick = () =>
   }).catch(() => {});
 window.teleport.onProgress((progress) => {
   $("status").textContent = progress.phase;
+  $("activitySummary").textContent = progress.phase;
   if (progress.ready)
     $("transferInfo").textContent = JSON.stringify(progress.ready, null, 2);
 });
@@ -489,6 +751,8 @@ window.teleport
       $(key).checked = Boolean(value[key]);
     document.documentElement.dataset.theme = value.theme || "system";
     await refreshData();
+    syncComponents();
+    syncReviewActions();
     if (!value.onboardingComplete) $("welcome").showModal();
   })
   .catch(showError);
@@ -514,5 +778,26 @@ window.teleport
 
 window.teleport.onOpenSnapshot((file) => {
   $("snapshot").value = file;
+  syncReviewActions();
   navigate("restore");
 });
+
+for (const element of document.querySelectorAll("input, textarea, select")) {
+  element.addEventListener("input", () => {
+    if (element.id === "source") syncComponents();
+    if (["restoreDb", "restoreVolumes"].includes(element.id) && element.checked)
+      document.querySelector(".mapping-details").open = true;
+    syncReviewActions();
+  });
+  element.addEventListener("change", syncReviewActions);
+}
+for (const button of document.querySelectorAll("[data-toggle-password]")) {
+  button.onclick = () => {
+    const field = $(button.dataset.togglePassword),
+      show = field.type === "password";
+    field.type = show ? "text" : "password";
+    button.textContent = show ? "Hide" : "Show";
+    button.setAttribute("aria-pressed", String(show));
+    button.setAttribute("aria-label", (show ? "Hide" : "Show") + " passphrase");
+  };
+}

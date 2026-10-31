@@ -23,10 +23,12 @@ try {
   });
   const page = await app.firstWindow();
   async function done() {
-    await page.waitForFunction(() =>
-      ["Completed", "Needs attention"].includes(
-        document.getElementById("status").textContent,
-      ),
+    await page.waitForFunction(
+      () =>
+        document.getElementById("cancel").hidden &&
+        ["Completed", "Needs attention"].includes(
+          document.getElementById("status").textContent,
+        ),
     );
     if ((await page.locator("#status").textContent()) !== "Completed")
       throw new Error(await page.locator("#result").textContent());
@@ -52,11 +54,23 @@ try {
   await page.locator("#name").fill("desktop");
   await page.locator("#output").fill(temp);
   await page.locator("#capturePassword").fill("desktop passphrase for testing");
-  await page.locator("#includeDb").check();
-  await page.locator("#includeVolumes").check();
+  assert(await page.locator("#includeDb").isDisabled());
+  assert(await page.locator("#includeVolumes").isDisabled());
+  assert(
+    (await page.locator("#databaseAvailability").textContent()).includes(
+      "Not configured",
+    ),
+  );
+  // Preserve the preflight regression even if renderer state is manipulated.
+  await page.evaluate(() => {
+    document.getElementById("includeDb").checked = true;
+    document.getElementById("includeVolumes").checked = true;
+  });
   await page.locator('[data-action="capture"][data-dry="true"]').click();
   await page.waitForFunction(
-    () => document.getElementById("status").textContent === "Needs attention",
+    () =>
+      document.getElementById("cancel").hidden &&
+      document.getElementById("status").textContent === "Needs attention",
   );
   const missingConfiguration = await page.locator("#result").textContent();
   assert(
@@ -66,10 +80,43 @@ try {
   await assert.rejects(fs.stat(path.join(temp, "desktop.dtp")), {
     code: "ENOENT",
   });
-  await page.locator("#includeDb").uncheck();
-  await page.locator("#includeVolumes").uncheck();
-  await page.locator('[data-action="capture"][data-dry="true"]').click();
+  // Unavailable selections are reset after the failed preflight.
+  assert(!(await page.locator("#includeDb").isChecked()));
+  assert(!(await page.locator("#includeVolumes").isChecked()));
+  const lockedImmediately = await page.evaluate(() => {
+    // Hold settings persistence until the test releases it. A fast local disk
+    // must not hide a retry reading the previous operation's terminal status.
+    const save = persist;
+    let release;
+    persist = async () => {
+      await new Promise((resolve) => (release = resolve));
+      return save();
+    };
+    window.resumeSmokeSettings = () => {
+      persist = save;
+      release();
+      delete window.resumeSmokeSettings;
+    };
+    const button = document.querySelector(
+      '[data-action="capture"][data-dry="true"]',
+    );
+    button.click();
+    return (
+      button.disabled &&
+      document.getElementById("status").textContent === "Working…"
+    );
+  });
+  assert(
+    lockedImmediately,
+    "Review must immediately enter a busy state before saving preferences",
+  );
+  await page.evaluate(() => window.resumeSmokeSettings());
   await done();
+  assert(await page.locator("#captureReview").isVisible());
+  assert(!(await page.locator('[data-action="capture"].primary').isDisabled()));
+  await page.locator("#name").fill("changed-after-review");
+  assert(await page.locator('[data-action="capture"].primary').isDisabled());
+  await page.locator("#name").fill("desktop");
   await page.locator('[data-action="capture"].primary').click();
   await done();
   const archive = path.join(temp, "desktop.dtp");
@@ -201,27 +248,59 @@ try {
     ),
     "#f4f6fa",
   );
-  const expectedBounds = await app.evaluate(({ BrowserWindow, Menu }) => {
-    const menu = Menu.getApplicationMenu();
-    if (!menu?.items.some((item) => item.label === "Window"))
-      throw new Error("Native Window menu missing");
-    const window = BrowserWindow.getAllWindows()[0];
-    window.setBounds({ x: 40, y: 70, width: 1080, height: 760 });
-    return window.getBounds();
-  });
+  const expectedBounds = await app.evaluate(
+    ({ BrowserWindow, Menu, screen }) => {
+      const menu = Menu.getApplicationMenu();
+      if (!menu?.items.some((item) => item.label === "Window"))
+        throw new Error("Native Window menu missing");
+      const window = BrowserWindow.getAllWindows()[0];
+      const workArea = screen.getDisplayMatching(window.getBounds()).workArea;
+      const [minWidth, minHeight] = window.getMinimumSize();
+      // Hosted macOS can have a 1024 x 684 work area. Exercise that size even
+      // on a larger local display, and keep the requested bounds fully visible.
+      const width = Math.max(minWidth, Math.min(980, workArea.width));
+      const height = Math.max(minHeight, Math.min(640, workArea.height));
+      if (width > workArea.width || height > workArea.height)
+        throw new Error(
+          "Desktop smoke requires a work area of at least 800 x 600",
+        );
+      window.setBounds({
+        x: workArea.x + Math.min(40, workArea.width - width),
+        y: workArea.y + Math.min(40, workArea.height - height),
+        width,
+        height,
+      });
+      return window.getBounds();
+    },
+  );
   await app.close();
+  assert.deepEqual(
+    JSON.parse(
+      await fs.readFile(path.join(temp, "user-data", "window.json"), "utf8"),
+    ),
+    expectedBounds,
+    "The closed window must persist its exact native bounds",
+  );
   app = await electron.launch({
     ...(process.env.DEVTELEPORT_APP_BINARY
       ? { executablePath: process.env.DEVTELEPORT_APP_BINARY, args: [] }
       : { args: ["apps/desktop/main.cjs"] }),
     env,
   });
-  await app.firstWindow();
+  const reopened = await app.firstWindow();
+  await reopened.waitForFunction(
+    () => document.documentElement.dataset.theme === "light",
+  );
+  assert.equal(
+    await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+    "light",
+  );
   const restoredBounds = await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].getBounds(),
   );
   assert.deepEqual(restoredBounds, expectedBounds);
   native.windowBoundsRestored = true;
+  native.restoredWindowBounds = restoredBounds;
   await fs.writeFile(
     "dist/native-runtime.json",
     JSON.stringify(native, null, 2),

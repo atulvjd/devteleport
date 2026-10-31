@@ -10,7 +10,7 @@
     "devteleport": "apps/cli/main.ts"
   },
   "scripts": {
-    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts",
+    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts tests/wait-for-port.test.ts",
     "check": "tsc --noEmit && node --check apps/desktop/main.cjs && node --check apps/vscode-extension/extension.cjs",
     "desktop": "npm run build:backend && node scripts/launch-desktop.mjs",
     "package:cli": "node scripts/package.mjs",
@@ -38,7 +38,10 @@
     "test:updates": "node --test tests/updates-http.test.ts",
     "checksums": "node scripts/artifact-checksums.mjs",
     "verify:signing": "node scripts/verify-signing.mjs",
-    "benchmark:desktop": "npm run build:backend && node scripts/desktop-benchmark.mjs"
+    "benchmark:desktop": "npm run build:backend && node scripts/desktop-benchmark.mjs",
+    "verify:distribution": "node scripts/verify-distribution.mjs",
+    "test:desktop:visual": "npm run build:backend && node scripts/desktop-visual.mjs",
+    "verify:cli-package": "node scripts/verify-cli-package.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

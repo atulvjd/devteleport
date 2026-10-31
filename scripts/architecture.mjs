@@ -127,6 +127,25 @@ try {
     detail: error.message,
   });
 }
+try {
+  execFileSync(
+    "/usr/bin/codesign",
+    ["--verify", "--deep", "--strict", "--verbose=2", bundle],
+    { stdio: "pipe" },
+  );
+  checks.push({
+    name: "bundle-signature-integrity",
+    status: "PASS",
+    detail:
+      "Resource/code seals verify. Ad-hoc integrity does not establish Developer ID trust or notarization.",
+  });
+} catch (error) {
+  checks.push({
+    name: "bundle-signature-integrity",
+    status: "FAIL",
+    detail: error.stderr?.toString() || error.message,
+  });
+}
 const report = {
   createdAt: new Date().toISOString(),
   bundle,

@@ -8,12 +8,12 @@ Capture saved development state on one Mac, transfer an encrypted snapshot, and 
 
 ## Install and begin
 
-Use the unsigned ARM64 DMG/ZIP only as a development artifact. Production distribution requires real Developer ID signing, notarization and Gatekeeper verification; no protection should be disabled. The desktop bundles its own native engine runtime. Git/npm/PostgreSQL/Docker are needed only for the operations using them.
+Use the unsigned ARM64 DMG/ZIP only as a development artifact. Development builds are ad-hoc sealed for code/resource integrity; “unsigned” means they lack Apple Developer ID signing and notarization. See [downloaded-app validation](docs/DISTRIBUTION-VALIDATION.md). Production distribution requires real Developer ID signing, notarization and Gatekeeper verification; no protection should be disabled. The desktop bundles its own native engine runtime. Git/npm/PostgreSQL/Docker are needed only for the operations using them.
 
-CLI installation requires native Node 24 LTS:
+The [public CLI package](https://www.npmjs.com/package/devteleport) requires native Node.js 24 or newer:
 
 ```sh
-npm install -g /path/to/devteleport-0.2.0.tgz
+npm install -g devteleport
 devteleport diagnostics
 devteleport inspect /path/to/project
 devteleport capture --root /path/to/project --name my-project --output /path/to/snapshots --dry-run
@@ -43,6 +43,15 @@ CLI/desktop capture default to format 2; `--format 1` retains the legacy writer 
 Format 2 hashes/stages files and PostgreSQL exports in bounded chunks, streams AES-256-GCM encryption, authenticates the entire archive before parsing metadata/extracting, and verifies each body checksum before publication. Limits: **16 GiB per file/database**, **32 GiB aggregate**, 16 MiB metadata, 50,000 entries. The volume adapter retains its separate small-volume limits. Format 1's old limits remain unchanged. See [format 2](docs/FORMAT-2.md).
 
 Private plaintext staging requires additional free disk. Permissions protect temporary data; no physical erasure guarantee is made. Stop source writers: consistency checks are not one transaction across source, databases and volumes. Capture/receive publication requires hard-link-capable storage (APFS/HFS+/compatible POSIX filesystems). For ExFAT or unsupported external drives, capture internally and export the encrypted file; do not bypass atomic no-overwrite checks.
+
+## See what changed
+
+```sh
+devteleport diff project.dtp /path/to/project          # snapshot vs folder
+devteleport diff old.dtp --snapshot new.dtp            # snapshot vs snapshot
+```
+
+Lists files added, removed or modified (content, permissions, link target or type) using the same exclusion rules as capture. Works with format 1 and format 2 snapshots. Git internals are summarized unless `--include-git` is given. Exits 2 when anything differs. A second snapshot with a different passphrase reads `DEVTELEPORT_NEWER_PASSWORD`.
 
 ## Configure components
 

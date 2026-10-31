@@ -13,3 +13,8 @@ Before an external release, inspect the full support matrix and artifacts, valid
 Signing requires a real Developer ID certificate/private key and notarization requires authorized Apple credentials. Do not substitute ad-hoc signing for Developer ID certification. For an authorized signed build, provide credentials through a protected release environment (not source files), enable hardened runtime and the appropriate Electron entitlements, sign both architectures and helpers, notarize through Apple's tools, staple tickets, and verify with codesign/spctl on physical target machines. Those steps upload release artifacts to Apple and require explicit authorization. The currently generated DMGs are unsigned and unnotarized.
 
 No script publishes automatically. Future optional work includes larger streaming formats, additional Git-layout adapters, broader database/Windows platform support and authenticated peer pairing/resume. These must retain accurate support boundaries and independent end-to-end evidence.
+
+
+## Published CLI
+
+`devteleport@0.2.0` is public on npm. Users can run `npm install -g devteleport` with Node.js 24+ on macOS/Linux. See [NPM-RELEASE.md](NPM-RELEASE.md) for release integrity and clean registry-install evidence. `package:cli` builds only the curated CLI distribution and runs its package audit; never publish the private monorepo root. Future public changes need a new version and explicit release authorization.

@@ -1,5 +1,7 @@
 # Apple Silicon release candidate 0.2.0
 
+Latest UI implementation and 19-stage packaged verification: [UI-REFRESH.md](UI-REFRESH.md). Earlier measurements below retain their original checkpoint scope.
+
 This is a native Apple Silicon development release candidate, **not a production-certified release**. The stable bundle identifier remains `dev.devteleport.desktop`. No source push, public package/release publication or notarization upload is authorized/performed by this work.
 
 ## Actual changes

@@ -1443,3 +1443,37 @@ export async function verifyFromSnapshot(
   ).snapshotMetadata(snapshot, password);
   return verify(directory, manifest);
 }
+/**
+ * Lists the entries capture would include for a directory (same config,
+ * Git-ignored and built-in exclusions), stream-hashing each file so large
+ * workspaces are not loaded into memory. Used by diff to compare a folder.
+ */
+export async function listWorkspace(directory = ".") {
+  const root = await fs.realpath(directory);
+  const c = await config(root);
+  const ignored = await optional(
+    "git",
+    [
+      "ls-files",
+      "--others",
+      "--ignored",
+      "--exclude-standard",
+      "--directory",
+      "-z",
+    ],
+    root,
+  );
+  if (ignored)
+    c.exclude = [
+      ...(c.exclude ?? []),
+      ...ignored
+        .split("\0")
+        .filter(Boolean)
+        .map((p) => p.replace(/\/$/, "")),
+    ];
+  const listing = await enumerate(root, c, true);
+  const { hashFile } = await import("./stream-v2.ts");
+  for (const f of listing.files)
+    if (f.type === "file") f.checksum = await hashFile(path.join(root, f.path));
+  return listing;
+}
