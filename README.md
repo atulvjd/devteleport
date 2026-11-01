@@ -141,6 +141,12 @@ Unsigned executable auto-updates are disabled. Signed release metadata/version i
 
 ## Verify and build
 
+### Project website
+
+The landing page in [`apps/website`](apps/website/README.md) matches the desktop UI and includes release downloads, screenshots, use cases and CLI recipes. Run `npm run dev:website` to preview it, or `npm run build:website` to generate `dist/website`. Import this repository into Vercel with its root directory left at `.`; the included `vercel.json` builds only the static website without installing desktop dependencies. See the [website deployment guide](apps/website/README.md).
+
+### Application checks
+
 ```sh
 npm ci
 npm run check

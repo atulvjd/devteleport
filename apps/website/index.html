@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111419" />
+    <meta
+      name="description"
+      content="Move your saved development workspace to its next Mac. DevTeleport captures files, Git state and optional development data in an encrypted snapshot. Desktop, CLI and VS Code. Open source and local-first."
+    />
+    <meta
+      property="og:title"
+      content="DevTeleport — Your workspace. Your next Mac."
+    />
+    <meta
+      property="og:description"
+      content="Capture. Encrypt. Restore. Take your saved development environment with you, without a cloud account."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <title>DevTeleport — Your workspace. Your next Mac.</title>
+    <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <svg
+      class="definitions"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <defs>
+        <symbol id="arrow" viewBox="0 0 24 24">
+          <path d="M4 12h16m-6-6 6 6-6 6" />
+        </symbol>
+        <symbol id="icon-download" viewBox="0 0 24 24">
+          <path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" />
+        </symbol>
+        <symbol id="folder" viewBox="0 0 24 24">
+          <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3Z" />
+        </symbol>
+        <symbol id="lock" viewBox="0 0 24 24">
+          <rect x="5" y="10" width="14" height="11" rx="3" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+        </symbol>
+        <symbol id="mac" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="13" rx="2" />
+          <path d="M8 21h8m-4-5v5" />
+        </symbol>
+        <symbol id="git" viewBox="0 0 24 24">
+          <circle cx="6" cy="5" r="2" />
+          <circle cx="6" cy="19" r="2" />
+          <circle cx="18" cy="5" r="2" />
+          <path d="M6 7v10m0-5h6a6 6 0 0 0 6-5" />
+        </symbol>
+        <symbol id="database" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="5" rx="8" ry="3" />
+          <path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0" />
+        </symbol>
+        <symbol id="box" viewBox="0 0 24 24">
+          <path
+            d="m12 2 9 5v10l-9 5-9-5V7Zm0 10L3 7m9 5 9-5m-9 5v10M7.5 4.5l9 5"
+          />
+        </symbol>
+        <symbol id="shield" viewBox="0 0 24 24">
+          <path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z" />
+          <path d="m8 11 3 3 5-5" />
+        </symbol>
+        <symbol id="terminal" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <path d="m7 9 3 3-3 3m6 0h4" />
+        </symbol>
+        <symbol id="check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L19 6" />
+        </symbol>
+        <symbol id="github" viewBox="0 0 24 24">
+          <path
+            d="M9 19c-4 1-4-2-6-2m12 5v-4a3.5 3.5 0 0 0-1-2.7c3-.3 6-1.5 6-6.3a5 5 0 0 0-1.4-3.5 4.7 4.7 0 0 0-.1-3.5S17.4 1.7 15 3a13.4 13.4 0 0 0-6 0C6.6 1.7 5.5 2 5.5 2a4.7 4.7 0 0 0-.1 3.5A5 5 0 0 0 4 9c0 4.8 3 6 6 6.3A3.5 3.5 0 0 0 9 18v4"
+          />
+        </symbol>
+        <symbol id="transfer" viewBox="0 0 24 24">
+          <path d="M3 7h17m-4-4 4 4-4 4M21 17H4m4-4-4 4 4 4" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <header class="site-header">
+      <div class="container nav-row">
+        <a class="brand" href="#" aria-label="DevTeleport home"
+          ><img
+            src="assets/mark.svg"
+            width="32"
+            height="32"
+            alt=""
+          />DevTeleport<span class="version">v0.2</span></a
+        >
+        <button
+          class="menu-toggle"
+          aria-expanded="false"
+          aria-controls="navigation"
+          aria-label="Open navigation"
+        >
+          <span></span><span></span>
+        </button>
+        <nav id="navigation" aria-label="Main navigation">
+          <a href="#overview">Overview</a><a href="#workflow">How it works</a
+          ><a href="#use-cases">Use cases</a><a href="#cli">CLI</a>
+          <a class="nav-github" href="https://github.com/atulvjd/devteleport"
+            ><svg class="icon"><use href="#github" /></svg><span>GitHub</span
+            ><span aria-hidden="true">↗</span></a
+          >
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero container" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <a
+            class="release-pill"
+            href="https://github.com/atulvjd/devteleport/releases/tag/v0.2.0"
+            ><span class="status-dot"></span>0.2.0 RELEASE CANDIDATE<span
+              aria-hidden="true"
+              >↗</span
+            ></a
+          >
+          <h1 id="hero-title">
+            Your workspace.<br />Ready for its<br /><span>next Mac.</span>
+          </h1>
+          <p class="hero-description">
+            The code. The changes. The development data.<br
+              class="desktop-break"
+            />
+            Capture your saved workspace in one encrypted snapshot and pick up
+            on another machine.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#download"
+              ><svg class="icon"><use href="#icon-download" /></svg>Get
+              DevTeleport</a
+            ><a class="button secondary" href="#workflow"
+              >See how it works<svg class="icon"><use href="#arrow" /></svg
+            ></a>
+          </div>
+          <div class="install-line">
+            <span aria-hidden="true">$</span
+            ><code id="install-command">npm install -g devteleport</code
+            ><button
+              data-copy="install-command"
+              aria-label="Copy npm install command"
+            >
+              Copy<span aria-hidden="true"> ⧉</span>
+            </button>
+          </div>
+          <p class="hero-footnote">
+            Native Apple Silicon desktop <span>·</span> CLI for macOS & Linux
+          </p>
+        </div>
+        <div
+          class="teleport-visual"
+          role="img"
+          aria-label="Illustration: saved files, Git state and configured development data become an encrypted .dtp snapshot, ready to restore on a new Mac."
+        >
+          <div class="visual-heading">
+            <span class="tiny-label">WORKSPACE CONTINUITY</span
+            ><span class="local-label"
+              ><span class="status-dot"></span>Local-first</span
+            >
+          </div>
+          <div class="visual-grid"></div>
+          <div class="source-label">
+            <svg class="icon"><use href="#folder" /></svg>your-workspace<span
+              >~/projects</span
+            >
+          </div>
+          <div class="file-chips">
+            <span
+              ><svg class="icon"><use href="#git" /></svg>Git & changes</span
+            ><span
+              ><svg class="icon"><use href="#terminal" /></svg>Saved code</span
+            ><span
+              ><svg class="icon"><use href="#database" /></svg>Dev data
+              <small>OPT-IN</small></span
+            >
+          </div>
+          <div class="visual-path path-top"></div>
+          <div class="snapshot-illustration">
+            <div class="snapshot-orbit"></div>
+            <div class="snapshot-diamond">
+              <svg class="icon"><use href="#lock" /></svg>
+            </div>
+            <div class="snapshot-label">
+              my-workspace<span>.dtp</span><small>AES-256-GCM ENCRYPTED</small>
+            </div>
+          </div>
+          <div class="visual-path path-bottom"></div>
+          <div class="destination">
+            <div class="destination-icon">
+              <svg class="icon"><use href="#mac" /></svg>
+            </div>
+            <div>
+              <strong>Your next Mac</strong
+              ><span>A new folder. A verified copy.</span>
+            </div>
+            <span class="verified-icon"
+              ><svg class="icon"><use href="#check" /></svg
+            ></span>
+          </div>
+          <div class="visual-footer">
+            <svg class="icon"><use href="#shield" /></svg>Your passphrase. Your
+            files. Your control.
+          </div>
+        </div>
+      </section>
+
+      <div class="trust-strip">
+        <div class="container">
+          <span
+            ><svg class="icon"><use href="#github" /></svg>Open source ·
+            MIT</span
+          ><span
+            ><svg class="icon"><use href="#lock" /></svg>Encrypted by
+            default</span
+          ><span
+            ><svg class="icon"><use href="#shield" /></svg>No account or
+            telemetry</span
+          ><span
+            ><svg class="icon"><use href="#terminal" /></svg>Desktop · CLI · VS
+            Code</span
+          >
+        </div>
+      </div>
+
+      <section id="overview" class="section container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">01 / A FAMILIAR PLACE TO PICK UP</span>
+            <h2>Less setup.<br />More back to building.</h2>
+          </div>
+          <p>
+            A Git clone is a starting point. DevTeleport also carries your saved
+            local changes and explicitly configured development data, with a
+            review before every capture and restore.
+          </p>
+        </div>
+        <div class="product-showcase">
+          <div class="window-chrome">
+            <span class="window-dots" aria-hidden="true"
+              ><i></i><i></i><i></i></span
+            ><span>DevTeleport / Desktop</span
+            ><span class="window-native"
+              ><span class="status-dot"></span>Native Apple Silicon</span
+            >
+          </div>
+          <div
+            class="screenshot-tabs"
+            role="tablist"
+            aria-label="Desktop screenshots"
+          >
+            <button
+              id="view-overview"
+              role="tab"
+              aria-selected="true"
+              aria-controls="app-preview"
+              data-screen="overview"
+            >
+              Workspace overview</button
+            ><button
+              id="view-capture"
+              role="tab"
+              aria-selected="false"
+              aria-controls="app-preview"
+              tabindex="-1"
+              data-screen="capture"
+            >
+              Capture & review</button
+            ><button
+              id="view-restore"
+              role="tab"
+              aria-selected="false"
+              aria-controls="app-preview"
+              tabindex="-1"
+              data-screen="restore"
+            >
+              Restore</button
+            ><button
+              id="view-light"
+              role="tab"
+              aria-selected="false"
+              aria-controls="app-preview"
+              tabindex="-1"
+              data-screen="light"
+            >
+              Light theme<span aria-hidden="true"> ◐</span>
+            </button>
+          </div>
+          <div
+            id="app-preview"
+            role="tabpanel"
+            aria-labelledby="view-overview"
+            tabindex="0"
+          >
+            <img
+              id="desktop-image"
+              src="assets/desktop-overview.png"
+              width="1140"
+              height="1082"
+              alt="Real DevTeleport desktop overview with workspace selector, capture and restore actions, and recent snapshots."
+              fetchpriority="high"
+            />
+          </div>
+        </div>
+        <p class="screenshot-caption">
+          <span class="status-dot"></span>Actual app screenshots, using a
+          disposable example workspace.<span
+            >Graphite & mint. Light & dark. Built for focus.</span
+          >
+        </p>
+        <div class="interface-notes">
+          <div>
+            <svg class="icon"><use href="#mac" /></svg
+            ><strong>A guided desktop</strong>
+            <p>
+              Inspect your project, review what travels, and manage your local
+              snapshot library.
+            </p>
+          </div>
+          <div>
+            <svg class="icon"><use href="#terminal" /></svg
+            ><strong>A scriptable CLI</strong>
+            <p>
+              The same capture, restore, diff and verification workflow from
+              your terminal.
+            </p>
+          </div>
+          <div>
+            <svg class="icon"><use href="#folder" /></svg
+            ><strong>Inside VS Code</strong>
+            <p>
+              Capture saved work, reopen restored projects and track progress in
+              a trusted workspace.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflow" class="section section-band">
+        <div class="container">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow"
+                >02 / ONE CHECKPOINT. YOUR NEXT WORKSPACE.</span
+              >
+              <h2>Capture. Move. Continue.</h2>
+            </div>
+            <p>
+              From the project on this Mac to an independent workspace on the
+              next. The original source doesn’t need to stay around after a
+              verified restore.
+            </p>
+          </div>
+          <div class="workflow-grid">
+            <article>
+              <span class="step-number">01</span>
+              <div class="step-icon">
+                <svg class="icon"><use href="#folder" /></svg>
+              </div>
+              <h3>Capture your context</h3>
+              <p>
+                Inspect saved files and Git state. Opt in to configured
+                databases and volumes. Preview the capture, then encrypt with
+                your passphrase.
+              </p>
+              <span class="step-detail">REVIEW → ENCRYPT → AUTHENTICATE</span>
+            </article>
+            <article>
+              <span class="step-number">02</span>
+              <div class="step-icon">
+                <svg class="icon"><use href="#transfer" /></svg>
+              </div>
+              <h3>Take the snapshot</h3>
+              <p>
+                Move the encrypted <code>.dtp</code> file using export/import or
+                approved TLS pairing on your local network. No hosted relay or
+                cloud account.
+              </p>
+              <span class="step-detail">ONE PORTABLE, ENCRYPTED FILE</span>
+            </article>
+            <article>
+              <span class="step-number">03</span>
+              <div class="step-icon">
+                <svg class="icon"><use href="#check" /></svg>
+              </div>
+              <h3>Restore & verify</h3>
+              <p>
+                Review a new destination, unlock the archive and reconstruct
+                your files. Verify against the original snapshot before you get
+                back to work.
+              </p>
+              <span class="step-detail">NEW DESTINATION → VERIFIED COPY</span>
+            </article>
+          </div>
+          <a
+            class="text-link"
+            href="https://github.com/atulvjd/devteleport/blob/main/docs/WALKTHROUGH.md"
+            >Follow the complete walkthrough
+            <svg class="icon"><use href="#arrow" /></svg
+          ></a>
+        </div>
+      </section>
+
+      <section class="section container" id="what-travels">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">03 / MORE THAN A CLONE</span>
+            <h2>Your work has layers.<br />Bring them with you.</h2>
+          </div>
+          <p>
+            Capture the pieces that make your local project yours. Optional data
+            adapters are explicit, configured and reviewed.
+          </p>
+        </div>
+        <div class="components-grid">
+          <article class="component-card">
+            <div class="card-top">
+              <svg class="icon"><use href="#folder" /></svg
+              ><span class="badge">INCLUDED</span>
+            </div>
+            <h3>Saved project files</h3>
+            <p>
+              Source files, lockfiles, runtime metadata and saved editor files.
+              Known credential paths and dependency directories are excluded.
+            </p>
+            <div class="mini-files">
+              <span><b>TS</b> src/app.ts <em>saved</em></span
+              ><span><b>{ }</b> package-lock.json <em>locked</em></span
+              ><span><b>MD</b> README.md <em>saved</em></span>
+            </div>
+          </article>
+          <article class="component-card">
+            <div class="card-top">
+              <svg class="icon"><use href="#git" /></svg
+              ><span class="badge">INCLUDED</span>
+            </div>
+            <h3>The Git state in between</h3>
+            <p>
+              Standalone Git objects, index and HEAD, plus staged, unstaged,
+              deleted and untracked saved changes. Keep the work you haven’t
+              committed.
+            </p>
+            <div
+              class="git-visual"
+              aria-label="Illustration of a branch with local changes"
+            >
+              <span></span><i></i><i></i><i></i><i class="uncommitted"></i
+              ><code>feature/next-idea <b>+ local changes</b></code>
+            </div>
+          </article>
+          <article class="component-card">
+            <div class="card-top">
+              <svg class="icon"><use href="#database" /></svg
+              ><span class="badge optional">OPT-IN</span>
+            </div>
+            <h3>PostgreSQL development data</h3>
+            <p>
+              Explicit local database dumps, version checks and restore into an
+              empty local development database using a trusted external mapping.
+            </p>
+            <a
+              class="text-link"
+              href="https://github.com/atulvjd/devteleport#postgresql"
+              >Database setup <span aria-hidden="true">↗</span></a
+            >
+          </article>
+          <article class="component-card">
+            <div class="card-top">
+              <svg class="icon"><use href="#box" /></svg
+              ><span class="badge optional">OPT-IN</span>
+            </div>
+            <h3>Selected Docker volumes</h3>
+            <p>
+              Stopped, plain local named volumes and Compose configuration.
+              Review images, mounts and architecture before approving service
+              startup.
+            </p>
+            <a
+              class="text-link"
+              href="https://github.com/atulvjd/devteleport#docker"
+              >Volume requirements <span aria-hidden="true">↗</span></a
+            >
+          </article>
+        </div>
+        <div class="scope-note">
+          <svg class="icon"><use href="#shield" /></svg>
+          <p>
+            <strong>A checkpoint of saved state.</strong> Running processes,
+            open connections, unsaved buffers, debugger sessions and arbitrary
+            extension state don’t travel. Provision dependencies and excluded
+            secrets separately. Linked worktrees, submodules and nested
+            repositories need separate preparation.
+          </p>
+        </div>
+      </section>
+
+      <section id="use-cases" class="section container use-cases">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">04 / FOR THE WAY DEVELOPERS MOVE</span>
+            <h2>
+              A change of machine.<br /><span class="muted"
+                >A continuation of work.</span
+              >
+            </h2>
+          </div>
+        </div>
+        <div class="usecase-list">
+          <article>
+            <span class="usecase-index">01</span>
+            <h3>Meet your new Mac.</h3>
+            <p>
+              Bring saved code, uncommitted Git changes and selected local
+              development data to a fresh machine. Review tool compatibility
+              before installing dependencies.
+            </p>
+            <span class="usecase-tag">MACHINE MIGRATION</span>
+          </article>
+          <article>
+            <span class="usecase-index">02</span>
+            <h3>Change your desk.</h3>
+            <p>
+              Move a checkpoint between your desktop and laptop using an
+              encrypted file. Direct LAN pairing is available experimentally
+              with explicit peer approval.
+            </p>
+            <span class="usecase-tag">WORKSPACE HANDOFF</span>
+          </article>
+          <article>
+            <span class="usecase-index">03</span>
+            <h3>Keep a way back.</h3>
+            <p>
+              Save a checkpoint before a refactor or experiment. Compare it with
+              your current folder, or restore into a new directory while keeping
+              your existing work.
+            </p>
+            <span class="usecase-tag">LOCAL CHECKPOINTS</span>
+          </article>
+          <article>
+            <span class="usecase-index">04</span>
+            <h3>Share the context.</h3>
+            <p>
+              Hand a trusted collaborator a reviewed, encrypted development
+              snapshot. Share its passphrase separately and optionally verify
+              provenance with an Ed25519 signature.
+            </p>
+            <span class="usecase-tag">TRUSTED COLLABORATION</span>
+          </article>
+        </div>
+      </section>
+
+      <section id="cli" class="section section-band">
+        <div class="container">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">05 / AT HOME IN YOUR TERMINAL</span>
+              <h2>Small commands.<br />A whole workspace.</h2>
+            </div>
+            <div>
+              <p>
+                Install the standalone CLI with Node.js 24+ on macOS or Linux.
+                No desktop app or repository clone required.
+              </p>
+              <a
+                class="text-link"
+                href="https://www.npmjs.com/package/devteleport"
+                >View on npm <span aria-hidden="true">↗</span></a
+              >
+            </div>
+          </div>
+          <div class="cli-layout">
+            <div
+              class="recipe-tabs"
+              role="tablist"
+              aria-label="CLI recipes"
+              aria-orientation="vertical"
+            >
+              <button
+                role="tab"
+                id="recipe-start"
+                aria-selected="true"
+                aria-controls="recipe-panel"
+                data-recipe="start"
+              >
+                <span>01</span>First snapshot<svg class="icon">
+                  <use href="#arrow" />
+                </svg></button
+              ><button
+                role="tab"
+                id="recipe-restore"
+                aria-selected="false"
+                aria-controls="recipe-panel"
+                tabindex="-1"
+                data-recipe="restore"
+              >
+                <span>02</span>Restore & verify<svg class="icon">
+                  <use href="#arrow" />
+                </svg></button
+              ><button
+                role="tab"
+                id="recipe-diff"
+                aria-selected="false"
+                aria-controls="recipe-panel"
+                tabindex="-1"
+                data-recipe="diff"
+              >
+                <span>03</span>Compare changes<svg class="icon">
+                  <use href="#arrow" />
+                </svg></button
+              ><button
+                role="tab"
+                id="recipe-transfer"
+                aria-selected="false"
+                aria-controls="recipe-panel"
+                tabindex="-1"
+                data-recipe="transfer"
+              >
+                <span>04</span>Pair & transfer<svg class="icon">
+                  <use href="#arrow" />
+                </svg></button
+              ><button
+                role="tab"
+                id="recipe-sign"
+                aria-selected="false"
+                aria-controls="recipe-panel"
+                tabindex="-1"
+                data-recipe="sign"
+              >
+                <span>05</span>Sign a snapshot<svg class="icon">
+                  <use href="#arrow" />
+                </svg></button
+              ><a
+                href="https://github.com/atulvjd/devteleport/blob/main/docs/CLI.md"
+                class="text-link"
+                >Full command reference ↗</a
+              >
+            </div>
+            <div
+              class="terminal"
+              id="recipe-panel"
+              role="tabpanel"
+              aria-labelledby="recipe-start"
+              tabindex="0"
+            >
+              <div class="terminal-bar">
+                <span
+                  ><svg class="icon"><use href="#terminal" /></svg
+                  ><span id="recipe-title">First snapshot</span></span
+                ><button
+                  data-copy="recipe-code"
+                  aria-label="Copy selected CLI recipe"
+                >
+                  Copy ⧉
+                </button>
+              </div>
+              <pre><code id="recipe-code"># Install once · Node.js 24+
+npm install -g devteleport
+
+# Discover tools and inspect your saved workspace
+devteleport diagnostics
+devteleport inspect ./my-project
+
+# Preview what will travel
+devteleport capture --root ./my-project --name my-project --output ./snapshots --dry-run
+
+# Create your encrypted checkpoint
+devteleport capture --root ./my-project --name my-project --output ./snapshots</code></pre>
+              <div class="terminal-note" id="recipe-note">
+                <span class="status-dot"></span>Capture prompts for a hidden
+                passphrase. Keep it safe; there is no password recovery.
+              </div>
+            </div>
+          </div>
+          <div class="config-details">
+            <div>
+              <svg class="icon"><use href="#database" /></svg>
+              <h3>Your components. Explicitly configured.</h3>
+              <p>
+                Add a <code>devteleport.json</code> to your project for custom
+                exclusions, development databases and named volumes. Credentials
+                stay in protected environment variables.
+              </p>
+              <p>
+                Use <code>--include-db</code> or
+                <code>--include-volumes</code> when capturing. Restoring these
+                components requires separate approvals and a trusted destination
+                mapping outside the snapshot.
+              </p>
+              <a
+                class="text-link"
+                href="https://github.com/atulvjd/devteleport#configure-components"
+                >Read the configuration guide ↗</a
+              >
+            </div>
+            <div class="config-code">
+              <span>devteleport.json</span>
+              <pre><code>{
+  "exclude": ["dist", "coverage"],
+  "databases": [{
+    "name": "app",
+    "connectionEnv": "DEV_DATABASE_URL",
+    "excludeTables": ["public.private_events"]
+  }],
+  "volumes": [{
+    "name": "uploads",
+    "volume": "project_uploads"
+  }]
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section container security-section" id="security">
+        <div class="security-intro">
+          <div class="security-emblem">
+            <svg class="icon"><use href="#shield" /></svg>
+          </div>
+          <span class="eyebrow">06 / LOCAL-FIRST, BY DESIGN</span>
+          <h2>Your data stays<br /><span>your business.</span></h2>
+          <p>
+            No cloud account. No paid API. No analytics or telemetry. Encryption
+            happens locally, before your snapshot leaves your machine.
+          </p>
+          <a
+            class="text-link"
+            href="https://github.com/atulvjd/devteleport/blob/main/docs/SECURITY.md"
+            >Explore the security model
+            <svg class="icon"><use href="#arrow" /></svg
+          ></a>
+        </div>
+        <div class="security-points">
+          <article>
+            <span>01</span>
+            <div>
+              <h3>Encrypted. Authenticated. Verified.</h3>
+              <p>
+                AES-256-GCM protects snapshots. Format 2 authenticates the
+                entire archive before metadata parsing or extraction, then
+                checks payload hashes before publication.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span>02</span>
+            <div>
+              <h3>Review first. Approve explicitly.</h3>
+              <p>
+                Restores use new destinations. Normal restoration executes no
+                project code. Dependency installation, service startup, database
+                restore and volume restore require explicit approval.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span>03</span>
+            <div>
+              <h3>Know what was left behind.</h3>
+              <p>
+                Known credential paths and high-confidence secrets are excluded
+                with review records. Detection isn’t exhaustive; databases and
+                volumes are encrypted, not automatically scrubbed.
+              </p>
+            </div>
+          </article>
+          <article>
+            <span>04</span>
+            <div>
+              <h3>Trust has a defined boundary.</h3>
+              <p>
+                Optional Ed25519 signatures establish provenance relative to an
+                independently trusted key. There is no password recovery,
+                cross-system rollback or independent security audit claim.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section container faq-section" id="faq">
+        <div>
+          <span class="eyebrow">07 / BEFORE YOU TELEPORT</span>
+          <h2>The useful details.</h2>
+          <p>Clear expectations for your next workspace.</p>
+          <a
+            class="text-link"
+            href="https://github.com/atulvjd/devteleport/blob/main/docs/TROUBLESHOOTING.md"
+            >Troubleshooting ↗</a
+          >
+        </div>
+        <div class="faq-list">
+          <details open>
+            <summary>
+              Which machines are supported?<span aria-hidden="true">+</span>
+            </summary>
+            <p>
+              The desktop release targets native Apple Silicon Macs (M1 and
+              newer), with its own bundled engine runtime. The public CLI needs
+              Node.js 24+ on macOS or Linux. Git, PostgreSQL tools and Docker
+              are needed only for operations that use them. Windows and physical
+              Intel desktop acceptance are not certified.
+            </p>
+          </details>
+          <details>
+            <summary>
+              Is the desktop release production-ready?<span aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              Version 0.2.0 is a development release candidate. The app has an
+              ad-hoc code/resource signature, but is not Apple Developer ID
+              signed or notarized. macOS may block a downloaded installation. Do
+              not disable system-wide security protections. Signing,
+              fresh-install acceptance, physical two-Mac validation and secure
+              update installation remain release gates.
+              <a
+                href="https://github.com/atulvjd/devteleport/blob/main/docs/DISTRIBUTION-VALIDATION.md"
+                >Read distribution status ↗</a
+              >
+            </p>
+          </details>
+          <details>
+            <summary>
+              Does this copy a running development environment?<span
+                aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              DevTeleport reconstructs saved state. It does not migrate process
+              memory, open connections, unsaved buffers, terminal history or
+              live debugger sessions. Stop source writers before capture: files,
+              databases and volumes are not captured in one cross-system
+              transaction. Dependencies must be installed for the target
+              architecture.
+            </p>
+          </details>
+          <details>
+            <summary>
+              How large can a snapshot be?<span aria-hidden="true">+</span>
+            </summary>
+            <p>
+              Streaming format 2 allows up to 16 GiB per file/database payload,
+              32 GiB aggregate, 50,000 entries and 16 MiB metadata. The volume
+              adapter separately limits archives to 32 MiB compressed / 128 MiB
+              expanded. Private plaintext staging needs additional free disk
+              space. Capture on hard-link-capable storage such as APFS; export
+              the encrypted file to unsupported external filesystems.
+              <a
+                href="https://github.com/atulvjd/devteleport/blob/main/docs/FORMAT-2.md"
+                >Format details ↗</a
+              >
+            </p>
+          </details>
+          <details>
+            <summary>
+              Can I send a snapshot directly to another Mac?<span
+                aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              Yes, with manual TLS 1.3 pairing, an approved peer, certificate
+              fingerprint comparison and a protected pairing descriptor.
+              Interrupted transfers support resume with renewed pairing. The
+              receiver never obtains the snapshot passphrase and never executes
+              contents. LAN transfer remains experimental pending physical
+              two-Mac validation; automatic discovery is not implemented.
+              <a
+                href="https://github.com/atulvjd/devteleport/blob/main/docs/NETWORK-TRANSFER.md"
+                >Transfer guide ↗</a
+              >
+            </p>
+          </details>
+          <details>
+            <summary>
+              How do I use the VS Code extension?<span aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              Package the VSIX from source with
+              <code>npm run package:extension</code>, then use “Extensions:
+              Install from VSIX…” in VS Code. Install the CLI on PATH or
+              configure absolute executable paths in user/machine settings. The
+              extension respects workspace trust and supports saved-file
+              capture, reopen, history, verification and cancellation.
+              <a
+                href="https://github.com/atulvjd/devteleport/tree/main/apps/vscode-extension"
+                >Extension setup ↗</a
+              >
+            </p>
+          </details>
+          <details>
+            <summary>
+              What if an operation is interrupted?<span aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              Private staging journals record interrupted phases.
+              <code>devteleport recover ./snapshots</code> inspects recovery
+              evidence; cleanup requires a reviewed, explicit approval.
+              Filesystem, PostgreSQL and Docker work are separate, so an
+              approved operation can leave earlier successful components intact.
+              There is no distributed rollback.
+              <a
+                href="https://github.com/atulvjd/devteleport#provenance-and-recovery"
+                >Recovery commands ↗</a
+              >
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section id="download" class="container download-section">
+        <div class="download-top">
+          <div>
+            <span class="eyebrow"
+              ><span class="status-dot"></span> YOUR NEXT WORKSPACE STARTS
+              HERE</span
+            >
+            <h2>Take your work<br />with you.</h2>
+            <p>Open source. Local-first. Yours to explore.</p>
+          </div>
+          <img
+            src="assets/mark.svg"
+            width="132"
+            height="132"
+            alt="DevTeleport diamond mark"
+            loading="lazy"
+          />
+        </div>
+        <div class="download-options">
+          <article>
+            <div>
+              <svg class="icon"><use href="#mac" /></svg>
+              <h3>The native desktop</h3>
+              <span class="badge">APPLE SILICON</span>
+            </div>
+            <p>
+              Guided capture, restore and a local snapshot library. Bundled
+              engine; no separate Node.js install.
+            </p>
+            <a
+              class="button primary"
+              href="https://github.com/atulvjd/devteleport/releases/tag/v0.2.0"
+              ><svg class="icon"><use href="#icon-download" /></svg>Download on
+              GitHub<span aria-hidden="true">↗</span></a
+            ><small
+              >v0.2.0 prerelease · Not Developer ID signed or notarized</small
+            >
+          </article>
+          <article>
+            <div>
+              <svg class="icon"><use href="#terminal" /></svg>
+              <h3>The standalone CLI</h3>
+              <span class="badge optional">NODE.JS 24+</span>
+            </div>
+            <p>
+              Capture, diff, restore and verify directly from your terminal on
+              macOS or Linux.
+            </p>
+            <div class="install-line">
+              <span aria-hidden="true">$</span
+              ><code id="download-command">npm install -g devteleport</code
+              ><button
+                data-copy="download-command"
+                aria-label="Copy CLI installation command"
+              >
+                Copy ⧉
+              </button>
+            </div>
+            <a
+              class="text-link"
+              href="https://www.npmjs.com/package/devteleport"
+              >Package details on npm ↗</a
+            >
+          </article>
+        </div>
+        <div class="release-note">
+          <svg class="icon"><use href="#shield" /></svg>
+          <p>
+            <strong>Development release candidate.</strong> Review the release
+            notes and platform requirements before using snapshots for important
+            work. Verify a restored workspace before deleting its original.
+          </p>
+          <a
+            href="https://github.com/atulvjd/devteleport/blob/main/docs/STATUS.md"
+            >Current status ↗</a
+          >
+        </div>
+      </section>
+    </main>
+
+    <footer class="container site-footer">
+      <div>
+        <a class="brand" href="#"
+          ><img
+            src="assets/mark.svg"
+            width="28"
+            height="28"
+            alt=""
+          />DevTeleport</a
+        >
+        <p>Workspace continuity. Under your control.</p>
+      </div>
+      <nav aria-label="Footer">
+        <a href="https://github.com/atulvjd/devteleport">Source ↗</a
+        ><a href="https://github.com/atulvjd/devteleport/releases">Releases ↗</a
+        ><a href="https://github.com/atulvjd/devteleport/blob/main/README.md"
+          >Documentation ↗</a
+        ><a href="https://github.com/atulvjd/devteleport/issues"
+          >Report an issue ↗</a
+        ><a href="https://github.com/atulvjd/devteleport/blob/main/LICENSE"
+          >MIT License ↗</a
+        >
+      </nav>
+      <span class="footer-local"
+        ><span class="status-dot"></span>Built for work that moves.</span
+      >
+    </footer>
+    <div class="copy-status" role="status" aria-live="polite"></div>
+  </body>
+</html>
