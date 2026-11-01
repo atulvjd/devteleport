@@ -152,7 +152,7 @@ export function nodeSatisfies(version: string, range: string): boolean | null {
   return groups.includes(true) ? true : groups.includes(null) ? null : false;
 }
 
-function toolEnvironment(): NodeJS.ProcessEnv {
+function toolEnvironment(manager?: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     COREPACK_ENABLE_NETWORK: "0",
@@ -162,6 +162,12 @@ function toolEnvironment(): NodeJS.ProcessEnv {
   delete env.DEVTELEPORT_PASSWORD;
   delete env.DEVTELEPORT_NEWER_PASSWORD;
   delete env.NODE_OPTIONS;
+  if (manager === "pnpm") {
+    // pnpm also has its own version downloader, separate from Corepack.
+    // Versions are checked in our preflight; use the already-installed tool.
+    env.pnpm_config_pm_on_fail = "ignore";
+    env.npm_config_manage_package_manager_versions = "false";
+  }
   return env;
 }
 async function toolsFor(names: string[]): Promise<Tool[]> {
@@ -177,7 +183,7 @@ async function toolsFor(names: string[]): Promise<Tool[]> {
           // Never probe package managers from inside an untrusted project.
           const out = await execText(file, ["--version"], {
             cwd: os.tmpdir(),
-            env: toolEnvironment(),
+            env: toolEnvironment(name),
             timeout: 5000,
             maxBuffer: 65536,
           });
@@ -219,10 +225,15 @@ export async function planDependencies(
     parsed.set(path.posix.dirname(file.path), value);
   }
   const workspacePatterns = new Map<string, string[]>();
+  const managedRuntimeWorkspaces = new Set<string>();
   for (const [dir, pkg] of parsed) {
     let patterns = pkg.workspaces?.packages ?? pkg.workspaces;
     const yaml = await readText(join(dir, "pnpm-workspace.yaml"));
     if (yaml) {
+      if (
+        /^\s*(?:useNodeVersion|executionEnv|devEngines|engines)\s*:/m.test(yaml)
+      )
+        managedRuntimeWorkspaces.add(dir);
       // Only the literal package list is interpreted, never YAML tags/code.
       const section = yaml.match(/^packages:\s*\n((?:[ \t]+[^\n]*\n?)*)/m)?.[1];
       patterns = section
@@ -315,6 +326,18 @@ export async function planDependencies(
     ];
     const blockers: string[] = [],
       warnings: string[] = [];
+    if (
+      pkg.devEngines?.runtime ||
+      pkg.engines?.runtime ||
+      pkg.pnpm?.executionEnv?.nodeVersion
+    )
+      blockers.push(
+        "This project requests a managed runtime download. Configure its runtime manually before automatic setup.",
+      );
+    if (managedRuntimeWorkspaces.has(installAt))
+      blockers.push(
+        "Review the workspace's managed runtime settings manually before automatic setup.",
+      );
     if (!["npm", "pnpm"].includes(manager))
       blockers.push(
         `Automatic ${manager} installation is not supported yet. Install this package manually.`,
@@ -376,7 +399,11 @@ export async function planDependencies(
         frameworks.find(([key]) => deps.includes(key))?.[1] ?? "Node.js",
       manager,
       requiredNode: node,
-      requiredManager,
+      requiredManager:
+        requiredManager ??
+        (typeof pkg.engines?.[manager] === "string"
+          ? pkg.engines[manager]
+          : null),
       nodeCompatible: null,
       dependencies: deps,
       installAt,
@@ -526,7 +553,7 @@ export async function installDependencies(
     try {
       await execText(tool.file!, pkg.command.slice(1), {
         cwd,
-        env: toolEnvironment(),
+        env: toolEnvironment(pkg.manager),
         timeout: 3600000,
         maxBuffer: 8 * 1024 * 1024,
       });

@@ -198,6 +198,11 @@ try {
       /started/,
     );
   }
+  await fs.mkdir("dist/guided-restore", { recursive: true });
+  await page.screenshot({
+    path: "dist/guided-restore/restore-ready.png",
+    fullPage: true,
+  });
   assert.equal(
     await fs.readFile(path.join(target, "hello.txt"), "utf8"),
     "desktop roundtrip",

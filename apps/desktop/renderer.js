@@ -314,7 +314,7 @@ function renderSetup(plan, input, restored) {
       const details = document.createElement("details"),
         summary = document.createElement("summary"),
         names = document.createElement("p");
-      summary.textContent = "Dependencies to download";
+      summary.textContent = "Dependencies to install";
       names.textContent = pkg.dependencies.join(", ");
       details.append(summary, names);
       item.append(details);

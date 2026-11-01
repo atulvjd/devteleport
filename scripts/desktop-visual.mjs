@@ -28,6 +28,16 @@ try {
     path.join(root, "server.js"),
     "// Saved work travels with you.\n",
   );
+  await fs.mkdir(path.join(root, "cms"));
+  await fs.writeFile(
+    path.join(root, "cms", "package.json"),
+    JSON.stringify({
+      name: "orbit-cms",
+      private: true,
+      dependencies: { "@strapi/strapi": "^5.0.0" },
+      scripts: { develop: "strapi develop" },
+    }),
+  );
   const env = {
     ...process.env,
     DEVTELEPORT_USER_DATA: path.join(temp, "profile"),
