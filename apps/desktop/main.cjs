@@ -409,8 +409,11 @@ ipcMain.handle("operation", async (event, input) => {
         ? 3600000
         : 180000,
     );
+    const stdoutDecoder = new (require("node:string_decoder").StringDecoder)(
+      "utf8",
+    );
     child.stdout.on("data", (data) => {
-      stdout += data;
+      stdout += stdoutDecoder.write(data);
       if (stdout.length > 24 * 1024 * 1024) child.cancel();
     });
     let progressBuffer = "";
@@ -456,6 +459,7 @@ ipcMain.handle("operation", async (event, input) => {
     child.once("exit", async (code) => {
       clearTimeout(timer);
       const streams = await drained;
+      stdout += stdoutDecoder.end();
       progressLine(progressBuffer + progressDecoder.end());
       running = null;
       if (cancelled)

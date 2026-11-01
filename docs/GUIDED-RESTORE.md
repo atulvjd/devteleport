@@ -29,7 +29,7 @@ Installation may fetch packages and execute lifecycle scripts with the user's pe
 
 The preflight checks available native Node/package-manager versions against supported engine ranges and explicit manager version declarations. Unknown ranges require manual review. Corepack and pnpm's own package-manager provisioning are disabled; projects requesting managed runtime downloads need manual setup. No Homebrew, system runtime or database installation is performed.
 
-Environment hints list variable **names only** from included `.env.example`, `.env.sample` and `.env.template` files. Current snapshot exclusion rules omit `.env*` files, so many snapshots will not include those templates; an existing directory's setup check can still read them. These hints are not a complete missing-secret check. Configure credentials separately, without copying production secrets or assuming every project only needs dependencies.
+Environment hints list variable **names only** from included `.env.example`, `.env.sample` and `.env.template` files. Snapshots exclude `.env*` by default; the newer explicit **Include ignored files & secrets** capture option can include them and the real `.env`. Existing snapshots cannot recover previously omitted files; capture a new one with that option if needed. An existing directory's setup check can also read templates. These hints are not a complete missing-secret check. Configure destination-specific credentials separately when necessary, without assuming copied development secrets or dependencies will suit every machine. Installing dependencies after restoring captured node_modules can replace those files and cause verification differences; files-only restore preserves the captured files.
 
 ## CLI workflow
 

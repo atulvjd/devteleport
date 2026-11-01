@@ -25,7 +25,7 @@ try {
       path.join(
         root,
         "local-cache",
-        `entry-${String(i).padStart(4, "0")}-large-response-fixture.txt`,
+        `entry-${String(i).padStart(4, "0")}-large-response-fixture-日本語-résumé.txt`,
       ),
       "ignored fixture",
     );
@@ -188,6 +188,13 @@ try {
   assert(
     Buffer.byteLength(await page.locator("#result").textContent()) > 65536,
     "Ignored-file preview must exercise multi-chunk backend output",
+  );
+  assert.equal(
+    JSON.parse(await page.locator("#result").textContent()).files.filter(
+      (file) => file.path.includes("日本語-résumé"),
+    ).length,
+    600,
+    "Multi-chunk UTF-8 filenames must be preserved in the preview",
   );
   assert(
     (await page.locator("#captureReview").textContent()).includes(

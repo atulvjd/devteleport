@@ -32,6 +32,8 @@ The CLI prompts for passphrases in interactive terminals. Use at least 12 charac
 
 Dependencies and known credential files are excluded by default. Configure credentials separately and install dependencies with the project's package manager. A separate subproject may require its own dependency installation. Default restore does not run package scripts, SQL or containers.
 
+Current development source supports `capture --include-ignored`: explicitly include `.env`, dependency folders, Git-ignored files and otherwise filtered credentials inside the encrypted snapshot. Additional configured exclusions and reserved metadata/size/safe-path protections remain active. Review and restore reports warn about sensitive contents; previews never display file bodies. Only use this for trusted recipients. Previously omitted files require a new snapshot. This flag is not in the previously published npm 0.2.0 package.
+
 ## Commands
 
 | Command                                        | Purpose and options                                                                                                                                    |

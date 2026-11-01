@@ -91,6 +91,10 @@ for (const format of [1, 2] as const) {
       !JSON.stringify(preview).includes(secret),
       "Review must not reveal .env contents",
     );
+    assert(
+      preview.files!.every((file) => !("data" in file)),
+      "Review must omit file bodies, including base64 bodies",
+    );
     await assert.rejects(fs.stat(path.join(temp, "all.dtp")), {
       code: "ENOENT",
     });

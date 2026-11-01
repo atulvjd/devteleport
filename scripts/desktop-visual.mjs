@@ -28,6 +28,10 @@ try {
     path.join(root, "server.js"),
     "// Saved work travels with you.\n",
   );
+  await fs.writeFile(
+    path.join(root, ".env"),
+    "VISUAL_SECRET=visual-fixture-only\n",
+  );
   await fs.mkdir(path.join(root, "cms"));
   await fs.writeFile(
     path.join(root, "cms", "package.json"),
@@ -73,6 +77,7 @@ try {
   await page.locator("#name").fill("orbit-checkpoint");
   await page.locator("#output").fill(temp);
   await page.locator("#capturePassword").fill("visual acceptance passphrase");
+  await page.locator("#includeIgnored").check();
   await page.locator('[data-action="capture"][data-dry="true"]').click();
   await finish();
   await page.screenshot({
