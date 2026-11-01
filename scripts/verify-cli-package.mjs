@@ -16,6 +16,7 @@ const allowed = new Set([
   "package/docs/NETWORK-TRANSFER.md",
   "package/docs/SECURITY.md",
   "package/docs/TROUBLESHOOTING.md",
+  "package/docs/INCLUDE-IGNORED.md",
 ]);
 for (const file of files) {
   assert(
@@ -66,7 +67,7 @@ const report = {
   files,
   ok: true,
   policy:
-    "Only compiled CLI/core, four selected user guides, public CLI README, metadata and MIT license. No internal reports, original prompts, desktop, node_modules, install scripts or credentials are allowed.",
+    "Only compiled CLI/core, five selected user guides, public CLI README, metadata and MIT license. No internal reports, original prompts, desktop, node_modules, install scripts or credentials are allowed.",
 };
 await fs.mkdir("dist/evidence", { recursive: true });
 await fs.writeFile(

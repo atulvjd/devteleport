@@ -42,6 +42,7 @@ const userDocs = [
   "NETWORK-TRANSFER.md",
   "SECURITY.md",
   "TROUBLESHOOTING.md",
+  "INCLUDE-IGNORED.md",
 ];
 for (const name of userDocs)
   await fs.copyFile(path.join("docs", name), path.join(root, "docs", name));
