@@ -10,6 +10,7 @@ import {
 } from "../packages/core/activity.ts";
 import { execText } from "../packages/core/processes.ts";
 import { setupDirectory } from "../packages/core/setup.ts";
+import { capture, restore } from "../packages/core/index.ts";
 
 test("console filtering strips terminal control codes, known secrets, credentials and credential URLs", () => {
   const input =
@@ -30,6 +31,8 @@ test("console filtering strips terminal control codes, known secrets, credential
     assert(!output.includes(value), value);
   assert(output.includes("Build started"));
   assert(output.includes("[REDACTED]"));
+  const long = "plain".repeat(4000);
+  assert.equal(redactActivityText(long), long);
 });
 
 test("chunked output waits for complete lines, preserves split Unicode and suppresses private keys", () => {
@@ -128,4 +131,40 @@ test("approved dependency install emits filtered stdout/stderr without persistin
   );
   assert(!JSON.stringify(events).includes("fixture-token-value"));
   assert.equal(await fs.readFile(path.join(root, "ready"), "utf8"), "yes");
+});
+
+test("direct archive restore callbacks filter the supplied passphrase even without a password environment variable", async (t) => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "dtp-console-restore-")),
+    root = path.join(temp, "project");
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  await fs.mkdir(root);
+  const password = "console direct callback passphrase";
+  await fs.writeFile(
+    path.join(root, "package.json"),
+    JSON.stringify({
+      name: "direct-callback",
+      scripts: { postinstall: "node install.cjs" },
+    }),
+  );
+  await fs.writeFile(
+    path.join(root, "install.cjs"),
+    `console.log(${JSON.stringify(password)});console.log('<img data-console-injection>');`,
+  );
+  const archive = await capture({
+    root,
+    output: temp,
+    name: "direct",
+    password,
+    format: 2,
+  });
+  const events: string[] = [];
+  await restore(archive.output, {
+    password,
+    target: path.join(temp, "restored"),
+    install: true,
+    approveExecution: true,
+    onLog: (event) => events.push(event.text),
+  });
+  assert(!events.join("\n").includes(password));
+  assert(events.join("\n").includes("[REDACTED]"));
 });

@@ -39,17 +39,17 @@ export function redactActivityText(
     if (secret) text = text.split(secret).join("[REDACTED]");
   text = text
     .replace(
-      /-----BEGIN [^-\n]*PRIVATE KEY-----[\s\S]*?(?:-----END [^-\n]*PRIVATE KEY-----|$)/g,
+      /-----BEGIN [^-\n]{0,64}PRIVATE KEY-----[\s\S]*?(?:-----END [^-\n]{0,64}PRIVATE KEY-----|$)/g,
       "[Private key output omitted]",
     )
     .replace(
       /(authorization\s*[:=]\s*)(?:bearer|basic)\s+[^\s,;]+/gi,
       "$1[REDACTED]",
     )
-    .replace(/((?:[a-z][a-z0-9+.-]*):\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
+    .replace(/((?:[a-z][a-z0-9+.-]{0,15}):\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
     .replace(/([?&][a-zA-Z0-9_.%-]+=)[^\s&#"']+/g, "$1[REDACTED]")
     .replace(
-      /((?:[\w.-]*(?:password|passwd|passphrase|token|secret|api[_-]?key|credential|_auth)[\w.-]*|database_url|connection_string|dsn)["']?\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi,
+      /((?:\b[\w.-]{0,80}(?:password|passwd|passphrase|token|secret|api[_-]?key|credential|_auth)[\w.-]{0,80}|\bdatabase_url|\bconnection_string|\bdsn)["']?\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi,
       "$1[REDACTED]",
     )
     .replace(

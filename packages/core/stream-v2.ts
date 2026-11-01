@@ -883,6 +883,7 @@ export async function restoreV2(file: string, options: RestoreOptions) {
         Boolean(options.approveExecution),
         options.onProgress,
         options.onLog,
+        options.password ? [options.password] : [],
       );
       postActions.push(
         ...installation.completed.map(

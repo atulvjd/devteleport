@@ -151,6 +151,8 @@ Cleanup is limited to owned, inactive, recognized private format 2 stages/partia
 
 The ARM64 app bundles its engine through native Electron utility processes. It includes onboarding, real recent workspaces/snapshots, inspector, capture/restore reviews, local library labels/export/trash, approved network transfer, settings/tool discovery, light/dark mode, native menus, window restoration, local completion preferences, redacted manual diagnostics export and license/privacy information. No data is automatically uploaded.
 
+Current development source also includes a [live workspace console](docs/LIVE-CONSOLE.md): terminal-style commands, real operation steps and dependency-install output, timestamps, elapsed time, result totals, cancellation/error states, auto-follow, copy and private log export. It filters known credential forms and passphrases, renders output as text, and retains a bounded tail. Review before sharing; filtering cannot identify every kind of private application data. It does not add an interactive shell or bypass execution approvals. Previously published 0.2.0 installers/packages are unchanged.
+
 Unsigned executable auto-updates are disabled. Signed release metadata/version infrastructure is tested, but a trusted production feed, Developer ID, notarized artifacts and application installation/restart recovery still require external validation. No independent security audit is implied.
 
 ## Verify and build

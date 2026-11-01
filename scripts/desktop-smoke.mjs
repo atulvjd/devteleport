@@ -26,7 +26,7 @@ try {
     );
     await fs.writeFile(
       path.join(root, dir, "install.cjs"),
-      "console.log('Live install step');console.log('API_TOKEN=fixture-console-private-token');console.error('Example build warning');setTimeout(()=>{require('node:fs').writeFileSync('dependencies-ready.txt','ready');},350);",
+      "console.log('Live install step');console.log('API_TOKEN=fixture-console-private-token');console.log('<img data-console-injection>');console.error('Example build warning');setTimeout(()=>{require('node:fs').writeFileSync('dependencies-ready.txt','ready');},350);",
     );
     await fs.writeFile(
       path.join(root, dir, "app.cjs"),
@@ -203,6 +203,10 @@ try {
     "Installer output must appear before completion",
   );
   assert(!(await page.locator("#cancel").isHidden()));
+  await fs.mkdir("dist/live-console", { recursive: true });
+  await page
+    .locator("#operationConsole")
+    .screenshot({ path: "dist/live-console/console-running.png" });
   await done();
   const consoleText = await page.locator("#consoleOutput").textContent();
   assert(consoleText.includes("Live install step"));
@@ -210,6 +214,15 @@ try {
   assert(consoleText.includes("[REDACTED]"));
   assert(!consoleText.includes("fixture-console-private-token"));
   assert(!consoleText.includes("desktop passphrase for testing"));
+  assert(consoleText.includes("<img data-console-injection>"));
+  assert.equal(
+    await page.locator("#consoleOutput img").count(),
+    0,
+    "Project output must be rendered as text, never HTML",
+  );
+  await page
+    .locator("#operationConsole")
+    .screenshot({ path: "dist/live-console/console-complete.png" });
   assert(
     (await page.locator("#consoleMetrics").textContent()).includes(
       "Package installs",
@@ -423,6 +436,24 @@ try {
     (await page.locator("#consoleCount").textContent()).includes(
       "older events omitted",
     ),
+  );
+  await page.locator("#consoleFollow").uncheck();
+  await page.evaluate(() => {
+    document.getElementById("consoleOutput").scrollTop = 0;
+    appendConsole("info", "Fixture manual scroll preservation");
+    renderConsole();
+  });
+  assert.equal(
+    await page
+      .locator("#consoleOutput")
+      .evaluate((element) => element.scrollTop),
+    0,
+  );
+  await page.locator("#consoleFollow").check();
+  assert(
+    await page
+      .locator("#consoleOutput")
+      .evaluate((element) => element.scrollTop > 0),
   );
   await page.locator("#consoleClear").click();
   assert.equal(await page.locator("#consoleState").textContent(), "Idle");

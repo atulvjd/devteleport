@@ -511,6 +511,7 @@ export async function installDependencies(
   approved: boolean,
   progress?: (phase: string) => void,
   onLog?: (event: ActivityOutput) => void,
+  sensitiveValues: string[] = [],
 ) {
   if (!approved)
     throw new Error(
@@ -556,7 +557,7 @@ export async function installDependencies(
     const cwd = await checkedPath(root, pkg.directory),
       tool = plan.tools.find((t) => t.name === pkg.manager)!;
     progress?.(`Installing dependencies: ${pkg.directory} (${pkg.manager})`);
-    const secrets = activitySecrets();
+    const secrets = activitySecrets(process.env, sensitiveValues);
     const sinks = {
       stdout: activityLineSink(
         (text) => onLog?.({ stream: "stdout", text }),
