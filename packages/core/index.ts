@@ -1,4 +1,5 @@
 import { boundedRead, publishNoReplace } from "./atomic.ts";
+import { reviewDependencies, installDependencies } from "./setup.ts";
 import {
   execText,
   trackChild,
@@ -970,9 +971,11 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     );
   const requiredTools = [
     ...(m.git ? ["git"] : []),
-    ...(options.install ? ["npm"] : []),
     ...(options.restoreDb ? ["pg_restore", "psql"] : []),
   ];
+  const dependencies = await reviewDependencies(m.files, async (entry) =>
+    Buffer.from(entry.data!, "base64"),
+  );
   const tools = await Promise.all(
     requiredTools.map(async (tool) => ({
       tool,
@@ -989,6 +992,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     );
   const plan = {
     target,
+    dependencies,
     tools,
     fileCount: m.files.length,
     databases: m.databases.map((d) => d.name),
@@ -1007,6 +1011,11 @@ export async function restore(file: string, options: RestoreOptions = {}) {
   if (options.install && !options.approveExecution)
     throw new Error(
       "Dependency scripts require --approve-execution after reviewing the snapshot.",
+    );
+  if (options.install && dependencies.blockers.length)
+    throw new Error(
+      "Dependency preflight needs attention: " +
+        dependencies.blockers.join(" "),
     );
   if (options.restoreDb && !options.approveDb)
     throw new Error(
@@ -1209,12 +1218,17 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     }
   }
   if (options.install) {
-    if (!(await exists(path.join(target, "package-lock.json"))))
-      throw new Error(
-        "Approved install supports npm ci with package-lock.json only. Files remain restored.",
-      );
-    await run("npm", ["ci"], target);
-    postActions.push("npm ci completed");
+    const installation = await installDependencies(
+      target,
+      dependencies,
+      Boolean(options.approveExecution),
+      options.onProgress,
+    );
+    postActions.push(
+      ...installation.completed.map(
+        (p) => p.directory + ": " + p.command + " completed",
+      ),
+    );
   }
   await fs.writeFile(
     path.join(target, ".devteleport", "journal.json"),

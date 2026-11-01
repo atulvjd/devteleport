@@ -4,6 +4,7 @@ import type {
   CliOptions,
   RestoreOptions,
 } from "../../packages/core/types.ts";
+import { setupDirectory } from "../../packages/core/setup.ts";
 import {
   inspect,
   capture,
@@ -251,6 +252,14 @@ try {
     case "inspect":
       result = await inspect(options.root ?? positional[0] ?? ".");
       break;
+    case "setup":
+      result = await setupDirectory(
+        options.root ?? positional[0] ?? ".",
+        Boolean(options.install && !options.dryRun),
+        Boolean(options.approveExecution),
+        options.onProgress,
+      );
+      break;
     case "capture":
       options.format ??= 2;
       if (!options.dryRun) {
@@ -357,7 +366,7 @@ try {
         database:
           "capture --include-db; restore --restore-db --approve-db --db-config TRUSTED_CONFIG",
         install:
-          "restore --install --approve-execution permits npm lifecycle scripts",
+          "restore --install --approve-execution installs reviewed npm/pnpm packages, including independent subprojects; setup DIR previews requirements; setup DIR --install --approve-execution retries installation. Lifecycle scripts may execute.",
       };
   }
   console.log(JSON.stringify(result, null, 2));

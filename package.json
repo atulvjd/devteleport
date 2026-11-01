@@ -12,7 +12,7 @@
   "scripts": {
     "dev:website": "node scripts/serve-website.mjs",
     "build:website": "node scripts/build-website.mjs",
-    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts tests/wait-for-port.test.ts",
+    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts tests/wait-for-port.test.ts tests/setup.test.ts",
     "check": "tsc --noEmit && node --check apps/desktop/main.cjs && node --check apps/vscode-extension/extension.cjs",
     "desktop": "npm run build:backend && node scripts/launch-desktop.mjs",
     "package:cli": "node scripts/package.mjs",

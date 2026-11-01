@@ -1,4 +1,5 @@
 import { publishNoReplace } from "./atomic.ts";
+import { reviewDependencies, installDependencies } from "./setup.ts";
 import { throwIfCancelled } from "./processes.ts";
 import fs from "node:fs/promises";
 import { createReadStream, createWriteStream, constants } from "node:fs";
@@ -679,7 +680,6 @@ export async function restoreV2(file: string, options: RestoreOptions) {
     const tools = await Promise.all(
       [
         ...(m.git ? ["git"] : []),
-        ...(options.install ? ["npm"] : []),
         ...(options.restoreDb ? ["psql", "pg_restore"] : []),
         ...(options.restoreVolumes ? ["docker"] : []),
       ].map(async (tool) => ({
@@ -696,7 +696,24 @@ export async function restoreV2(file: string, options: RestoreOptions) {
             .map((t) => t.tool)
             .join(", "),
       );
+    const offsets = new Map<string, number>();
+    let dependencyOffset = decoded.offset;
+    for (const entry of m.files.filter((f) => f.type === "file")) {
+      offsets.set(entry.path, dependencyOffset);
+      dependencyOffset += entry.size!;
+    }
+    const dependencies = await reviewDependencies(m.files, async (entry) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of range(
+        decoded.payload,
+        offsets.get(entry.path)!,
+        entry.size!,
+      ))
+        chunks.push(Buffer.from(chunk));
+      return Buffer.concat(chunks);
+    });
     const plan = {
+      dependencies,
       tools,
       databaseDetails: m.databases.map(
         ({ name, serverVersion, toolVersion, size, exclusions }) => ({
@@ -733,6 +750,11 @@ export async function restoreV2(file: string, options: RestoreOptions) {
     }
     if (options.install && !options.approveExecution)
       throw new Error("Dependency scripts require --approve-execution");
+    if (options.install && dependencies.blockers.length)
+      throw new Error(
+        "Dependency preflight needs attention: " +
+          dependencies.blockers.join(" "),
+      );
     if (options.restoreDb && !options.approveDb)
       throw new Error("Database restore requires --approve-db");
     if (options.restoreVolumes && !options.approveVolumes)
@@ -854,12 +876,17 @@ export async function restoreV2(file: string, options: RestoreOptions) {
         }
     }
     if (options.install) {
-      if (!(await present(path.join(target, "package-lock.json"))))
-        throw new Error(
-          "Approved install requires package-lock.json; source files remain restored.",
-        );
-      await run("npm", ["ci"], target, { timeout: 3600000 });
-      postActions.push("npm ci completed");
+      const installation = await installDependencies(
+        target,
+        dependencies,
+        Boolean(options.approveExecution),
+        options.onProgress,
+      );
+      postActions.push(
+        ...installation.completed.map(
+          (p) => p.directory + ": " + p.command + " completed",
+        ),
+      );
     }
     const verification = await verify(target);
     if (!verification.ok)
