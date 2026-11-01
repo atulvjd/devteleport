@@ -137,14 +137,20 @@ export function spawnBuffered(
     if (out > maximum) {
       error = new Error("Tool output exceeds limit");
       kill(child, "SIGKILL");
-    } else { stdout.push(chunk); options.onOutput?.("stdout", chunk); }
+    } else {
+      stdout.push(chunk);
+      options.onOutput?.("stdout", chunk);
+    }
   });
   child.stderr!.on("data", (chunk: Buffer) => {
     err += chunk.length;
     if (err > maximum) {
       error = new Error("Tool diagnostics exceed limit");
       kill(child, "SIGKILL");
-    } else { stderr.push(chunk); options.onOutput?.("stderr", chunk); }
+    } else {
+      stderr.push(chunk);
+      options.onOutput?.("stderr", chunk);
+    }
   });
   child.once("error", (caught) => {
     error = caught;

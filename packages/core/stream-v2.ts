@@ -702,6 +702,7 @@ export async function restoreV2(file: string, options: RestoreOptions) {
       offsets.set(entry.path, dependencyOffset);
       dependencyOffset += entry.size!;
     }
+    options.onProgress?.("Checking project requirements");
     const dependencies = await reviewDependencies(m.files, async (entry) => {
       const chunks: Buffer[] = [];
       for await (const chunk of range(

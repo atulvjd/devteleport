@@ -862,6 +862,62 @@ Choose a project above, then select Inspect.</pre>
           ><button id="cancel" disabled hidden>Cancel</button>
         </div>
         <div class="progress-track" hidden><span></span></div>
+        <div class="operation-console" id="operationConsole" data-state="idle">
+          <div class="console-toolbar">
+            <div class="console-heading">
+              <span class="console-dot"></span><strong>Workspace console</strong
+              ><span id="consoleState">Idle</span>
+            </div>
+            <div class="console-tools">
+              <span id="consoleElapsed" aria-label="Elapsed time">00:00</span>
+              <label class="console-follow"
+                ><input
+                  type="checkbox"
+                  id="consoleFollow"
+                  checked
+                />Auto-follow</label
+              >
+              <button id="consoleCopy" data-console-control="true" disabled>
+                Copy
+              </button>
+              <button id="consoleExport" data-console-control="true" disabled>
+                Save log…
+              </button>
+              <button id="consoleClear" data-console-control="true" disabled>
+                Clear
+              </button>
+            </div>
+          </div>
+          <div class="console-command" id="consoleCommand">
+            Choose an action to see its command and live output.
+          </div>
+          <ol
+            class="console-steps"
+            id="consoleSteps"
+            aria-label="Operation steps"
+            hidden
+          ></ol>
+          <div
+            class="console-output"
+            id="consoleOutput"
+            role="log"
+            aria-label="Filtered operation output"
+            aria-live="off"
+            tabindex="0"
+          >
+            <p class="console-empty">
+              Live steps and dependency-install output will appear here.
+            </p>
+          </div>
+          <div class="console-metrics" id="consoleMetrics" hidden></div>
+          <div class="console-footnote">
+            <span id="consoleCount">No events yet</span
+            ><span id="consoleNotice" role="status" aria-live="polite"
+              >Filtered output · local paths may be included · review before
+              sharing</span
+            >
+          </div>
+        </div>
         <details id="activityDetails">
           <summary>Technical details</summary>
           <pre id="result">

@@ -963,6 +963,197 @@ pre {
   font-weight: 400;
   color: var(--muted);
 }
+.operation-console {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--field);
+  overflow: hidden;
+  min-width: 0;
+}
+.console-toolbar,
+.console-heading,
+.console-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.console-toolbar {
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.console-heading {
+  font-size: 10px;
+}
+.console-heading > span:last-child {
+  color: var(--muted);
+  font-size: 9px;
+}
+.console-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.operation-console[data-state="working"] .console-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--tint);
+}
+.operation-console[data-state="success"] .console-dot {
+  background: var(--accent);
+}
+.operation-console[data-state="error"] .console-dot,
+.operation-console[data-state="cancelled"] .console-dot {
+  background: var(--danger);
+}
+.console-tools {
+  gap: 7px;
+  font-size: 9px;
+  color: var(--muted);
+}
+.console-tools button {
+  padding: 5px 8px;
+  min-height: 26px;
+  font-size: 9px;
+  background: transparent;
+  border: 1px solid var(--line);
+}
+.console-follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 5px;
+  font-size: 9px;
+}
+.console-follow input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+}
+#consoleElapsed {
+  font-variant-numeric: tabular-nums;
+}
+.console-command {
+  padding: 12px 14px;
+  font:
+    10px/1.8 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--line);
+}
+.console-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 17px;
+  list-style: none;
+  padding: 11px 14px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+.console-steps li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 9px;
+  color: var(--muted);
+}
+.console-steps li > span:first-child {
+  font:
+    9px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.console-steps li[data-state="active"],
+.console-steps li[data-state="done"] {
+  color: var(--accent);
+}
+.console-steps li[data-state="active"] > span:first-child {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.console-steps li[data-state="error"],
+.console-steps li[data-state="cancelled"] {
+  color: var(--danger);
+}
+.console-output {
+  min-height: 90px;
+  max-height: 290px;
+  overflow: auto;
+  padding: 12px 14px;
+  scrollbar-gutter: stable;
+  font:
+    10px/1.9 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.console-empty {
+  margin: 8px 0;
+  color: var(--muted);
+}
+.console-line {
+  display: grid;
+  grid-template-columns: 70px 12px minmax(0, 1fr);
+  gap: 8px;
+}
+.console-line time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.console-line > span:last-child {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.console-tag {
+  color: var(--muted);
+  user-select: none;
+}
+.console-line[data-level="command"],
+.console-line[data-level="success"] {
+  color: var(--accent);
+}
+.console-line[data-level="error"],
+.console-line[data-level="warning"] {
+  color: var(--danger);
+}
+.console-line[data-level="step"] {
+  color: var(--text);
+}
+.console-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+  border-top: 1px solid var(--line);
+  padding: 13px 14px;
+}
+.console-metrics > div {
+  display: grid;
+  gap: 5px;
+}
+.console-metrics span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.console-metrics strong {
+  font-size: 12px;
+}
+.console-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 8px;
+  color: var(--muted);
+}
 .progress-track {
   height: 2px;
   overflow: hidden;

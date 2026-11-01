@@ -26,7 +26,7 @@ try {
     );
     await fs.writeFile(
       path.join(root, dir, "install.cjs"),
-      "require('node:fs').writeFileSync('dependencies-ready.txt','ready');",
+      "console.log('Live install step');console.log('API_TOKEN=fixture-console-private-token');console.error('Example build warning');setTimeout(()=>{require('node:fs').writeFileSync('dependencies-ready.txt','ready');},350);",
     );
     await fs.writeFile(
       path.join(root, dir, "app.cjs"),
@@ -101,6 +101,15 @@ try {
     missingConfiguration.includes("PostgreSQL databases or Docker volumes"),
   );
   assert(missingConfiguration.includes("Uncheck"));
+  assert.equal(
+    await page.locator("#consoleState").textContent(),
+    "Needs attention",
+  );
+  assert(
+    (await page.locator("#consoleOutput").textContent()).includes(
+      "Nothing has been captured",
+    ),
+  );
   await assert.rejects(fs.stat(path.join(temp, "desktop.dtp")), {
     code: "ENOENT",
   });
@@ -144,6 +153,21 @@ try {
   await page.locator('[data-action="capture"].primary').click();
   await done();
   const archive = path.join(temp, "desktop.dtp");
+  assert.equal(await page.locator("#consoleState").textContent(), "Completed");
+  assert(
+    (await page.locator("#consoleCommand").textContent()).includes(
+      "devteleport capture",
+    ),
+  );
+  assert.equal(
+    await page.locator('#consoleSteps li[data-state="done"]').count(),
+    await page.locator("#consoleSteps li").count(),
+  );
+  assert(
+    (await page.locator("#consoleOutput").textContent()).includes(
+      "Authenticating created archive",
+    ),
+  );
   await fs.stat(archive);
   await fs.rm(root, { recursive: true });
   await page.locator('[data-view="restore"]').click();
@@ -168,7 +192,89 @@ try {
   );
   await assert.rejects(fs.stat(target), { code: "ENOENT" });
   await page.locator('[data-action="restore"].primary').click();
+  await page.waitForFunction(() =>
+    document
+      .getElementById("consoleOutput")
+      .textContent.includes("Live install step"),
+  );
+  assert.equal(
+    await page.locator("#consoleState").textContent(),
+    "Running",
+    "Installer output must appear before completion",
+  );
+  assert(!(await page.locator("#cancel").isHidden()));
   await done();
+  const consoleText = await page.locator("#consoleOutput").textContent();
+  assert(consoleText.includes("Live install step"));
+  assert(consoleText.includes("Example build warning"));
+  assert(consoleText.includes("[REDACTED]"));
+  assert(!consoleText.includes("fixture-console-private-token"));
+  assert(!consoleText.includes("desktop passphrase for testing"));
+  assert(
+    (await page.locator("#consoleMetrics").textContent()).includes(
+      "Package installs",
+    ),
+  );
+  assert.equal(
+    await page.locator('#consoleSteps li[data-state="done"]').count(),
+    await page.locator("#consoleSteps li").count(),
+  );
+  // Exercise native clipboard IPC without changing the user's system clipboard.
+  await app.evaluate(({ clipboard }) => {
+    globalThis.dtpConsoleClipboard = {
+      original: clipboard.writeText,
+      value: "",
+    };
+    clipboard.writeText = (text) => {
+      globalThis.dtpConsoleClipboard.value = text;
+    };
+  });
+  try {
+    await page.locator("#consoleCopy").click();
+    await page.waitForFunction(() =>
+      document.getElementById("consoleNotice").textContent.includes("copied"),
+    );
+    const copied = await app.evaluate(
+      () => globalThis.dtpConsoleClipboard.value,
+    );
+    assert(copied.includes("Live install step"));
+    assert(!copied.includes("fixture-console-private-token"));
+  } finally {
+    await app.evaluate(({ clipboard }) => {
+      clipboard.writeText = globalThis.dtpConsoleClipboard.original;
+      delete globalThis.dtpConsoleClipboard;
+    });
+  }
+  const logFile = path.join(temp, "activity.txt");
+  await app.evaluate(({ dialog }, file) => {
+    globalThis.dtpConsoleDialog = dialog.showSaveDialog;
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
+  }, logFile);
+  try {
+    await page.locator("#consoleExport").click();
+    await page.waitForFunction(() =>
+      document.getElementById("consoleNotice").textContent.includes("saved"),
+    );
+    const exported = await fs.readFile(logFile, "utf8");
+    assert(exported.includes("npm install"));
+    assert(!exported.includes("fixture-console-private-token"));
+    assert(!exported.includes("desktop passphrase for testing"));
+    assert.equal((await fs.stat(logFile)).mode & 0o777, 0o600);
+    await page.locator("#consoleExport").click();
+    await page.waitForFunction(() =>
+      document.getElementById("consoleNotice").textContent.includes("EEXIST"),
+    );
+    assert.equal(
+      await fs.readFile(logFile, "utf8"),
+      exported,
+      "Log export must never overwrite an existing file",
+    );
+  } finally {
+    await app.evaluate(({ dialog }) => {
+      dialog.showSaveDialog = globalThis.dtpConsoleDialog;
+      delete globalThis.dtpConsoleDialog;
+    });
+  }
   assert(
     (await page.locator("#setupIntro").textContent()).includes(
       "Dependency installation completed",
@@ -302,6 +408,25 @@ try {
     () => document.getElementById("status").textContent === "Needs attention",
   );
   assert((await page.locator("#result").textContent()).includes("cancelled"));
+  await page.waitForFunction(
+    () => document.getElementById("consoleState").textContent === "Cancelled",
+  );
+  assert(
+    (await page.locator('#consoleSteps li[data-state="pending"]').count()) > 0,
+  );
+  await page.evaluate(() => {
+    for (let i = 0; i < 650; i++) appendConsole("info", "Fixture event " + i);
+    renderConsole();
+  });
+  assert.equal(await page.locator("#consoleOutput .console-line").count(), 500);
+  assert(
+    (await page.locator("#consoleCount").textContent()).includes(
+      "older events omitted",
+    ),
+  );
+  await page.locator("#consoleClear").click();
+  assert.equal(await page.locator("#consoleState").textContent(), "Idle");
+  assert(await page.locator("#consoleCopy").isDisabled());
   await assert.rejects(fs.stat(path.join(temp, "cancelled.dtp")));
   await fs.mkdir("dist", { recursive: true });
   await page.locator('[data-view="settings"]').click();
@@ -376,6 +501,14 @@ try {
     previewBeforeDestination: true,
     installedPackages: [".", "cms"],
     startupCommandsPassed: ["npm run dev", "npm run develop"],
+  };
+  native.liveConsole = {
+    liveInstallOutput: true,
+    filteredCredentials: true,
+    copyAndPrivateExport: true,
+    noOverwriteExport: true,
+    boundedTail: true,
+    cancellationState: true,
   };
   native.restoredWindowBounds = restoredBounds;
   await fs.writeFile(

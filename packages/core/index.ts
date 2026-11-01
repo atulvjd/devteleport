@@ -973,6 +973,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     ...(m.git ? ["git"] : []),
     ...(options.restoreDb ? ["pg_restore", "psql"] : []),
   ];
+  options.onProgress?.("Checking project requirements");
   const dependencies = await reviewDependencies(m.files, async (entry) =>
     Buffer.from(entry.data!, "base64"),
   );

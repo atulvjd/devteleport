@@ -4,7 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
 import { execText, throwIfCancelled } from "./processes.ts";
-import { activityLineSink, activitySecrets, type ActivityOutput } from "./activity.ts";
+import {
+  activityLineSink,
+  activitySecrets,
+  type ActivityOutput,
+} from "./activity.ts";
 import { findExecutable } from "./platform.ts";
 import type { SnapshotEntry } from "./types.ts";
 
@@ -554,24 +558,41 @@ export async function installDependencies(
     progress?.(`Installing dependencies: ${pkg.directory} (${pkg.manager})`);
     const secrets = activitySecrets();
     const sinks = {
-      stdout: activityLineSink((text) => onLog?.({ stream: "stdout", text }), secrets),
-      stderr: activityLineSink((text) => onLog?.({ stream: "stderr", text }), secrets),
+      stdout: activityLineSink(
+        (text) => onLog?.({ stream: "stdout", text }),
+        secrets,
+      ),
+      stderr: activityLineSink(
+        (text) => onLog?.({ stream: "stderr", text }),
+        secrets,
+      ),
     };
-    onLog?.({ stream: "system", text: `[${pkg.directory}] $ ${pkg.command.join(" ")}` });
+    onLog?.({
+      stream: "system",
+      text: `[${pkg.directory}] $ ${pkg.command.join(" ")}`,
+    });
     try {
       await execText(tool.file!, pkg.command.slice(1), {
         cwd,
         env: toolEnvironment(pkg.manager),
         timeout: 3600000,
         maxBuffer: 8 * 1024 * 1024,
-        ...(onLog ? { onOutput: (stream: "stdout" | "stderr", chunk: Buffer) => sinks[stream].write(chunk) } : {}),
+        ...(onLog
+          ? {
+              onOutput: (stream: "stdout" | "stderr", chunk: Buffer) =>
+                sinks[stream].write(chunk),
+            }
+          : {}),
       });
     } catch {
       // Raw tool output can contain registry credentials, URLs or script output.
       throw new Error(
         `Dependency installation failed in ${pkg.directory}. Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then retry this package's displayed command in a trusted terminal. Tool output was withheld to protect credentials.`,
       );
-    } finally { sinks.stdout.end(); sinks.stderr.end(); }
+    } finally {
+      sinks.stdout.end();
+      sinks.stderr.end();
+    }
     progress?.(`Dependencies installed: ${pkg.directory}`);
     completed.push({
       directory: pkg.directory,
@@ -684,7 +705,8 @@ export async function setupDirectory(
             root,
             plan,
             approved,
-            progress, onLog,
+            progress,
+            onLog,
           ),
         }
       : {}),

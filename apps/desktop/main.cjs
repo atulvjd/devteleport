@@ -33,7 +33,10 @@ const platformModule = () =>
   import(
     pathToFileURL(path.join(backendRoot, "packages/core/platform.js")).href
   );
-const activityModule = () => import(pathToFileURL(path.join(backendRoot, "packages/core/activity.js")).href);
+const activityModule = () =>
+  import(
+    pathToFileURL(path.join(backendRoot, "packages/core/activity.js")).href
+  );
 const consoleSecrets = new Set();
 
 const cli = app.isPackaged
@@ -265,8 +268,10 @@ ipcMain.handle("operation", async (event, input) => {
   if (running) throw new Error("An operation is already running.");
   const secrets = activitySecrets(process.env, [input.password || ""]);
   for (const value of secrets) consoleSecrets.add(value);
-  while (consoleSecrets.size > 128) consoleSecrets.delete(consoleSecrets.values().next().value);
-  const safe = (value) => redactActivityText(value, [...consoleSecrets]);
+  while (consoleSecrets.size > 128)
+    consoleSecrets.delete(consoleSecrets.values().next().value);
+  const safe = (value) =>
+    redactActivityText(value, [...secrets, ...consoleSecrets]);
   const args = [input.action];
   if (input.action === "capture") args.push("--format", "2");
   if (input.action === "capture") {
@@ -357,7 +362,18 @@ ipcMain.handle("operation", async (event, input) => {
       serviceName: "DevTeleport workspace engine",
     });
     running = child;
-    sendToWindow("progress", { action: input.action, kind: "command", text: safe("$ devteleport " + args.map((arg) => /^[a-zA-Z0-9_./:@=-]+$/.test(arg) ? arg : JSON.stringify(arg)).join(" ")) });
+    sendToWindow("progress", {
+      action: input.action,
+      kind: "command",
+      text: safe(
+        "$ devteleport " +
+          args
+            .map((arg) =>
+              /^[a-zA-Z0-9_./:@=-]+$/.test(arg) ? arg : JSON.stringify(arg),
+            )
+            .join(" "),
+      ),
+    });
     let stdout = "",
       stderr = "",
       cancelled = false;
@@ -396,15 +412,30 @@ ipcMain.handle("operation", async (event, input) => {
       if (stdout.length > 24 * 1024 * 1024) child.cancel();
     });
     let progressBuffer = "";
-    const progressDecoder = new (require("node:string_decoder").StringDecoder)("utf8");
+    const progressDecoder = new (require("node:string_decoder").StringDecoder)(
+      "utf8",
+    );
     function progressLine(line) {
       if (!line.startsWith("DTP_PROGRESS:")) return;
       try {
         const value = JSON.parse(line.slice(13));
-        if (value.kind === "output" && ["stdout", "stderr", "system"].includes(value.stream) && typeof value.text === "string")
-          sendToWindow("progress", { action: input.action, kind: "output", stream: value.stream, text: safe(value.text).slice(0, 4096) });
+        if (
+          value.kind === "output" &&
+          ["stdout", "stderr", "system"].includes(value.stream) &&
+          typeof value.text === "string"
+        )
+          sendToWindow("progress", {
+            action: input.action,
+            kind: "output",
+            stream: value.stream,
+            text: safe(value.text).slice(0, 4096),
+          });
         else if (typeof value.phase === "string")
-          sendToWindow("progress", { action: input.action, phase: safe(value.phase).slice(0, 4096), ...(value.ready ? { ready: value.ready } : {}) });
+          sendToWindow("progress", {
+            action: input.action,
+            phase: safe(value.phase).slice(0, 4096),
+            ...(value.ready ? { ready: value.ready } : {}),
+          });
       } catch {}
     }
     child.stderr.on("data", (data) => {
@@ -429,12 +460,14 @@ ipcMain.handle("operation", async (event, input) => {
       if (code !== 0)
         return reject(
           new Error(
-            safe(stderr
-              .split("\n")
-              .filter((s) => s.startsWith("DevTeleport:"))
-              .join("\n") ||
-              stderr.slice(-2000) ||
-              "Workspace engine failed. Review paths, permissions and diagnostics."),
+            safe(
+              stderr
+                .split("\n")
+                .filter((s) => s.startsWith("DevTeleport:"))
+                .join("\n") ||
+                stderr.slice(-2000) ||
+                "Workspace engine failed. Review paths, permissions and diagnostics.",
+            ),
           ),
         );
       try {
@@ -460,12 +493,24 @@ ipcMain.handle("operation", async (event, input) => {
 });
 ipcMain.handle("activity-text", async (event, input) => {
   sender(event);
-  if (!input || !["copy", "export"].includes(input.action) || typeof input.text !== "string" || input.text.length > 256 * 1024)
+  if (
+    !input ||
+    !["copy", "export"].includes(input.action) ||
+    typeof input.text !== "string" ||
+    input.text.length > 256 * 1024
+  )
     throw new Error("Invalid console transcript");
   const { redactActivityText } = await activityModule();
   const text = redactActivityText(input.text, [...consoleSecrets]);
-  if (input.action === "copy") { clipboard.writeText(text); return { copied: true }; }
-  const selected = await dialog.showSaveDialog(win, { title: "Save filtered activity log", defaultPath: "devteleport-activity.txt", filters: [{ name: "Text log", extensions: ["txt"] }] });
+  if (input.action === "copy") {
+    clipboard.writeText(text);
+    return { copied: true };
+  }
+  const selected = await dialog.showSaveDialog(win, {
+    title: "Save filtered activity log",
+    defaultPath: "devteleport-activity.txt",
+    filters: [{ name: "Text log", extensions: ["txt"] }],
+  });
   if (selected.canceled) return { cancelled: true };
   await fs.writeFile(selected.filePath, text, { flag: "wx", mode: 0o600 });
   return { exported: true };

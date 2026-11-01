@@ -93,6 +93,406 @@ function showError(error) {
   activity("error", "Let’s get this sorted.", message, "Needs attention");
   $("result").textContent = message;
 }
+let consoleRun = null,
+  consoleTimer = null,
+  consoleRenderTimer = null;
+const operationLabels = {
+  capture: "Capture",
+  restore: "Restore",
+  inspect: "Inspect",
+  verify: "Verify",
+  history: "Snapshot history",
+  services: "Inspect services",
+  diagnostics: "Diagnostics",
+  recover: "Recovery inspection",
+  send: "Send snapshot",
+  receive: "Receive snapshot",
+  "pairing-info": "Inspect pairing",
+};
+function consoleDuration(ms, precise = false) {
+  const seconds = Math.max(0, ms / 1000),
+    minutes = Math.floor(seconds / 60);
+  return (
+    String(minutes).padStart(2, "0") +
+    ":" +
+    String(Math.floor(seconds % 60)).padStart(2, "0") +
+    (precise ? "." + String(Math.floor(ms % 1000)).padStart(3, "0") : "")
+  );
+}
+function consoleStages(input) {
+  if (input.action === "capture")
+    return input.dryRun
+      ? ["Inspect workspace", "Review saved files"]
+      : [
+          "Inspect workspace",
+          "Stage files",
+          ...(input.includeDb || input.includeVolumes
+            ? ["Back up selected data"]
+            : []),
+          "Encrypt archive",
+          "Publish snapshot",
+          "Authenticate archive",
+        ];
+  if (input.action === "restore")
+    return input.dryRun
+      ? ["Authenticate snapshot", "Review requirements"]
+      : [
+          "Authenticate snapshot",
+          "Review requirements",
+          "Restore files",
+          ...(input.restoreDb || input.restoreVolumes
+            ? ["Restore selected data"]
+            : []),
+          ...(input.install ? ["Install dependencies"] : []),
+          "Verify workspace",
+        ];
+  return [operationLabels[input.action] || "Run operation"];
+}
+function beginConsole(input) {
+  clearInterval(consoleTimer);
+  consoleRun = {
+    action: input.action,
+    dryRun: input.dryRun,
+    started: performance.now(),
+    date: new Date().toISOString(),
+    entries: [],
+    dropped: 0,
+    retained: 0,
+    steps: consoleStages(input),
+    active: 0,
+    finished: false,
+    state: "working",
+    command:
+      (operationLabels[input.action] || input.action) +
+      (input.dryRun ? " · review only" : ""),
+    metrics: [],
+  };
+  $("consoleNotice").textContent =
+    "Filtered output · local paths may be included · review before sharing";
+  appendConsole(
+    "info",
+    input.dryRun
+      ? "Starting read-only review. No project actions are approved by reviewing."
+      : "Operation started. Follow the live steps below.",
+  );
+  consoleTimer = setInterval(() => {
+    if (consoleRun && !consoleRun.finished)
+      $("consoleElapsed").textContent = consoleDuration(
+        performance.now() - consoleRun.started,
+      );
+  }, 500);
+  renderConsole();
+  if (!input.dryRun)
+    requestAnimationFrame(() =>
+      $("operationConsole").scrollIntoView({
+        block: "nearest",
+        behavior: "instant",
+      }),
+    );
+}
+function appendConsole(level, value) {
+  if (!consoleRun) return;
+  const text = String(value ?? "").slice(0, 4096);
+  if (!text) return;
+  if (consoleRun.entries.at(-1)?.text === text) return;
+  consoleRun.entries.push({
+    time: consoleDuration(performance.now() - consoleRun.started, true),
+    level,
+    text,
+  });
+  consoleRun.retained += text.length;
+  while (consoleRun.entries.length > 500 || consoleRun.retained > 180 * 1024) {
+    const item = consoleRun.entries.shift();
+    consoleRun.retained -= item.text.length;
+    consoleRun.dropped++;
+  }
+  if (!consoleRenderTimer)
+    consoleRenderTimer = setTimeout(() => {
+      consoleRenderTimer = null;
+      renderConsole();
+    }, 50);
+}
+function advanceConsole(phase) {
+  if (!consoleRun || consoleRun.finished) return;
+  let label = null;
+  if (/^Checking project requirements/.test(phase))
+    label = "Review requirements";
+  else if (/^Authenticating (?:entire|and)/.test(phase))
+    label = "Authenticate snapshot";
+  else if (/^Authenticating created|^Checking your new/.test(phase))
+    label = "Authenticate archive";
+  else if (/^Verifying restored/.test(phase)) label = "Verify workspace";
+  else if (/^(?:Installing dependencies:|Dependencies installed:)/.test(phase))
+    label = "Install dependencies";
+  else if (
+    /^Restoring database |^Running explicitly approved post-restore/.test(phase)
+  )
+    label = "Restore selected data";
+  else if (/^Restoring /.test(phase)) label = "Restore files";
+  else if (/^Encrypting|^Validating and encrypting/.test(phase))
+    label = "Encrypt archive";
+  else if (/^Publishing/.test(phase)) label = "Publish snapshot";
+  else if (/^Exporting database |^Backing up/.test(phase))
+    label = "Back up selected data";
+  else if (/^Staging |^Enumerating/.test(phase))
+    label = consoleRun.dryRun ? "Review saved files" : "Stage files";
+  else if (/^Analyzing/.test(phase)) label = "Inspect workspace";
+  const index = consoleRun.steps.indexOf(label);
+  if (index >= 0) consoleRun.active = Math.max(consoleRun.active, index);
+  appendConsole("step", phase);
+}
+function consoleResultMetrics(input, result) {
+  const metrics = [];
+  if (Number.isFinite(result.fileCount))
+    metrics.push(["Entries", String(result.fileCount)]);
+  if (Number.isFinite(result.bytes))
+    metrics.push(["Payload", size(result.bytes)]);
+  if (result.databases?.length)
+    metrics.push(["Databases", String(result.databases.length)]);
+  if (result.volumes?.length)
+    metrics.push(["Volumes", String(result.volumes.length)]);
+  if (input.action === "restore" && input.install)
+    metrics.push([
+      "Package installs",
+      String(
+        new Set((result.dependencies?.packages || []).map((p) => p.installAt))
+          .size,
+      ),
+    ]);
+  if (input.action === "verify")
+    metrics.push(["Verification", result.ok ? "Matched" : "Differences found"]);
+  if (result.archiveVerified) metrics.push(["Authentication", "Passed"]);
+  if (input.action === "history" && Array.isArray(result))
+    metrics.push(["Snapshots", String(result.length)]);
+  if (input.action === "diagnostics" && result.tools)
+    metrics.push(
+      [
+        "Available tools",
+        String(result.tools.filter((t) => t.status === "available").length),
+      ],
+      [
+        "Tools to check",
+        String(result.tools.filter((t) => t.status !== "available").length),
+      ],
+    );
+  return metrics;
+}
+function finishConsole(input, result, error) {
+  if (!consoleRun || consoleRun.finished) return;
+  clearInterval(consoleTimer);
+  const failed = error || result?.ok === false;
+  consoleRun.state =
+    error && /cancelled/i.test(error.message)
+      ? "cancelled"
+      : failed
+        ? "error"
+        : "success";
+  consoleRun.elapsed = performance.now() - consoleRun.started;
+  appendConsole(
+    failed ? "error" : "success",
+    error
+      ? error.message
+          .replace(
+            /^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/,
+            "",
+          )
+          .replace(/^DevTeleport:\s*/, "")
+      : failed
+        ? "Verification found differences. Review the result before continuing."
+        : input.dryRun
+          ? "Review complete. No project actions were executed."
+          : "Operation completed successfully.",
+  );
+  consoleRun.metrics = result ? consoleResultMetrics(input, result) : [];
+  for (const [label, value] of consoleRun.metrics)
+    appendConsole("info", label + ": " + value);
+  for (const warning of result?.warnings || [])
+    appendConsole("warning", warning);
+  for (const problem of (result?.problems || []).slice(0, 100))
+    appendConsole(
+      "error",
+      typeof problem === "string" ? problem : JSON.stringify(problem),
+    );
+  if ((result?.problems?.length || 0) > 100)
+    appendConsole(
+      "warning",
+      "More verification differences are available in Technical details.",
+    );
+  if (input.action === "inspect" && result) {
+    appendConsole(
+      "info",
+      "Package manager: " + (result.runtime?.packageManager || "not detected"),
+    );
+    appendConsole(
+      "info",
+      "Git branch: " + (result.git?.branch || "No branch / repository"),
+    );
+  }
+  if (input.action === "diagnostics" && result?.tools)
+    for (const tool of result.tools)
+      appendConsole(
+        tool.status === "available" ? "success" : "warning",
+        tool.name + ": " + tool.status,
+      );
+  if (input.action === "restore" && !input.dryRun && result) {
+    for (const pkg of result.dependencies?.packages || [])
+      for (const script of pkg.scripts)
+        appendConsole(
+          "command",
+          `[${pkg.directory}] $ ${pkg.manager} run ${script.name}`,
+        );
+  }
+  consoleRun.finished = true;
+  renderConsole();
+}
+function renderConsole() {
+  clearTimeout(consoleRenderTimer);
+  consoleRenderTimer = null;
+  const run = consoleRun;
+  $("operationConsole").dataset.state = run?.state || "idle";
+  $("consoleState").textContent = !run
+    ? "Idle"
+    : !run.finished
+      ? "Running"
+      : run.state === "success"
+        ? "Completed"
+        : run.state === "cancelled"
+          ? "Cancelled"
+          : "Needs attention";
+  $("consoleElapsed").textContent = run
+    ? consoleDuration(run.elapsed ?? performance.now() - run.started)
+    : "00:00";
+  $("consoleCommand").textContent =
+    run?.command || "Choose an action to see its command and live output.";
+  $("consoleSteps").hidden = !run;
+  $("consoleSteps").replaceChildren();
+  for (const [index, label] of (run?.steps || []).entries()) {
+    const row = document.createElement("li"),
+      mark = document.createElement("span"),
+      text = document.createElement("span");
+    const state =
+      (run.finished && run.state === "success") || index < run.active
+        ? "done"
+        : index === run.active
+          ? run.finished
+            ? run.state
+            : "active"
+          : "pending";
+    row.dataset.state = state;
+    row.setAttribute("aria-label", label + ": " + state);
+    mark.textContent =
+      state === "done"
+        ? "✓"
+        : ["error", "cancelled"].includes(state)
+          ? "!"
+          : String(index + 1).padStart(2, "0");
+    text.textContent = label;
+    row.append(mark, text);
+    $("consoleSteps").append(row);
+  }
+  const output = $("consoleOutput"),
+    oldScroll = output.scrollTop;
+  output.replaceChildren();
+  for (const entry of run?.entries || []) {
+    const row = document.createElement("div"),
+      time = document.createElement("time"),
+      tag = document.createElement("span"),
+      text = document.createElement("span");
+    row.className = "console-line";
+    row.dataset.level = entry.level;
+    time.textContent = entry.time;
+    tag.className = "console-tag";
+    tag.textContent =
+      {
+        command: "$",
+        step: "›",
+        success: "✓",
+        warning: "!",
+        error: "×",
+        output: "│",
+        info: "·",
+      }[entry.level] || "·";
+    text.textContent = entry.text;
+    row.append(time, tag, text);
+    output.append(row);
+  }
+  if (!run?.entries.length) {
+    const p = document.createElement("p");
+    p.className = "console-empty";
+    p.textContent =
+      "Live steps and dependency-install output will appear here.";
+    output.append(p);
+  }
+  output.scrollTop = $("consoleFollow").checked
+    ? output.scrollHeight
+    : oldScroll;
+  $("consoleCount").textContent = run
+    ? `${run.entries.length} events` +
+      (run.dropped ? ` · ${run.dropped} older events omitted` : "")
+    : "No events yet";
+  $("consoleMetrics").replaceChildren();
+  $("consoleMetrics").hidden = !run?.metrics.length;
+  for (const [label, value] of run?.metrics || []) {
+    const item = document.createElement("div"),
+      key = document.createElement("span"),
+      strong = document.createElement("strong");
+    key.textContent = label;
+    strong.textContent = value;
+    item.append(key, strong);
+    $("consoleMetrics").append(item);
+  }
+  $("consoleCopy").disabled = $("consoleExport").disabled =
+    !run?.entries.length;
+  $("consoleClear").disabled = busy || !run;
+}
+function consoleTranscript() {
+  if (!consoleRun) return "";
+  return [
+    `DevTeleport workspace activity · ${consoleRun.date}`,
+    consoleRun.command,
+    `State: ${$("consoleState").textContent} · elapsed ${$("consoleElapsed").textContent}`,
+    ...(consoleRun.dropped
+      ? [
+          `${consoleRun.dropped} older events omitted; this is the retained tail.`,
+        ]
+      : []),
+    ...consoleRun.entries.map((e) => `${e.time} [${e.level}] ${e.text}`),
+  ].join("\n");
+}
+for (const [id, action] of [
+  ["consoleCopy", "copy"],
+  ["consoleExport", "export"],
+])
+  $(id).onclick = async () => {
+    try {
+      const result = await window.teleport.activityText({
+        action,
+        text: consoleTranscript(),
+      });
+      $("consoleNotice").textContent = result.cancelled
+        ? "Save cancelled."
+        : action === "copy"
+          ? "Filtered log copied. Review before sharing."
+          : "Filtered log saved. Review before sharing.";
+    } catch (error) {
+      $("consoleNotice").textContent = error.message.replace(
+        /^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/,
+        "",
+      );
+    }
+  };
+$("consoleClear").onclick = () => {
+  if (busy) return;
+  consoleRun = null;
+  clearInterval(consoleTimer);
+  renderConsole();
+  $("consoleNotice").textContent =
+    "Console cleared. No log is saved automatically.";
+};
+$("consoleFollow").onchange = () => {
+  if ($("consoleFollow").checked)
+    $("consoleOutput").scrollTop = $("consoleOutput").scrollHeight;
+};
 function reviewKey(input) {
   return JSON.stringify({ ...input, password: undefined, dryRun: undefined });
 }
@@ -568,14 +968,20 @@ function setBusy(value) {
   busy = value;
   $("cancel").hidden = !value;
   for (const button of document.querySelectorAll("button"))
-    if (!button.dataset.view && !button.dataset.go)
+    if (
+      !button.dataset.view &&
+      !button.dataset.go &&
+      !button.dataset.consoleControl
+    )
       button.disabled = value ? button.id !== "cancel" : button.id === "cancel";
   syncComponents();
   syncReviewActions();
+  $("consoleClear").disabled = value || !consoleRun;
 }
 async function execute(input) {
   if (busy) throw new Error("An operation is already running.");
   setBusy(true);
+  beginConsole(input);
   activity(
     "working",
     input.dryRun ? "Reviewing your workspace…" : "Working on it…",
@@ -622,6 +1028,7 @@ async function execute(input) {
         "Authenticating the encrypted archive before reporting success.",
         "Authenticating created archive…",
       );
+      advanceConsole("Authenticating created archive");
       await window.teleport.operation({
         action: "snapshot-info",
         source: result.output,
@@ -687,8 +1094,10 @@ async function execute(input) {
         "\nChoose Restore when ready; authentication and approval remain required.";
     }
     await refreshData();
+    finishConsole(input, result);
     return result;
   } catch (error) {
+    finishConsole(input, null, error);
     showError(error);
     throw error;
   } finally {
@@ -830,6 +1239,28 @@ $("receiveButton").onclick = () =>
     toolDirectories: $("toolDirectories").value,
   }).catch(() => {});
 window.teleport.onProgress((progress) => {
+  if (progress.kind === "command") {
+    if (consoleRun && !consoleRun.finished) {
+      if (progress.action === consoleRun.action)
+        consoleRun.command = progress.text;
+      appendConsole("command", progress.text);
+    }
+    return;
+  }
+  if (progress.kind === "output") {
+    if (consoleRun && !consoleRun.finished)
+      appendConsole(
+        progress.stream === "stderr"
+          ? "warning"
+          : progress.stream === "system"
+            ? "command"
+            : "output",
+        progress.text,
+      );
+    return;
+  }
+  if (typeof progress.phase !== "string") return;
+  advanceConsole(progress.phase);
   $("status").textContent = progress.phase;
   $("activitySummary").textContent = progress.phase;
   if (progress.ready)
