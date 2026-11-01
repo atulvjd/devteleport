@@ -7,6 +7,7 @@ import { execText, throwIfCancelled } from "./processes.ts";
 import {
   activityLineSink,
   activitySecrets,
+  redactActivityText,
   type ActivityOutput,
 } from "./activity.ts";
 import { findExecutable } from "./platform.ts";
@@ -570,7 +571,10 @@ export async function installDependencies(
     };
     onLog?.({
       stream: "system",
-      text: `[${pkg.directory}] $ ${pkg.command.join(" ")}`,
+      text: redactActivityText(
+        `[${pkg.directory}] $ ${pkg.command.join(" ")}`,
+        secrets,
+      ),
     });
     try {
       await execText(tool.file!, pkg.command.slice(1), {
