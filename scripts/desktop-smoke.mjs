@@ -99,6 +99,7 @@ try {
   const missingConfiguration = await page.locator("#result").textContent();
   assert(
     missingConfiguration.includes("PostgreSQL databases or Docker volumes"),
+    missingConfiguration,
   );
   assert(missingConfiguration.includes("Uncheck"));
   assert.equal(
