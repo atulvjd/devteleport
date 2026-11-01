@@ -95,7 +95,21 @@ Helpers use a public `python:3.13-alpine` image, native ARM64 when running nativ
 
 ### Dependency execution
 
-Ordinary restoration executes no project code. `--install --approve-execution` explicitly permits `npm ci`, including lifecycle scripts, when `package-lock.json` exists. Review source first. Other package managers are detected and require separately reviewed installation. Native dependencies must match the destination architecture. Tool discovery never silently installs Homebrew software; Corepack network provisioning is disabled during diagnostic probes.
+Ordinary restoration executes no project code. The current development source adds a guided dependency preview to restore: review the detected packages, then select **Restore and install dependencies**. After one explicit approval, supported npm/pnpm packages are installed in their restored directories, including independent subprojects such as `cms`. Workspace members share their declared workspace root's install. The completion guide lists the declared `dev`, `develop`, `start` and `dev:*` commands and their working directories; applications are not started automatically.
+
+With approval, npm uses `ci` when a lockfile exists and `install` otherwise. pnpm uses frozen-lockfile installation when possible, and explicitly permits a new lockfile when none exists. Missing locks mean dependency versions will be resolved rather than reproduced exactly. Installing may use the network and execute lifecycle scripts with the user's permissions. Missing/incompatible Node/package-manager versions, conflicting lockfiles or unsupported managers block automatic installation before the destination is created; files-only recovery remains available. Yarn/Bun and non-Node projects need manual setup. System tools and credentials are never installed or generated automatically. Corepack provisioning is disabled, and snapshot passphrases are removed from installer environments.
+
+```sh
+# Preview authenticated requirements before a new destination is created:
+devteleport restore project.dtp --target /path/to/new-project --dry-run --install
+# Restore and install the reviewed dependencies, including independent subprojects:
+devteleport restore project.dtp --target /path/to/new-project --install --approve-execution
+# Inspect or retry setup in an existing restored folder:
+devteleport setup /path/to/new-project
+devteleport setup /path/to/new-project --install --approve-execution
+```
+
+These additions are in development source; the previously published npm 0.2.0 package and GitHub DMG have not been replaced. Use `node apps/cli/main.ts` or `npm run desktop` from this checkout for the new workflow. See [guided restore](docs/GUIDED-RESTORE.md).
 
 ## Pair and transfer over your LAN
 

@@ -42,6 +42,7 @@ Dependencies and known credential files are excluded by default. Configure crede
 | `capture`                                      | `--root DIR --name NAME --output DIR`; optional `--dry-run`, `--format 1                                                                               | 2`, repeated `--exclude PREFIX`, `--include-db`, `--include-volumes` |
 | `snapshot-info FILE`                           | Authenticate and display metadata without payload contents                                                                                             |
 | `restore FILE`                                 | `--target NEW_DIR`; optional `--dry-run`, `--verify-key PUBLIC.pem`, and explicit component approvals below                                            |
+| `setup [DIR]` | Development source: preview package requirements, install commands and startup scripts; `--install --approve-execution` installs or retries dependencies. `--dry-run` prevents installation. |
 | `verify [DIR]`                                 | Check local inventory; use `--snapshot FILE` for authenticated original metadata                                                                       |
 | `diff FILE [DIR]`                              | Compare source-file state with a directory; optional `--include-git`                                                                                   |
 | `diff FILE --snapshot NEWER`                   | Compare two snapshots; `DEVTELEPORT_NEWER_PASSWORD` can supply a different newer passphrase                                                            |
@@ -75,7 +76,11 @@ Example database configuration uses an environment-variable name, not a connecti
 
 Database restore requires `--restore-db --approve-db --db-config TRUSTED.json`, with an explicit mapping to an empty local development database. Volume restore requires `--restore-volumes --approve-volumes --db-config TRUSTED.json` and new destination volume names. Never reuse production targets.
 
-`restore --install --approve-execution` permits npm lifecycle scripts and currently supports only projects with `package-lock.json`. For pnpm/yarn or separate subprojects, install manually using their own lockfiles.
+The current development source expands `restore --install --approve-execution` to reviewed npm/pnpm packages, including independent subprojects such as a separate CMS. The dry-run report includes dependencies and exact install/start commands before creating the destination. npm uses `ci` with a lockfile or `install` without one. pnpm uses `install --frozen-lockfile` with a lockfile or `install --no-frozen-lockfile` without one. Declared workspace members share the workspace root's installation; unrelated packages retain their own manager.
+
+Installation uses the network and may execute lifecycle scripts; only approve trusted projects. Missing/incompatible tools, unsupported managers and conflicting lockfiles block automatic installation before creating the destination. Node engine ranges that cannot be checked conservatively require manual review. Yarn/Bun and other language ecosystems need manual setup. Credentials, services and system tools remain separate prerequisites. Snapshot passphrases are not passed to project installers, and raw tool output is withheld because scripts or registry errors can expose credentials. A failed install preserves restored files and earlier successful installs; there is no rollback.
+
+After restoring, use the reported working directory and declared startup script, such as `npm run dev` for the frontend and `npm run develop` inside `cms`. `setup DIR --install --approve-execution` can retry setup without restoring again. These additions are not in the previously published npm 0.2.0 package; use the source CLI until a new version is released.
 
 ## Transfer and recovery boundaries
 

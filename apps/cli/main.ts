@@ -360,7 +360,7 @@ try {
         throw new Error("Unknown command: " + command);
       result = {
         usage:
-          "devteleport inspect | capture --name NAME [--include-db] [--include-volumes] [--dry-run] | restore FILE --target DIR [--dry-run] | verify DIR [--snapshot FILE] | diff FILE [DIR | --snapshot NEWER] [--include-git] | recover DIR | history DIR | services DIR [--start --approve-execution] | export/import FILE --target FILE | keygen --target PREFIX | sign FILE --key PRIVATE | check-signature FILE --key PUBLIC",
+          "devteleport inspect | capture --name NAME [--include-db] [--include-volumes] [--dry-run] | restore FILE --target DIR [--dry-run] | setup DIR [--install --approve-execution] [--dry-run] | verify DIR [--snapshot FILE] | diff FILE [DIR | --snapshot NEWER] [--include-git] | recover DIR | history DIR | services DIR [--start --approve-execution] | export/import FILE --target FILE | keygen --target PREFIX | sign FILE --key PRIVATE | check-signature FILE --key PUBLIC",
         security:
           "Encrypted snapshots require a passphrase. Never put passphrases in command arguments. Use interactive input or DEVTELEPORT_PASSWORD.",
         database:

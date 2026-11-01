@@ -488,23 +488,38 @@ export async function installDependencies(
       "Dependency preflight needs attention: " + plan.blockers.join(" "),
     );
   root = await fs.realpath(root);
-  // Recheck every reviewed manifest/lockfile before executing the first command.
-  for (const input of plan.inputs) {
-    const file = await checkedPath(root, input.path),
-      hash = crypto.createHash("sha256");
-    if ((await fs.lstat(file)).size !== input.size)
-      throw new Error("Dependency inputs changed; review again: " + input.path);
-    const handle = await fs.open(
-      file,
-      constants.O_RDONLY | constants.O_NOFOLLOW,
-    );
-    for await (const chunk of handle.createReadStream()) hash.update(chunk);
-    if (hash.digest("hex") !== input.checksum)
-      throw new Error("Dependency inputs changed; review again: " + input.path);
+  // Recheck every reviewed input before executing, including between packages:
+  // a root lifecycle script must not silently change the CMS install plan.
+  async function verifyInputs() {
+    for (const input of plan.inputs) {
+      const file = await checkedPath(root, input.path),
+        hash = crypto.createHash("sha256");
+      if ((await fs.lstat(file)).size !== input.size)
+        throw new Error(
+          "Dependency inputs changed; review again: " + input.path,
+        );
+      const handle = await fs.open(
+        file,
+        constants.O_RDONLY | constants.O_NOFOLLOW,
+      );
+      let bytes = 0;
+      for await (const chunk of handle.createReadStream()) {
+        bytes += chunk.length;
+        if (bytes > input.size)
+          throw new Error("Dependency input grew; review again: " + input.path);
+        hash.update(chunk);
+      }
+      if (hash.digest("hex") !== input.checksum)
+        throw new Error(
+          "Dependency inputs changed; review again: " + input.path,
+        );
+    }
   }
+  await verifyInputs();
   const completed: { directory: string; command: string; state: string }[] = [];
   for (const pkg of plan.packages.filter((p) => p.directory === p.installAt)) {
     throwIfCancelled();
+    if (completed.length) await verifyInputs();
     const cwd = await checkedPath(root, pkg.directory),
       tool = plan.tools.find((t) => t.name === pkg.manager)!;
     progress?.(`Installing dependencies: ${pkg.directory} (${pkg.manager})`);

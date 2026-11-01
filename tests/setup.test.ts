@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { once } from "node:events";
 import {
   setupDirectory,
   installDependencies,
@@ -149,6 +150,81 @@ test("Node engine checks refuse mismatches and leave unknown ranges for manual r
   for (const range of ["<24", "^22", ">24", "<=23", "~24.20.0"])
     assert.equal(nodeSatisfies("24.21.0", range), false, range);
   assert.equal(nodeSatisfies("24.21.0", "lts/jod"), null);
+});
+
+test("runtime mismatches and conflicting lockfiles are actionable preflight blockers", async (t) => {
+  const { root } = await fixture(t);
+  const file = path.join(root, "cms", "package.json"),
+    pkg = JSON.parse(await fs.readFile(file, "utf8"));
+  pkg.engines.node = "<10";
+  await fs.writeFile(file, JSON.stringify(pkg));
+  await fs.writeFile(path.join(root, "yarn.lock"), "");
+  await fs.writeFile(path.join(root, "package-lock.json"), "{}");
+  const plan = await setupDirectory(root);
+  assert(plan.blockers.some((b) => b.includes("Conflicting")));
+  assert(plan.blockers.some((b) => b.includes("does not match")));
+  await assert.rejects(installDependencies(root, plan, true), /preflight/);
+  await assert.rejects(fs.stat(path.join(root, "installed.txt")), {
+    code: "ENOENT",
+  });
+});
+
+test("a root lifecycle change to CMS metadata stops execution before the unreviewed CMS install", async (t) => {
+  const { root } = await fixture(t);
+  await fs.writeFile(
+    path.join(root, "install.cjs"),
+    "const fs=require('node:fs');fs.writeFileSync('installed.txt','ready');fs.appendFileSync('cms/package.json',' ');",
+  );
+  const plan = await setupDirectory(root);
+  await assert.rejects(installDependencies(root, plan, true), /inputs changed/);
+  assert.equal(
+    await fs.readFile(path.join(root, "installed.txt"), "utf8"),
+    "ready",
+  );
+  await assert.rejects(fs.stat(path.join(root, "cms", "installed.txt")), {
+    code: "ENOENT",
+  });
+});
+
+test("cancelling guided installation terminates lifecycle descendants and preserves the project", async (t) => {
+  const { root } = await fixture(t);
+  await fs.writeFile(
+    path.join(root, "install.cjs"),
+    "const fs=require('node:fs');const child=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});fs.writeFileSync('child.pid',String(child.pid));setInterval(()=>{},1000);",
+  );
+  const child = spawn(
+    process.execPath,
+    ["apps/cli/main.ts", "setup", root, "--install", "--approve-execution"],
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+  const exited = once(child, "exit");
+  child.stderr.resume();
+  t.after(async () => {
+    if (child.exitCode === null) child.kill("SIGTERM");
+    await exited;
+  });
+  let pid = 0;
+  for (let attempt = 0; attempt < 500 && !pid; attempt++) {
+    try {
+      pid = Number(await fs.readFile(path.join(root, "child.pid"), "utf8"));
+    } catch {}
+    if (!pid) await new Promise((r) => setTimeout(r, 20));
+  }
+  assert(pid > 0, "Lifecycle descendant did not start");
+  child.kill("SIGTERM");
+  await exited;
+  let alive = true;
+  for (let attempt = 0; attempt < 100 && alive; attempt++) {
+    try {
+      process.kill(pid, 0);
+      await new Promise((r) => setTimeout(r, 20));
+    } catch (error) {
+      if (error.code === "ESRCH") alive = false;
+      else throw error;
+    }
+  }
+  assert.equal(alive, false, "A lifecycle descendant survived cancellation");
+  assert((await fs.stat(path.join(root, "cms", "package.json"))).isFile());
 });
 
 for (const format of [1, 2] as const)
