@@ -10,6 +10,27 @@ try {
   const root = path.join(temp, "source");
   await fs.mkdir(root);
   await fs.writeFile(path.join(root, "hello.txt"), "desktop roundtrip");
+  await fs.writeFile(
+    path.join(root, ".env"),
+    "APP_SECRET=desktop-env-private-fixture\n",
+  );
+  await fs.writeFile(path.join(root, ".gitignore"), ".env*\nlocal-cache/\n");
+  await fs.mkdir(path.join(root, "local-cache"));
+  await fs.writeFile(
+    path.join(root, "local-cache", "state.txt"),
+    "ignored local state",
+  );
+  for (let i = 0; i < 600; i++)
+    await fs.writeFile(
+      path.join(
+        root,
+        "local-cache",
+        `entry-${String(i).padStart(4, "0")}-large-response-fixture.txt`,
+      ),
+      "ignored fixture",
+    );
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["add", "hello.txt", ".gitignore"], { cwd: root });
   await fs.mkdir(path.join(root, "cms"));
   for (const [dir, script] of [
     ["", "dev"],
@@ -147,6 +168,43 @@ try {
   await page.evaluate(() => window.resumeSmokeSettings());
   await done();
   assert(await page.locator("#captureReview").isVisible());
+  assert(
+    !(await page.locator("#includeIgnored").isChecked()),
+    "Including ignored files/secrets must be explicit",
+  );
+  assert(
+    !JSON.parse(await page.locator("#result").textContent()).files.some(
+      (file) => file.path === ".env",
+    ),
+  );
+  await page.locator("#includeIgnored").check();
+  assert(
+    await page.locator('[data-action="capture"].primary').isDisabled(),
+    "Changing inclusion policy must invalidate the review",
+  );
+  await page.locator('[data-action="capture"][data-dry="true"]').click();
+  await done();
+  assert((await page.locator("#captureReview").textContent()).includes(".env"));
+  assert(
+    Buffer.byteLength(await page.locator("#result").textContent()) > 65536,
+    "Ignored-file preview must exercise multi-chunk backend output",
+  );
+  assert(
+    (await page.locator("#captureReview").textContent()).includes(
+      "credentials",
+    ),
+  );
+  assert(
+    !(
+      (await page.locator("#result").textContent()) +
+      (await page.locator("#consoleOutput").textContent())
+    ).includes("desktop-env-private-fixture"),
+  );
+  await fs.mkdir("dist/include-ignored", { recursive: true });
+  await page.screenshot({
+    path: "dist/include-ignored/capture-review.png",
+    fullPage: true,
+  });
   assert(!(await page.locator('[data-action="capture"].primary').isDisabled()));
   await page.locator("#name").fill("changed-after-review");
   assert(await page.locator('[data-action="capture"].primary').isDisabled());
@@ -184,6 +242,11 @@ try {
   await page.locator('[data-action="restore"][data-dry="true"]').click();
   await done();
   assert(await page.locator("#restoreSetup").isVisible());
+  assert(
+    (await page.locator("#restoreReview").textContent()).includes(
+      "credentials",
+    ),
+  );
   const dependencyGuide = await page.locator("#setupPackages").textContent();
   assert(dependencyGuide.includes("Main project"));
   assert(dependencyGuide.includes("cms"));
@@ -326,6 +389,14 @@ try {
   assert.equal(
     await fs.readFile(path.join(target, "hello.txt"), "utf8"),
     "desktop roundtrip",
+  );
+  assert.equal(
+    await fs.readFile(path.join(target, ".env"), "utf8"),
+    "APP_SECRET=desktop-env-private-fixture\n",
+  );
+  assert.equal(
+    await fs.readFile(path.join(target, "local-cache", "state.txt"), "utf8"),
+    "ignored local state",
   );
   await page.locator("#source").fill(target);
   await page.locator('[data-action="verify"]').click();
@@ -541,6 +612,13 @@ try {
     noOverwriteExport: true,
     boundedTail: true,
     cancellationState: true,
+  };
+  native.includeIgnoredCapture = {
+    optInDefaultOff: true,
+    reviewInvalidation: true,
+    environmentRestored: true,
+    gitIgnoredDataRestored: true,
+    environmentValuesHiddenInReview: true,
   };
   native.restoredWindowBounds = restoredBounds;
   await fs.writeFile(

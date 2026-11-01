@@ -385,6 +385,24 @@ Choose a project above, then select Inspect.</pre>
                 ></span
               ><input id="includeVolumes" type="checkbox" disabled
             /></label>
+            <label class="component selectable"
+              ><svg class="icon" aria-hidden="true"><use href="#i-lock" /></svg
+              ><span
+                ><strong>Include ignored files & secrets</strong
+                ><small
+                  >Includes .env, dependency folders and other ignored project
+                  files. May contain credentials.</small
+                ></span
+              ><input
+                id="includeIgnored"
+                type="checkbox"
+                aria-describedby="ignoredFilesHelp"
+            /></label>
+            <p class="field-help" id="ignoredFilesHelp">
+              Off by default. Only enable for a private encrypted snapshot you
+              trust the recipient with. Extra exclusions and archive/path limits
+              still apply.
+            </p>
             <p class="hint" id="componentHint">
               Files and Git work on their own. Optional components need entries
               in your project’s devteleport.json.

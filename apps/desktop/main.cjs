@@ -12,6 +12,7 @@ const {
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
+const { finished: streamFinished } = require("node:stream/promises");
 const applicationRoot = app.isPackaged
   ? app.getAppPath()
   : path.join(__dirname, "../..");
@@ -286,6 +287,7 @@ ipcMain.handle("operation", async (event, input) => {
     if (input.dryRun) args.push("--dry-run");
     if (input.includeDb) args.push("--include-db");
     if (input.includeVolumes) args.push("--include-volumes");
+    if (input.includeIgnored) args.push("--include-ignored");
     for (const prefix of (input.exclusions || "").split("\n").filter(Boolean))
       args.push("--exclude", prefix);
   } else if (input.action === "receive") {
@@ -447,9 +449,14 @@ ipcMain.handle("operation", async (event, input) => {
       stderr += data;
       if (stderr.length > 24 * 1024 * 1024) child.cancel();
     });
-    child.once("exit", (code) => {
-      progressLine(progressBuffer + progressDecoder.end());
+    const drained = Promise.allSettled([
+      streamFinished(child.stdout, { cleanup: true }),
+      streamFinished(child.stderr, { cleanup: true }),
+    ]);
+    child.once("exit", async (code) => {
       clearTimeout(timer);
+      const streams = await drained;
+      progressLine(progressBuffer + progressDecoder.end());
       running = null;
       if (cancelled)
         return reject(
@@ -468,6 +475,12 @@ ipcMain.handle("operation", async (event, input) => {
                 stderr.slice(-2000) ||
                 "Workspace engine failed. Review paths, permissions and diagnostics.",
             ),
+          ),
+        );
+      if (streams.some((result) => result.status === "rejected"))
+        return reject(
+          new Error(
+            "The workspace engine output was interrupted. Review the operation state before retrying.",
           ),
         );
       try {

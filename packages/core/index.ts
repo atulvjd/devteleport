@@ -68,6 +68,8 @@ export const sensitive = (p: string) =>
   /(^|\/)(\.env(?:\..*)?|.*\.(?:pem|key|p12|pfx)|credentials(?:\.json)?|id_rsa|id_ed25519|\.npmrc|\.netrc|\.pypirc)$/i.test(
     p,
   );
+export const IGNORED_CAPTURE_WARNING =
+  "Ignored files and secrets are included by explicit choice. This snapshot may contain .env values, credentials, dependency folders and local configuration. Share it only with trusted recipients; copied dependencies may need rebuilding on another machine.";
 export function safePath(p: string) {
   if (
     typeof p !== "string" ||
@@ -334,6 +336,7 @@ export async function enumerate(
   root: string,
   c: WorkspaceConfig,
   metadataOnly = false,
+  policy: Pick<CaptureOptions, "includeIgnored"> = {},
 ) {
   const files: SnapshotEntry[] = [],
     omitted: string[] = [];
@@ -346,10 +349,10 @@ export async function enumerate(
       const p = rel ? `${rel}/${ent.name}` : ent.name;
       safePath(p);
       if (
-        excluded.has(ent.name) ||
+        ent.name === ".devteleport" ||
         ent.name.startsWith(".devteleport-") ||
         ent.name.includes(".dtp.partial-") ||
-        sensitive(p) ||
+        (!policy.includeIgnored && (excluded.has(ent.name) || sensitive(p))) ||
         p.endsWith(".dtp") ||
         (c.exclude ?? []).some((x) => p === x || p.startsWith(x + "/"))
       ) {
@@ -422,6 +425,7 @@ export async function enumerate(
             `File changed during capture: ${p}. Stop writers and retry.`,
           );
         if (
+          !policy.includeIgnored &&
           !p.startsWith(".git/") &&
           /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}/.test(
             data.toString("utf8"),
@@ -510,18 +514,20 @@ export async function capture(options: CaptureOptions = {}) {
     safePath(prefix);
     c.exclude = [...(c.exclude ?? []), prefix];
   }
-  const ignored = await optional(
-    "git",
-    [
-      "ls-files",
-      "--others",
-      "--ignored",
-      "--exclude-standard",
-      "--directory",
-      "-z",
-    ],
-    report.root,
-  );
+  const ignored = options.includeIgnored
+    ? null
+    : await optional(
+        "git",
+        [
+          "ls-files",
+          "--others",
+          "--ignored",
+          "--exclude-standard",
+          "--directory",
+          "-z",
+        ],
+        report.root,
+      );
   if (ignored)
     c.exclude = [
       ...(c.exclude ?? []),
@@ -553,7 +559,7 @@ export async function capture(options: CaptureOptions = {}) {
     }
   }
   const firstStatus = report.git?.status;
-  const { files, omitted } = await enumerate(report.root, c);
+  const { files, omitted } = await enumerate(report.root, c, false, options);
   if (
     files.some(
       (file) =>
@@ -577,6 +583,8 @@ export async function capture(options: CaptureOptions = {}) {
       report,
       lfs,
       name,
+      capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
+      warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
       fileCount: files.length,
       omitted,
       actions: [
@@ -680,7 +688,7 @@ export async function capture(options: CaptureOptions = {}) {
     await fs.rm(temp, { recursive: true, force: true });
   }
   // Re-read every entry to detect a workspace changed while its archive was assembled.
-  const second = await enumerate(report.root, c);
+  const second = await enumerate(report.root, c, false, options);
   if (
     sha(JSON.stringify(files)) !== sha(JSON.stringify(second.files)) ||
     firstStatus !== (await inspect(report.root)).git?.status
@@ -690,6 +698,7 @@ export async function capture(options: CaptureOptions = {}) {
     );
   const manifest = {
     formatVersion: 1,
+    capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
     name,
     createdAt: new Date().toISOString(),
     platform: report.platform,
@@ -762,6 +771,8 @@ export async function capture(options: CaptureOptions = {}) {
   }
   return {
     output,
+    capturePolicy: manifest.capturePolicy,
+    warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
     fileCount: files.length,
     databases: databases.map((d) => d.name),
     volumes: volumes.map((v) => v.name),
@@ -774,6 +785,13 @@ export function validateManifest(value: unknown): Manifest {
     throw new Error(
       "Unsupported snapshot version; no automatic migrations are available.",
     );
+  if (
+    m.capturePolicy !== undefined &&
+    (!m.capturePolicy ||
+      typeof m.capturePolicy.includeIgnored !== "boolean" ||
+      Object.keys(m.capturePolicy).some((key) => key !== "includeIgnored"))
+  )
+    throw new Error("Invalid capture inclusion policy");
   if (
     typeof m.name !== "string" ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(m.name) ||
@@ -962,6 +980,14 @@ export async function restore(file: string, options: RestoreOptions = {}) {
       "Destination already exists. Choose a new empty destination path; existing paths are never overwritten.",
     );
   const warnings = [];
+  if (m.capturePolicy?.includeIgnored) warnings.push(IGNORED_CAPTURE_WARNING);
+  if (
+    options.install &&
+    m.files.some((f) => f.path.split("/").includes("node_modules"))
+  )
+    warnings.push(
+      "Dependency installation may replace captured node_modules files and cause verification differences. Leave installation off to preserve the captured dependency files.",
+    );
   if (
     m.platform.os !== process.platform ||
     m.platform.architecture !== process.arch
@@ -993,6 +1019,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     );
   const plan = {
     target,
+    capturePolicy: m.capturePolicy ?? { includeIgnored: false },
     dependencies,
     tools,
     fileCount: m.files.length,
@@ -1465,21 +1492,26 @@ export async function verifyFromSnapshot(
  * Git-ignored and built-in exclusions), stream-hashing each file so large
  * workspaces are not loaded into memory. Used by diff to compare a folder.
  */
-export async function listWorkspace(directory = ".") {
+export async function listWorkspace(
+  directory = ".",
+  policy: Pick<CaptureOptions, "includeIgnored"> = {},
+) {
   const root = await fs.realpath(directory);
   const c = await config(root);
-  const ignored = await optional(
-    "git",
-    [
-      "ls-files",
-      "--others",
-      "--ignored",
-      "--exclude-standard",
-      "--directory",
-      "-z",
-    ],
-    root,
-  );
+  const ignored = policy.includeIgnored
+    ? null
+    : await optional(
+        "git",
+        [
+          "ls-files",
+          "--others",
+          "--ignored",
+          "--exclude-standard",
+          "--directory",
+          "-z",
+        ],
+        root,
+      );
   if (ignored)
     c.exclude = [
       ...(c.exclude ?? []),
@@ -1488,7 +1520,7 @@ export async function listWorkspace(directory = ".") {
         .filter(Boolean)
         .map((p) => p.replace(/\/$/, "")),
     ];
-  const listing = await enumerate(root, c, true);
+  const listing = await enumerate(root, c, true, policy);
   const { hashFile } = await import("./stream-v2.ts");
   for (const f of listing.files)
     if (f.type === "file") f.checksum = await hashFile(path.join(root, f.path));

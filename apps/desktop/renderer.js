@@ -624,7 +624,15 @@ function renderReview(action, result, input) {
     ],
   ];
   if (action === "capture")
-    rows.push(["Excluded entries", String(result.omitted?.length ?? 0)]);
+    rows.push(
+      [
+        "Ignored files & secrets",
+        input.includeIgnored
+          ? "Included by explicit choice"
+          : "Excluded by default",
+      ],
+      ["Excluded entries", String(result.omitted?.length ?? 0)],
+    );
   else
     rows.push([
       "Install dependencies",
@@ -640,6 +648,23 @@ function renderReview(action, result, input) {
     list.append(dt, dd);
   }
   target.append(heading, list);
+  if (action === "capture") {
+    const environmentFiles = (result.files || []).filter((file) =>
+      /(^|\/)\.env(?:\.|$)/.test(file.path),
+    );
+    if (environmentFiles.length) {
+      const included = document.createElement("p");
+      included.className = "review-warning";
+      included.textContent =
+        "Environment files included (contents hidden): " +
+        environmentFiles
+          .slice(0, 20)
+          .map((file) => file.path)
+          .join(", ") +
+        (environmentFiles.length > 20 ? " …" : "");
+      target.append(included);
+    }
+  }
   for (const warning of result.warnings || []) {
     const note = document.createElement("p");
     note.className = "review-warning";
@@ -956,6 +981,7 @@ function inputFor(action, dryRun = false) {
     toolDirectories: $("toolDirectories").value,
     includeDb: $("includeDb").checked,
     includeVolumes: $("includeVolumes").checked,
+    includeIgnored: $("includeIgnored").checked,
     restoreDb: $("restoreDb").checked,
     restoreVolumes: $("restoreVolumes").checked,
     install: $("install").checked,

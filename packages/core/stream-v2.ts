@@ -18,6 +18,7 @@ import {
   validateManifest,
   readSnapshot,
   verify,
+  IGNORED_CAPTURE_WARNING,
 } from "./index.ts";
 import { verifyLfsCompleteness } from "./lfs.ts";
 import { dumpDatabase, restoreDatabase } from "./postgres-stream.ts";
@@ -262,18 +263,20 @@ export async function captureV2(options: CaptureOptions) {
         );
     await run("git", ["fsck", "--full", "--no-dangling"], report.root);
   }
-  const ignored = await optional(
-    "git",
-    [
-      "ls-files",
-      "--others",
-      "--ignored",
-      "--exclude-standard",
-      "--directory",
-      "-z",
-    ],
-    report.root,
-  );
+  const ignored = options.includeIgnored
+    ? null
+    : await optional(
+        "git",
+        [
+          "ls-files",
+          "--others",
+          "--ignored",
+          "--exclude-standard",
+          "--directory",
+          "-z",
+        ],
+        report.root,
+      );
   if (ignored)
     c.exclude = [
       ...(c.exclude ?? []),
@@ -293,7 +296,7 @@ export async function captureV2(options: CaptureOptions) {
       ...(c.exclude ?? []),
       relativeOutput.split(path.sep).join("/"),
     ];
-  const listing = await enumerate(report.root, c, true),
+  const listing = await enumerate(report.root, c, true, options),
     name = options.name ?? path.basename(report.root);
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(name))
     throw new Error("Invalid snapshot name");
@@ -315,6 +318,7 @@ export async function captureV2(options: CaptureOptions) {
     for (const file of listing.files) {
       if (
         file.type === "file" &&
+        !options.includeIgnored &&
         !file.path.startsWith(".git/") &&
         (await embeddedSecret(path.join(report.root, file.path), file.size))
       ) {
@@ -324,6 +328,8 @@ export async function captureV2(options: CaptureOptions) {
     return {
       report,
       name,
+      capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
+      warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
       formatVersion: 2,
       fileCount: reviewFiles.length,
       bytes,
@@ -394,7 +400,7 @@ export async function captureV2(options: CaptureOptions) {
             highWaterMark: V2_LIMITS.chunk,
             autoClose: false,
           })) {
-            if (!f.path.startsWith(".git/")) {
+            if (!options.includeIgnored && !f.path.startsWith(".git/")) {
               const text = tail + chunk.toString("latin1");
               if (
                 /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}/.test(
@@ -463,7 +469,7 @@ export async function captureV2(options: CaptureOptions) {
         payloads.push(file);
       }
     }
-    const second = await enumerate(report.root, c, true);
+    const second = await enumerate(report.root, c, true, options);
     if (
       JSON.stringify(second.files) !== JSON.stringify(listing.files) ||
       report.git?.status !== (await inspect(report.root)).git?.status
@@ -476,6 +482,7 @@ export async function captureV2(options: CaptureOptions) {
         throw new Error("Workspace changed during capture: " + file);
     const m: Manifest = {
       formatVersion: 2,
+      capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
       name,
       createdAt: new Date().toISOString(),
       platform: report.platform,
@@ -542,6 +549,8 @@ export async function captureV2(options: CaptureOptions) {
     await fs.unlink(partial);
     return {
       output,
+      capturePolicy: m.capturePolicy,
+      warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
       formatVersion: 2,
       fileCount: files.length,
       bytes: blobs(m).reduce((sum, b) => sum + b.size, 0),
@@ -677,6 +686,14 @@ export async function restoreV2(file: string, options: RestoreOptions) {
             "OS or architecture differs; reinstall native dependencies and review compatibility.",
           ]
         : [];
+    if (m.capturePolicy?.includeIgnored) warnings.push(IGNORED_CAPTURE_WARNING);
+    if (
+      options.install &&
+      m.files.some((f) => f.path.split("/").includes("node_modules"))
+    )
+      warnings.push(
+        "Dependency installation may replace captured node_modules files and cause verification differences. Leave installation off to preserve the captured dependency files.",
+      );
     const tools = await Promise.all(
       [
         ...(m.git ? ["git"] : []),
@@ -726,6 +743,7 @@ export async function restoreV2(file: string, options: RestoreOptions) {
         }),
       ),
       target,
+      capturePolicy: m.capturePolicy ?? { includeIgnored: false },
       formatVersion: 2,
       fileCount: m.files.length,
       bytes: blobs(m).reduce((sum, b) => sum + b.size, 0),

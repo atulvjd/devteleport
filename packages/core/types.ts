@@ -10,6 +10,7 @@ export interface CaptureOptions {
   dryRun?: boolean;
   includeDb?: boolean;
   includeVolumes?: boolean;
+  includeIgnored?: boolean;
 }
 export interface RestoreOptions {
   target?: string;
@@ -83,6 +84,7 @@ export interface VolumeRecord {
 }
 export interface Manifest {
   formatVersion: number;
+  capturePolicy?: { includeIgnored: boolean };
   name: string;
   createdAt: string;
   platform: { os: string; architecture: string };

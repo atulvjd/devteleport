@@ -103,7 +103,7 @@ export async function diffSnapshotWithDirectory(
   options: DiffOptions = {},
 ) {
   const manifest = await snapshotMetadata(snapshot, password);
-  const { files } = await listWorkspace(directory);
+  const { files } = await listWorkspace(directory, manifest.capturePolicy);
   // Files capture skipped for holding credentials were never in the snapshot.
   const secret = new Set(
     manifest.omitted
