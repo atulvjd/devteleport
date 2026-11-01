@@ -5,6 +5,7 @@ import type {
   RestoreOptions,
 } from "../../packages/core/types.ts";
 import { setupDirectory } from "../../packages/core/setup.ts";
+import { activitySecrets, redactActivityText } from "../../packages/core/activity.ts";
 import {
   inspect,
   capture,
@@ -127,6 +128,16 @@ try {
     } else positional.push(a);
   }
   if (process.env.DEVTELEPORT_PROGRESS === "1") {
+    const secrets = activitySecrets();
+    let outputBytes = 0, outputLimited = false;
+    options.onLog = ({ stream, text }) => {
+      const safe = redactActivityText(text, secrets);
+      if ((outputBytes += Buffer.byteLength(safe)) > 1024 * 1024) {
+        if (!outputLimited) process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ kind: "output", stream: "system", text: "[Console output limit reached; operation continues]" }) + "\n");
+        outputLimited = true; return;
+      }
+      process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ kind: "output", stream, text: safe }) + "\n");
+    };
     let last = 0;
     options.onProgress = (phase) => {
       const now = Date.now();
@@ -136,7 +147,7 @@ try {
       )
         return;
       last = now;
-      process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ phase }) + "\n");
+      process.stderr.write("DTP_PROGRESS:" + JSON.stringify({ phase: redactActivityText(phase, secrets) }) + "\n");
     };
   }
   if (options.format !== undefined) {
@@ -258,6 +269,7 @@ try {
         Boolean(options.install && !options.dryRun),
         Boolean(options.approveExecution),
         options.onProgress,
+        options.onLog,
       );
       break;
     case "capture":

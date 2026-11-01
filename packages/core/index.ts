@@ -1223,6 +1223,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
       dependencies,
       Boolean(options.approveExecution),
       options.onProgress,
+      options.onLog,
     );
     postActions.push(
       ...installation.completed.map(

@@ -8,6 +8,7 @@ const {
   nativeTheme,
   shell,
   Notification,
+  clipboard,
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
@@ -32,6 +33,8 @@ const platformModule = () =>
   import(
     pathToFileURL(path.join(backendRoot, "packages/core/platform.js")).href
   );
+const activityModule = () => import(pathToFileURL(path.join(backendRoot, "packages/core/activity.js")).href);
+const consoleSecrets = new Set();
 
 const cli = app.isPackaged
   ? path.join(process.resourcesPath, "backend/entry.cjs")
@@ -235,6 +238,7 @@ ipcMain.handle("choose", async (event, kind) => {
 });
 ipcMain.handle("operation", async (event, input) => {
   sender(event);
+  const { redactActivityText, activitySecrets } = await activityModule();
   if (
     !input ||
     ![
@@ -259,6 +263,10 @@ ipcMain.handle("operation", async (event, input) => {
   )
     throw new Error("Choose an absolute workspace or snapshot path");
   if (running) throw new Error("An operation is already running.");
+  const secrets = activitySecrets(process.env, [input.password || ""]);
+  for (const value of secrets) consoleSecrets.add(value);
+  while (consoleSecrets.size > 128) consoleSecrets.delete(consoleSecrets.values().next().value);
+  const safe = (value) => redactActivityText(value, [...consoleSecrets]);
   const args = [input.action];
   if (input.action === "capture") args.push("--format", "2");
   if (input.action === "capture") {
@@ -349,6 +357,7 @@ ipcMain.handle("operation", async (event, input) => {
       serviceName: "DevTeleport workspace engine",
     });
     running = child;
+    sendToWindow("progress", { action: input.action, kind: "command", text: safe("$ devteleport " + args.map((arg) => /^[a-zA-Z0-9_./:@=-]+$/.test(arg) ? arg : JSON.stringify(arg)).join(" ")) });
     let stdout = "",
       stderr = "",
       cancelled = false;
@@ -387,23 +396,28 @@ ipcMain.handle("operation", async (event, input) => {
       if (stdout.length > 24 * 1024 * 1024) child.cancel();
     });
     let progressBuffer = "";
+    const progressDecoder = new (require("node:string_decoder").StringDecoder)("utf8");
+    function progressLine(line) {
+      if (!line.startsWith("DTP_PROGRESS:")) return;
+      try {
+        const value = JSON.parse(line.slice(13));
+        if (value.kind === "output" && ["stdout", "stderr", "system"].includes(value.stream) && typeof value.text === "string")
+          sendToWindow("progress", { action: input.action, kind: "output", stream: value.stream, text: safe(value.text).slice(0, 4096) });
+        else if (typeof value.phase === "string")
+          sendToWindow("progress", { action: input.action, phase: safe(value.phase).slice(0, 4096), ...(value.ready ? { ready: value.ready } : {}) });
+      } catch {}
+    }
     child.stderr.on("data", (data) => {
-      progressBuffer += data.toString();
+      progressBuffer += progressDecoder.write(data);
       const lines = progressBuffer.split("\n");
       progressBuffer = lines.pop();
-      for (const line of lines)
-        if (line.startsWith("DTP_PROGRESS:")) {
-          try {
-            sendToWindow("progress", {
-              action: input.action,
-              ...JSON.parse(line.slice(13)),
-            });
-          } catch {}
-        }
+      for (const line of lines) progressLine(line);
+      if (progressBuffer.length > 128 * 1024) child.cancel();
       stderr += data;
       if (stderr.length > 24 * 1024 * 1024) child.cancel();
     });
     child.once("exit", (code) => {
+      progressLine(progressBuffer + progressDecoder.end());
       clearTimeout(timer);
       running = null;
       if (cancelled)
@@ -415,12 +429,12 @@ ipcMain.handle("operation", async (event, input) => {
       if (code !== 0)
         return reject(
           new Error(
-            stderr
+            safe(stderr
               .split("\n")
               .filter((s) => s.startsWith("DevTeleport:"))
               .join("\n") ||
               stderr.slice(-2000) ||
-              "Workspace engine failed. Review paths, permissions and diagnostics.",
+              "Workspace engine failed. Review paths, permissions and diagnostics."),
           ),
         );
       try {
@@ -443,6 +457,18 @@ ipcMain.handle("operation", async (event, input) => {
       }
     });
   });
+});
+ipcMain.handle("activity-text", async (event, input) => {
+  sender(event);
+  if (!input || !["copy", "export"].includes(input.action) || typeof input.text !== "string" || input.text.length > 256 * 1024)
+    throw new Error("Invalid console transcript");
+  const { redactActivityText } = await activityModule();
+  const text = redactActivityText(input.text, [...consoleSecrets]);
+  if (input.action === "copy") { clipboard.writeText(text); return { copied: true }; }
+  const selected = await dialog.showSaveDialog(win, { title: "Save filtered activity log", defaultPath: "devteleport-activity.txt", filters: [{ name: "Text log", extensions: ["txt"] }] });
+  if (selected.canceled) return { cancelled: true };
+  await fs.writeFile(selected.filePath, text, { flag: "wx", mode: 0o600 });
+  return { exported: true };
 });
 ipcMain.handle("cancel", (event) => {
   sender(event);

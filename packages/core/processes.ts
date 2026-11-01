@@ -98,7 +98,7 @@ function kill(child: ChildProcess, signal: NodeJS.Signals) {
 export function spawnBuffered(
   file: string,
   args: string[],
-  options: ExecFileOptions & { detached?: boolean },
+  options: ToolOptions,
   callback: (error: Error | null, stdout: Buffer, stderr: Buffer) => void,
 ) {
   assertNative(file, options.env);
@@ -137,14 +137,14 @@ export function spawnBuffered(
     if (out > maximum) {
       error = new Error("Tool output exceeds limit");
       kill(child, "SIGKILL");
-    } else stdout.push(chunk);
+    } else { stdout.push(chunk); options.onOutput?.("stdout", chunk); }
   });
   child.stderr!.on("data", (chunk: Buffer) => {
     err += chunk.length;
     if (err > maximum) {
       error = new Error("Tool diagnostics exceed limit");
       kill(child, "SIGKILL");
-    } else stderr.push(chunk);
+    } else { stderr.push(chunk); options.onOutput?.("stderr", chunk); }
   });
   child.once("error", (caught) => {
     error = caught;
@@ -161,10 +161,14 @@ export function spawnBuffered(
   });
   return child;
 }
+export type ToolOptions = ExecFileOptions & {
+  detached?: boolean;
+  onOutput?: (stream: "stdout" | "stderr", chunk: Buffer) => void;
+};
 export function execText(
   file: string,
   args: string[],
-  options: ExecFileOptions = {},
+  options: ToolOptions = {},
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawnBuffered(file, args, options, (error, stdout, stderr) =>

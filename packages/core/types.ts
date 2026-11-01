@@ -14,6 +14,7 @@ export interface CaptureOptions {
 export interface RestoreOptions {
   target?: string;
   onProgress?: (phase: string) => void;
+  onLog?: (event: import("./activity.ts").ActivityOutput) => void;
   password?: string;
   dryRun?: boolean;
   restoreDb?: boolean;

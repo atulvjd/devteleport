@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
 import { execText, throwIfCancelled } from "./processes.ts";
+import { activityLineSink, activitySecrets, type ActivityOutput } from "./activity.ts";
 import { findExecutable } from "./platform.ts";
 import type { SnapshotEntry } from "./types.ts";
 
@@ -505,6 +506,7 @@ export async function installDependencies(
   plan: DependencyPlan,
   approved: boolean,
   progress?: (phase: string) => void,
+  onLog?: (event: ActivityOutput) => void,
 ) {
   if (!approved)
     throw new Error(
@@ -550,19 +552,27 @@ export async function installDependencies(
     const cwd = await checkedPath(root, pkg.directory),
       tool = plan.tools.find((t) => t.name === pkg.manager)!;
     progress?.(`Installing dependencies: ${pkg.directory} (${pkg.manager})`);
+    const secrets = activitySecrets();
+    const sinks = {
+      stdout: activityLineSink((text) => onLog?.({ stream: "stdout", text }), secrets),
+      stderr: activityLineSink((text) => onLog?.({ stream: "stderr", text }), secrets),
+    };
+    onLog?.({ stream: "system", text: `[${pkg.directory}] $ ${pkg.command.join(" ")}` });
     try {
       await execText(tool.file!, pkg.command.slice(1), {
         cwd,
         env: toolEnvironment(pkg.manager),
         timeout: 3600000,
         maxBuffer: 8 * 1024 * 1024,
+        ...(onLog ? { onOutput: (stream: "stdout" | "stderr", chunk: Buffer) => sinks[stream].write(chunk) } : {}),
       });
     } catch {
       // Raw tool output can contain registry credentials, URLs or script output.
       throw new Error(
         `Dependency installation failed in ${pkg.directory}. Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then retry this package's displayed command in a trusted terminal. Tool output was withheld to protect credentials.`,
       );
-    }
+    } finally { sinks.stdout.end(); sinks.stderr.end(); }
+    progress?.(`Dependencies installed: ${pkg.directory}`);
     completed.push({
       directory: pkg.directory,
       command: pkg.command.join(" "),
@@ -608,6 +618,7 @@ export async function setupDirectory(
   install = false,
   approved = false,
   progress?: (phase: string) => void,
+  onLog?: (event: ActivityOutput) => void,
 ) {
   const root = await fs.realpath(directory),
     entries: SnapshotEntry[] = [];
@@ -673,7 +684,7 @@ export async function setupDirectory(
             root,
             plan,
             approved,
-            progress,
+            progress, onLog,
           ),
         }
       : {}),

@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("teleport", {
   savePath: (input) => ipcRenderer.invoke("save-path", input),
   openProject: () => ipcRenderer.invoke("open-project"),
   exportDiagnostics: () => ipcRenderer.invoke("export-diagnostics"),
+  activityText: (input) => ipcRenderer.invoke("activity-text", input),
   onNavigate: (callback) =>
     ipcRenderer.on("navigate", (_event, view) => callback(view)),
   checkUpdates: () => ipcRenderer.invoke("update-check"),

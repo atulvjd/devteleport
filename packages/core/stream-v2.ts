@@ -881,6 +881,7 @@ export async function restoreV2(file: string, options: RestoreOptions) {
         dependencies,
         Boolean(options.approveExecution),
         options.onProgress,
+        options.onLog,
       );
       postActions.push(
         ...installation.completed.map(
@@ -888,6 +889,7 @@ export async function restoreV2(file: string, options: RestoreOptions) {
         ),
       );
     }
+    options.onProgress?.("Verifying restored workspace");
     const verification = await verify(target);
     if (!verification.ok)
       throw new Error("Restored workspace verification failed");
