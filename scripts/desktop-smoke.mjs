@@ -3,12 +3,36 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), "dtp-ui-"));
 let app;
 try {
   const root = path.join(temp, "source");
   await fs.mkdir(root);
   await fs.writeFile(path.join(root, "hello.txt"), "desktop roundtrip");
+  await fs.mkdir(path.join(root, "cms"));
+  for (const [dir, script] of [
+    ["", "dev"],
+    ["cms", "develop"],
+  ]) {
+    await fs.writeFile(
+      path.join(root, dir, "package.json"),
+      JSON.stringify({
+        name: dir || "frontend",
+        version: "1.0.0",
+        private: true,
+        scripts: { postinstall: "node install.cjs", [script]: "node app.cjs" },
+      }),
+    );
+    await fs.writeFile(
+      path.join(root, dir, "install.cjs"),
+      "require('node:fs').writeFileSync('dependencies-ready.txt','ready');",
+    );
+    await fs.writeFile(
+      path.join(root, dir, "app.cjs"),
+      "if(require('node:fs').readFileSync('dependencies-ready.txt','utf8')!=='ready')process.exit(1);console.log('started');",
+    );
+  }
   const env = {
     ...process.env,
     DEVTELEPORT_NODE: "/missing-node-for-test",
@@ -127,10 +151,53 @@ try {
   const target = path.join(temp, "restored");
   await page.locator("#target").fill(target);
   await page.locator("#restorePassword").fill("desktop passphrase for testing");
+  assert(
+    !(await page.locator("#install").isChecked()),
+    "Executing dependency scripts must require opt-in",
+  );
+  await page.locator("#install").check();
   await page.locator('[data-action="restore"][data-dry="true"]').click();
   await done();
+  assert(await page.locator("#restoreSetup").isVisible());
+  const dependencyGuide = await page.locator("#setupPackages").textContent();
+  assert(dependencyGuide.includes("Main project"));
+  assert(dependencyGuide.includes("cms"));
+  assert(
+    dependencyGuide.includes("npm install"),
+    "Missing lockfiles must use install, not ci",
+  );
+  await assert.rejects(fs.stat(target), { code: "ENOENT" });
   await page.locator('[data-action="restore"].primary').click();
   await done();
+  assert(
+    (await page.locator("#setupIntro").textContent()).includes(
+      "Dependency installation completed",
+    ),
+  );
+  assert(
+    (await page.locator("#setupPackages").textContent()).includes(
+      "npm run develop",
+    ),
+  );
+  for (const [dir, script] of [
+    ["", "dev"],
+    ["cms", "develop"],
+  ]) {
+    assert.equal(
+      await fs.readFile(
+        path.join(target, dir, "dependencies-ready.txt"),
+        "utf8",
+      ),
+      "ready",
+    );
+    assert.match(
+      execFileSync("npm", ["run", script], {
+        cwd: path.join(target, dir),
+        encoding: "utf8",
+      }),
+      /started/,
+    );
+  }
   assert.equal(
     await fs.readFile(path.join(target, "hello.txt"), "utf8"),
     "desktop roundtrip",
@@ -300,6 +367,11 @@ try {
   );
   assert.deepEqual(restoredBounds, expectedBounds);
   native.windowBoundsRestored = true;
+  native.guidedDependencyRestore = {
+    previewBeforeDestination: true,
+    installedPackages: [".", "cms"],
+    startupCommandsPassed: ["npm run dev", "npm run develop"],
+  };
   native.restoredWindowBounds = restoredBounds;
   await fs.writeFile(
     "dist/native-runtime.json",

@@ -102,9 +102,12 @@ function syncReviewActions() {
     const button = document.querySelector(`[data-action="${action}"].primary`);
     button.disabled = busy || !valid;
     if (action === "restore") {
-      const blocked = $("install").checked && restoreDependencies?.blockers?.length;
+      const blocked =
+        $("install").checked && restoreDependencies?.blockers?.length;
       if (blocked) button.disabled = true;
-      button.firstChild.textContent = $("install").checked ? "Restore & install " : "Restore files ";
+      button.firstChild.textContent = $("install").checked
+        ? "Restore & install "
+        : "Restore files ";
     }
     const panel = button.closest(".action-panel");
     panel.dataset.reviewed = String(valid);
@@ -225,7 +228,9 @@ function renderReview(action, result, input) {
   else
     rows.push([
       "Install dependencies",
-      input.install ? "Approved for listed npm/pnpm packages" : "Manual, after restore",
+      input.install
+        ? "Approved for listed npm/pnpm packages"
+        : "Manual, after restore",
     ]);
   for (const [label, value] of rows) {
     const dt = document.createElement("dt"),
@@ -249,14 +254,24 @@ function renderReview(action, result, input) {
   }
 }
 function renderSetup(plan, input, restored) {
-  const panel = $("restoreSetup"), container = $("setupPackages");
+  const panel = $("restoreSetup"),
+    container = $("setupPackages");
   container.replaceChildren();
   panel.hidden = false;
-  $("setupTitle").textContent = restored ? "Your workspace is restored." : "What this project needs";
+  $("setupTitle").textContent = restored
+    ? "Your workspace is restored."
+    : "What this project needs";
   $("setupIntro").textContent = restored
-    ? input.install ? "Dependency installation completed. Open a terminal in the restored folder and use the startup commands below." : "Your files are ready. Install the dependencies below before starting the project."
-    : input.install ? "After restoring, DevTeleport will install these packages automatically using your approval above. Review the commands before continuing." : "Select ‘Restore and install dependencies’ to download these packages automatically after restore.";
-  for (const message of [...(plan?.blockers || []), ...(plan?.warnings || [])]) {
+    ? input.install
+      ? "Dependency installation completed. Open a terminal in the restored folder and use the startup commands below."
+      : "Your files are ready. Install the dependencies below before starting the project."
+    : input.install
+      ? "After restoring, DevTeleport will install these packages automatically using your approval above. Review the commands before continuing."
+      : "Select ‘Restore and install dependencies’ to download these packages automatically after restore.";
+  for (const message of [
+    ...(plan?.blockers || []),
+    ...(plan?.warnings || []),
+  ]) {
     const note = document.createElement("p");
     note.className = "field-help";
     note.textContent = message;
@@ -264,39 +279,70 @@ function renderSetup(plan, input, restored) {
   }
   if (!plan?.packages?.length) {
     const note = document.createElement("p");
-    note.textContent = "No supported Node.js packages were found. Follow the project's README for its setup and startup commands.";
+    note.textContent =
+      "No supported Node.js packages were found. Follow the project's README for its setup and startup commands.";
     container.append(note);
   }
   for (const pkg of plan?.packages || []) {
     const item = document.createElement("div");
     item.className = "setup-package";
-    const heading = document.createElement("h3"), description = document.createElement("p");
-    heading.textContent = pkg.directory === "." ? "Main project · " + pkg.name : pkg.directory + " · " + pkg.name;
-    description.textContent = `${pkg.framework} · ${pkg.manager} · ${pkg.dependencies.length} declared dependencies` + (pkg.requiredNode ? " · Node " + pkg.requiredNode : "");
+    const heading = document.createElement("h3"),
+      description = document.createElement("p");
+    heading.textContent =
+      pkg.directory === "."
+        ? "Main project · " + pkg.name
+        : pkg.directory + " · " + pkg.name;
+    description.textContent =
+      `${pkg.framework} · ${pkg.manager} · ${pkg.dependencies.length} declared dependencies` +
+      (pkg.requiredNode ? " · Node " + pkg.requiredNode : "");
     item.append(heading, description);
     for (const warning of pkg.warnings) {
-      const p = document.createElement("p"); p.className = "field-help"; p.textContent = warning; item.append(p);
+      const p = document.createElement("p");
+      p.className = "field-help";
+      p.textContent = warning;
+      item.append(p);
     }
     const install = document.createElement("p");
-    install.textContent = pkg.installAt === pkg.directory
-      ? (restored && input.install ? "Installed using: " : "Install in this folder: ") + pkg.command.join(" ")
-      : "Dependencies installed by workspace root: " + pkg.installAt;
+    install.textContent =
+      pkg.installAt === pkg.directory
+        ? (restored && input.install
+            ? "Installed using: "
+            : "Install in this folder: ") + pkg.command.join(" ")
+        : "Dependencies installed by workspace root: " + pkg.installAt;
     item.append(install);
     if (pkg.dependencies.length) {
-      const details = document.createElement("details"), summary = document.createElement("summary"), names = document.createElement("p");
-      summary.textContent = "Dependencies to download"; names.textContent = pkg.dependencies.join(", "); details.append(summary, names); item.append(details);
+      const details = document.createElement("details"),
+        summary = document.createElement("summary"),
+        names = document.createElement("p");
+      summary.textContent = "Dependencies to download";
+      names.textContent = pkg.dependencies.join(", ");
+      details.append(summary, names);
+      item.append(details);
     }
     if (pkg.environmentKeys.length) {
-      const env = document.createElement("p"); env.className = "field-help";
-      env.textContent = "Configure environment values separately: " + pkg.environmentKeys.join(", "); item.append(env);
+      const env = document.createElement("p");
+      env.className = "field-help";
+      env.textContent =
+        "Configure environment values separately: " +
+        pkg.environmentKeys.join(", ");
+      item.append(env);
     }
     for (const script of pkg.scripts) {
       const code = document.createElement("pre");
-      code.textContent = (pkg.directory === "." ? "# In the restored project folder\n" : "# In the restored project's " + pkg.directory + " folder\n") + pkg.manager + " run " + script.name;
+      code.textContent =
+        (pkg.directory === "."
+          ? "# In the restored project folder\n"
+          : "# In the restored project's " + pkg.directory + " folder\n") +
+        pkg.manager +
+        " run " +
+        script.name;
       item.append(code);
     }
     if (!pkg.scripts.length) {
-      const p = document.createElement("p"); p.textContent = "No dev, develop or start script is declared. See this package's README."; item.append(p);
+      const p = document.createElement("p");
+      p.textContent =
+        "No dev, develop or start script is declared. See this package's README.";
+      item.append(p);
     }
     container.append(item);
   }
@@ -597,7 +643,9 @@ async function execute(input) {
       : input.action === "capture"
         ? "Your encrypted snapshot was created and authenticated. Find it in your snapshot library."
         : input.action === "restore"
-          ? input.install ? "Your files were restored, dependencies installed and files verified. Follow the startup guide above." : "Your files were restored and verified. Follow the dependency and startup guide above."
+          ? input.install
+            ? "Your files were restored, dependencies installed and files verified. Follow the startup guide above."
+            : "Your files were restored and verified. Follow the dependency and startup guide above."
           : input.action === "verify"
             ? result.ok
               ? "The workspace verification completed successfully."
@@ -619,7 +667,8 @@ async function execute(input) {
     );
     if (input.dryRun && ["capture", "restore"].includes(input.action))
       renderReview(input.action, result, input);
-    if (input.action === "restore" && !input.dryRun) renderSetup(result.dependencies, input, true);
+    if (input.action === "restore" && !input.dryRun)
+      renderSetup(result.dependencies, input, true);
     if (input.action === "inspect") {
       workspaceInfo = { source: input.source, report: result };
       renderInspector(result);
@@ -849,7 +898,11 @@ window.teleport.onOpenSnapshot((file) => {
 
 for (const element of document.querySelectorAll("input, textarea, select")) {
   element.addEventListener("input", () => {
-    if (["snapshot", "target", "restorePassword", "toolDirectories"].includes(element.id)) {
+    if (
+      ["snapshot", "target", "restorePassword", "toolDirectories"].includes(
+        element.id,
+      )
+    ) {
       $("restoreSetup").hidden = true;
       restoreDependencies = null;
     }

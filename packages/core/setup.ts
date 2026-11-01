@@ -323,17 +323,25 @@ export async function planDependencies(
       blockers.push(
         "Conflicting package managers or lockfiles. Keep the intended manager and lockfile, then review again.",
       );
-    let node =
-      typeof pkg.engines?.node === "string" ? pkg.engines.node : null;
+    let node = typeof pkg.engines?.node === "string" ? pkg.engines.node : null;
     const pin =
       (await readText(join(dir, ".nvmrc"))) ??
       (await readText(join(dir, ".node-version")));
     if (pin) warnings.push("Runtime version hint: " + pin.trim().slice(0, 100));
     if (!node && pin) node = pin.trim();
     const declaredManager = parsed.get(installAt)?.packageManager;
-    const requiredManager = typeof declaredManager === "string" && /^[a-z]+@\d/.test(declaredManager) ? declaredManager.split("@")[1].split("+")[0] : null;
-    if (installAt !== dir && typeof pkg.packageManager === "string" && pkg.packageManager.split("@")[0] !== manager)
-      blockers.push("This package declares a different manager from its workspace root. Review the workspace configuration before installing.");
+    const requiredManager =
+      typeof declaredManager === "string" && /^[a-z]+@\d/.test(declaredManager)
+        ? declaredManager.split("@")[1].split("+")[0]
+        : null;
+    if (
+      installAt !== dir &&
+      typeof pkg.packageManager === "string" &&
+      pkg.packageManager.split("@")[0] !== manager
+    )
+      blockers.push(
+        "This package declares a different manager from its workspace root. Review the workspace configuration before installing.",
+      );
     const locked =
       manager === "npm"
         ? byPath.has(join(installAt, "package-lock.json")) ||
@@ -386,7 +394,12 @@ export async function planDependencies(
       warnings,
     });
   }
-  packages.sort((a, b) => (a.directory === "." ? 0 : a.directory.split("/").length) - (b.directory === "." ? 0 : b.directory.split("/").length) || a.directory.localeCompare(b.directory));
+  packages.sort(
+    (a, b) =>
+      (a.directory === "." ? 0 : a.directory.split("/").length) -
+        (b.directory === "." ? 0 : b.directory.split("/").length) ||
+      a.directory.localeCompare(b.directory),
+  );
   const tools = packages.length
     ? await toolsFor([
         "node",
@@ -405,8 +418,13 @@ export async function planDependencies(
     }
     if (pkg.requiredManager) {
       const tool = tools.find((t) => t.name === pkg.manager);
-      if (tool?.version && nodeSatisfies(tool.version, pkg.requiredManager) !== true)
-        pkg.blockers.push(`${pkg.manager} ${pkg.requiredManager} is declared by this project. Install that version explicitly, then review again.`);
+      if (
+        tool?.version &&
+        nodeSatisfies(tool.version, pkg.requiredManager) !== true
+      )
+        pkg.blockers.push(
+          `${pkg.manager} ${pkg.requiredManager} is declared by this project. Install that version explicitly, then review again.`,
+        );
     }
     if (pkg.requiredNode && tools.find((t) => t.name === "node")?.version) {
       pkg.nodeCompatible = nodeSatisfies(
