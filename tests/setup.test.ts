@@ -194,6 +194,71 @@ test("settings-only and empty pnpm workspace lists retain root and independent p
   }
 });
 
+test("missing pnpm blocks approved installation before any restore destination or project script is created", async (t) => {
+  const { root, temp } = await fixture(t);
+  await fs.writeFile(
+    path.join(root, "package.json"),
+    JSON.stringify({
+      name: "frontend",
+      packageManager: "pnpm",
+      scripts: { postinstall: "node install.cjs" },
+    }),
+  );
+  const originalAccess = fs.access;
+  t.mock.method(fs, "access", async (file, ...args) => {
+    if (path.basename(String(file)) === "pnpm")
+      throw Object.assign(new Error("fixture pnpm is unavailable"), {
+        code: "ENOENT",
+      });
+    return originalAccess(file, ...args);
+  });
+  const plan = await setupDirectory(root);
+  assert.equal(plan.packages[0].manager, "pnpm");
+  assert.equal(plan.tools.find((tool) => tool.name === "pnpm")?.file, null);
+  assert(
+    plan.blockers.some((blocker) =>
+      blocker.includes("working native pnpm tool"),
+    ),
+  );
+  await assert.rejects(
+    installDependencies(root, plan, true),
+    /working native pnpm tool/,
+  );
+  await assert.rejects(fs.stat(path.join(root, "installed.txt")), {
+    code: "ENOENT",
+  });
+  const archive = await capture({
+    root,
+    output: temp,
+    name: "missing-tool",
+    password,
+    format: 2,
+  });
+  const target = path.join(temp, "refused-restore");
+  const preview = await restore(archive.output, {
+    target,
+    password,
+    dryRun: true,
+    install: true,
+    approveExecution: true,
+  });
+  assert(
+    preview.dependencies.blockers.some((blocker) =>
+      blocker.includes("working native pnpm tool"),
+    ),
+  );
+  await assert.rejects(
+    restore(archive.output, {
+      target,
+      password,
+      install: true,
+      approveExecution: true,
+    }),
+    /working native pnpm tool/,
+  );
+  await assert.rejects(fs.stat(target), { code: "ENOENT" });
+});
+
 test("unsupported pnpm YAML remains blocked and known review failures explain the affected file", async (t) => {
   const { root } = await fixture(t);
   for (const yaml of [
