@@ -109,11 +109,33 @@ try {
       "package.json",
     ).toString("utf8"),
   );
+  const expectedVersion = JSON.parse(
+    await fs.readFile("package.json", "utf8"),
+  ).version;
   checks.push({
     name: "bundle-version",
-    status: packagedMetadata.version === inventory.version ? "PASS" : "FAIL",
+    status:
+      packagedMetadata.version === inventory.version &&
+      packagedMetadata.version === expectedVersion
+        ? "PASS"
+        : "FAIL",
     detail: packagedMetadata.version,
   });
+  for (const [key, expected] of [
+    ["CFBundleShortVersionString", expectedVersion],
+    ["CFBundleIdentifier", "dev.devteleport.desktop"],
+  ]) {
+    const actual = execFileSync(
+      "/usr/libexec/PlistBuddy",
+      ["-c", "Print :" + key, path.join(bundle, "Contents/Info.plist")],
+      { encoding: "utf8" },
+    ).trim();
+    checks.push({
+      name: key,
+      status: actual === expected ? "PASS" : "FAIL",
+      detail: actual,
+    });
+  }
   checks.push({
     name: "bundled-backend",
     status: "PASS",

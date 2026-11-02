@@ -97,10 +97,51 @@ try {
   await page.waitForSelector("#source");
   await page.locator("#welcome").waitFor({ state: "visible" });
   await page.locator("#welcomeDone").click();
-  const native = await app.evaluate(() => ({
+  const native = await app.evaluate(({ app }) => ({
     architecture: process.arch,
     electron: process.versions.electron,
+    version: app.getVersion(),
+    packaged: app.isPackaged,
   }));
+  const expectedVersion = JSON.parse(
+    await fs.readFile("package.json", "utf8"),
+  ).version;
+  if (native.packaged)
+    assert.equal(
+      native.version,
+      expectedVersion,
+      "The packaged application must match the release version",
+    );
+  const desktopData = await page.evaluate(() => window.teleport.data());
+  assert.equal(
+    desktopData.version,
+    expectedVersion,
+    "The desktop UI/backend metadata must match the release version",
+  );
+  const rendererSecurity = await app.evaluate(({ BrowserWindow }) => {
+    const prefs =
+      BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
+    return {
+      contextIsolation: prefs.contextIsolation,
+      nodeIntegration: prefs.nodeIntegration,
+      sandbox: prefs.sandbox,
+    };
+  });
+  assert.deepEqual(rendererSecurity, {
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+  });
+  const rendererGlobals = await page.evaluate(() => ({
+    require: typeof window.require,
+    process: typeof window.process,
+    csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')
+      .content,
+  }));
+  assert.equal(rendererGlobals.require, "undefined");
+  assert.equal(rendererGlobals.process, "undefined");
+  assert(rendererGlobals.csp.includes("script-src 'self'"));
+  native.rendererSecurity = rendererSecurity;
   assert.equal(
     native.architecture,
     process.env.DEVTELEPORT_EXPECT_ARCH || process.arch,

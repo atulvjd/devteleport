@@ -8,6 +8,8 @@ Failed metadata review shows controlled reasons including the affected metadata 
 
 Read-only planning of the user's current source project now detects two independent installation locations: root `pnpm install --frozen-lockfile`, nested `npm ci --no-audit --no-fund`, with no local tool/runtime blockers. This did not decrypt the user's existing archive, install dependencies, modify the project or create a restore destination. Source-manifest evidence is `dist/dependency-review/project-plan.json`; existing archives can be reviewed by the fixed app without recapture.
 
+Latest local preview: `dist/dependency-review/final/DevTeleport-dependency-review-preview.dmg`, SHA-256 `2a8d6d5d5f89e51f0802135d8ad1b68d88b0f68d0975ef1c3267a8b1b4d1467e`. All earlier generated-folder/ignored-file/live-console features remain included. Fresh 75 tests, source/final packaged desktop workflow, 44 architecture/integrity checks and 3 actual-DMG checks PASS. Checksums were generated and verified after final packaging. No publication or installation replacement occurred; this is still an ad-hoc 0.2.0 preview. Intermediate artifacts in `dist/dependency-review/desktop` are superseded by `final/`.
+
 The receiver can review requirements before restoring, approve dependency installation once, then use the project's normal startup commands. This feature is in development source and the separate guided-restore preview build. The previously published npm 0.2.0 package and GitHub release asset have not been replaced.
 
 ## Desktop workflow

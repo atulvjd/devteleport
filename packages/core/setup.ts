@@ -246,7 +246,7 @@ export async function planDependencies(
   for (const [dir, pkg] of parsed) {
     let patterns = pkg.workspaces?.packages ?? pkg.workspaces;
     const yaml = await readText(join(dir, "pnpm-workspace.yaml"));
-    if (yaml) {
+    if (yaml !== null) {
       if (
         /^\s*["']?(?:useNodeVersion|executionEnv|devEngines|engines|nodeVersion|runtime|tools)["']?\s*:/m.test(
           yaml,

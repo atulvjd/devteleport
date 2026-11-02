@@ -37,7 +37,14 @@ try {
   const binary =
     process.env.DEVTELEPORT_VSCODE_BINARY ||
     "/Applications/Visual Studio Code - Insiders.app/Contents/MacOS/Code - Insiders";
-  if (process.env.DTP_TEST_VSIX) {
+  const requestedVsix = process.env.DTP_TEST_VSIX;
+  const vsix =
+    requestedVsix === "auto"
+      ? path.resolve(
+          `apps/vscode-extension/devteleport-${JSON.parse(await fs.readFile("package.json", "utf8")).version}.vsix`,
+        )
+      : requestedVsix;
+  if (vsix) {
     const bin = path.resolve(path.dirname(binary), "../Resources/app/bin");
     let command;
     for (const name of ["code", "code-insiders"])
@@ -53,7 +60,7 @@ try {
       command,
       [
         "--install-extension",
-        path.resolve(process.env.DTP_TEST_VSIX),
+        path.resolve(vsix),
         "--extensions-dir",
         path.join(temp, "extensions"),
         "--user-data-dir",

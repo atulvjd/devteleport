@@ -357,7 +357,6 @@ export async function captureV2(options: CaptureOptions) {
   const work = await fs.mkdtemp(
     path.join(path.dirname(output), ".devteleport-v2-"),
   );
-  await fs.chmod(work, 0o700);
   const journal = path.join(work, "journal.json"),
     partial = path.join(
       path.dirname(output),
@@ -370,6 +369,7 @@ export async function captureV2(options: CaptureOptions) {
   const fingerprint = (s: import("node:fs").Stats) =>
     JSON.stringify([s.dev, s.ino, s.size, s.mtimeMs, s.ctimeMs]);
   try {
+    await fs.chmod(work, 0o700);
     await durable(journal, {
       owner: "devteleport",
       pid: process.pid,
@@ -591,18 +591,19 @@ async function authenticate(file: string, password: string | undefined) {
     throw new Error("Unsupported streaming format");
   await available(os.tmpdir(), size);
   const work = await fs.mkdtemp(path.join(os.tmpdir(), ".devteleport-v2-"));
-  await fs.chmod(work, 0o700);
-  await durable(path.join(work, "journal.json"), {
-    owner: "devteleport",
-    pid: process.pid,
-    operation: "authenticate",
-    formatVersion: 2,
-    status: "authenticating",
-    archive: file,
-  });
   const payload = path.join(work, "payload");
-  const key = await derive(password, header.subarray(4, 20));
+  let key: Buffer | undefined;
   try {
+    await fs.chmod(work, 0o700);
+    await durable(path.join(work, "journal.json"), {
+      owner: "devteleport",
+      pid: process.pid,
+      operation: "authenticate",
+      formatVersion: 2,
+      status: "authenticating",
+      archive: file,
+    });
+    key = await derive(password, header.subarray(4, 20));
     const decipher = crypto.createDecipheriv(
       "aes-256-gcm",
       key,
@@ -620,7 +621,26 @@ async function authenticate(file: string, password: string | undefined) {
         decipher,
         createWriteStream(payload, { mode: 0o600, flags: "wx" }),
       );
-    } catch {
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOSPC" || code === "EDQUOT")
+        throw Object.assign(
+          new Error(
+            "Cannot stage snapshot authentication: storage is full or its quota was reached. Free disk space and retry; no destination was restored.",
+          ),
+          { code },
+        );
+      if (
+        ["EACCES", "EPERM", "EROFS", "EIO", "ENOENT", "ENODEV"].includes(
+          code ?? "",
+        )
+      )
+        throw Object.assign(
+          new Error(
+            "Cannot read the snapshot or write private authentication staging. Check storage access, permissions and drive availability, then retry; no destination was restored.",
+          ),
+          { code },
+        );
       throw new Error(
         "Cannot authenticate snapshot: incorrect passphrase or damaged archive.",
       );
@@ -652,7 +672,7 @@ async function authenticate(file: string, password: string | undefined) {
     await fs.rm(work, { recursive: true, force: true });
     throw error;
   } finally {
-    key.fill(0);
+    key?.fill(0);
   }
 }
 export async function snapshotMetadata(

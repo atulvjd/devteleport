@@ -154,6 +154,8 @@ test("settings-only and empty pnpm workspace lists retain root and independent p
     "lockfileVersion: '9.0'\n",
   );
   for (const yaml of [
+    "",
+    "# settings only\n",
     "minimumReleaseAgeExclude:\n  - fixture-local-package\n",
     "packages: []\n",
     "packages: [] # root only\n",

@@ -1,10 +1,12 @@
-# DevTeleport 0.2 — Apple Silicon release candidate
+# DevTeleport 0.2.1 — Apple Silicon release candidate
 
 **Your development environment. Anywhere. Exactly where you left off.**
 
 Capture saved development state on one Mac, transfer an encrypted snapshot, and reconstruct an independent workspace on another. Native ARM64 Electron app, CLI and VS Code extension. Local-first; no cloud account, paid API, analytics or telemetry.
 
 **Development release candidate, not production-certified.** Signing/notarization and physical two-Mac acceptance remain release gates. [Current status](docs/STATUS.md) · [Apple Silicon release report](docs/APPLE-SILICON-RELEASE.md).
+
+Version 0.2.1 release preparation includes guided npm/pnpm setup, live operation output, optional ignored-file/secrets capture, separate dependency/build exclusions and improved failure handling. See [0.2.1 release notes](docs/RELEASE-NOTES-0.2.1.md). Public npm/GitHub downloads remain unchanged until separately published.
 
 ## Install and begin
 

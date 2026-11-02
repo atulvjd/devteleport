@@ -3,7 +3,6 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import os from "node:os";
 import { stripVTControlCharacters } from "node:util";
-const version = JSON.parse(await fs.readFile("package.json", "utf8")).version;
 const evidence = path.resolve("dist/evidence");
 await fs.mkdir(evidence, { recursive: true });
 const checks = [];
@@ -81,14 +80,10 @@ if (checks[0].status === "PASS") {
   await stage("installed-cli", "npm", ["run", "test:package"]);
   await stage("vsix-package", "npm", ["run", "package:extension"]);
   await stage("actual-vscode-host", "npm", ["run", "test:vscode"], {
-    DTP_TEST_VSIX: path.resolve(
-      `apps/vscode-extension/devteleport-${version}.vsix`,
-    ),
+    DTP_TEST_VSIX: "auto",
   });
   await stage("untrusted-vscode-host", "npm", ["run", "test:vscode"], {
-    DTP_TEST_VSIX: path.resolve(
-      `apps/vscode-extension/devteleport-${version}.vsix`,
-    ),
+    DTP_TEST_VSIX: "auto",
     DTP_TEST_UNTRUSTED: "1",
   });
   await stage("bundle-architecture-and-integrity", process.execPath, [
