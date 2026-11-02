@@ -183,3 +183,39 @@ test("files skipped for embedded credentials are not reported as added", async (
   const r = await diffSnapshotWithDirectory(file, root, password);
   assert.equal(r.identical, true);
 });
+
+for (const format of [1, 2] as const)
+  test(`format ${format}: directory diff honors explicit capture exclusions before traversing ignored data`, async (t) => {
+    const { temp, root } = await fixture(t);
+    await fs.mkdir(path.join(root, "manual-cache"));
+    await fs.writeFile(
+      path.join(root, "manual-cache", "state.txt"),
+      "excluded data",
+    );
+    const archive = await capture({
+      root,
+      output: temp,
+      name: "manual-" + format,
+      password,
+      format,
+      includeIgnored: true,
+      exclusions: ["manual-cache"],
+    });
+    // An excluded subtree may later become huge, unreadable or contain unsafe
+    // links. Diff must preserve capture's boundary instead of inspecting it.
+    await fs.symlink(temp, path.join(root, "manual-cache", "external"));
+    assert(
+      (await diffSnapshotWithDirectory(archive.output, root, password))
+        .identical,
+    );
+    await fs.writeFile(path.join(root, "keep.txt"), "actual source change");
+    const result = await diffSnapshotWithDirectory(
+      archive.output,
+      root,
+      password,
+    );
+    assert.deepEqual(result.modified, [
+      { path: "keep.txt", reasons: ["content"] },
+    ]);
+    assert.deepEqual(result.added, []);
+  });

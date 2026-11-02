@@ -10,7 +10,9 @@ Native Apple Silicon development release candidate. The desktop application, bun
 - Larger preview responses preserve complete UTF-8 output and wait for backend stream completion.
 - Blocked dependency reviews clearly say Needs attention and preserve files-only recovery. Parser diagnostics omit file bodies.
 - Authentication setup failure now cleans its private stage. Storage-full, permission and drive errors during authentication are distinguished from incorrect passwords or archive tampering. No-overwrite protections, explicit execution approvals and inactive-stage recovery remain intact.
+- Directory comparison honors the original capture exclusions before walking or hashing excluded data, including with ignored-file capture enabled.
 - Version checks cover the actual packaged application, UI/backend metadata and bundle identity. CI resolves the matching versioned VSIX automatically.
+- Desktop packaging includes the application, license and compiled engine, while excluding internal handoff reports, original prompts, test evidence and development dependencies. Documentation remains in the repository and the app's Help link.
 
 ## Distribution boundaries
 

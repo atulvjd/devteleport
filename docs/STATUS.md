@@ -1,4 +1,8 @@
-# DevTeleport 0.2.0 status — 2026-10-31
+# DevTeleport 0.2.1 status — 2026-11-02
+
+**Final local 0.2.1 DMG:** `dist/releases/v0.2.1/DevTeleport V0.2.1.dmg`, SHA-256 `c3c4df44015b42c93cf232dc50809f8cfcf5dc24253e8c1df8127aac6769d999`. Fresh final gate: **19 stages PASS, 82 tests PASS, zero required skips**, 32 packaged layouts, 46 native/integrity checks and 3 checks on the exact named DMG. Mixed pnpm/npm setup/startup, real services, source-removal recovery and four original-0.2.0 compatibility cases passed. Source/package privacy review excludes internal documents, prompts and build-tool code. Storage-failure cleanup/diagnostics, empty pnpm settings, dynamic versioned VSIX selection and explicit-exclusion diff defects were fixed with regressions. See [0.2.1 validation](RELEASE-0.2.1.md) and [release notes](RELEASE-NOTES-0.2.1.md).
+
+**Remaining gates:** Developer ID/notarization and Gatekeeper trust are BLOCKED; the app is ad-hoc only. Physical second-Mac/fresh-install/manual acceptance, hosted CI for this exact revision and secure update installation remain unverified. Approved npm audit: zero production alerts; 16 moderate build-tool alerts from an upstream minimatch advisory remain unresolved. No upload/push/install replacement was performed. Earlier 0.2.0/preview summaries below are historical and superseded for the current artifact.
 
 Native Apple Silicon release candidate implemented; **not production certified**. The complete 15-point delivery report is [FINAL-REPORT.md](FINAL-REPORT.md). Design changes and release boundaries are in [APPLE-SILICON-RELEASE.md](APPLE-SILICON-RELEASE.md).
 
@@ -19,8 +23,8 @@ Latest local follow-up (2 November 2026): separate **Skip dependencies & build c
 | Recovery                            | Durable private-stage journals, process-group cancellation and approved inactive-stage cleanup; no distributed rollback                                                                                                                         |
 | Updates                             | Signed metadata validation implemented; automatic application installation remains disabled                                                                                                                                                     |
 | Packaging                           | Native ARM64 DMG/ZIP, CLI tarball and VSIX; unsigned development artifacts                                                                                                                                                                      |
-| Verification | Dependency-review preview: 75 tests PASS, source/final packaged smoke PASS, 44 architecture/integrity and 3 actual-DMG checks PASS. Published 0.2.0 core compatibility checks from the earlier opt-in/generated-folder previews remain historical. |
-| Performance                         | Actual Apple M4 / 16 GiB: generated 1 GiB fixture captured in 2.707 s and restored in 2.176 s; peak capture RSS 191,520 KiB. Method/caveats in release report                                                                                   |
+| Verification | Final 0.2.1: 19 stages / 82 tests PASS, zero required skips; 32 packaged layouts / 46 architecture+integrity / 3 exact-DMG checks PASS. Original published 0.2.0 compatibility passed both formats in both directions. |
+| Performance | Fresh M4 / 16 GiB isolated generated 1 GiB: capture 2.529 s / restore 2.143 s; a first 444.255 s restore outlier is retained with cause unestablished. Method/caveats in RELEASE-0.2.1.md. |
 | CI | Hosted main run #23 at dc2faa4: all five jobs PASS, including native applications, packaged smoke, distribution checks and 32 UI layout combinations. |
 
 ## Evidence

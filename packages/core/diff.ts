@@ -103,10 +103,26 @@ export async function diffSnapshotWithDirectory(
   options: DiffOptions = {},
 ) {
   const manifest = await snapshotMetadata(snapshot, password);
-  const { files } = await listWorkspace(directory, manifest.capturePolicy);
+  const captured = new Set(manifest.files.map((entry) => entry.path));
+  const omitted = Array.isArray(manifest.omitted)
+    ? manifest.omitted.filter((entry) => typeof entry === "string")
+    : [];
+  // Honor capture's explicit omissions before walking/hashing. Every parent
+  // directory of a captured entry is itself in the validated manifest; never
+  // let an inconsistent omission mask a path that the snapshot actually saved.
+  const exclusions = omitted.filter(
+    (entry) =>
+      !entry.endsWith(" (embedded credential detected)") &&
+      !captured.has(entry),
+  );
+  const { files } = await listWorkspace(
+    directory,
+    manifest.capturePolicy,
+    exclusions,
+  );
   // Files capture skipped for holding credentials were never in the snapshot.
   const secret = new Set(
-    manifest.omitted
+    omitted
       .filter((o) => o.endsWith(" (embedded credential detected)"))
       .map((o) => o.replace(/ \(embedded credential detected\)$/, "")),
   );

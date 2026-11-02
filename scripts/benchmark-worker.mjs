@@ -18,6 +18,9 @@ import crypto from "node:crypto";
 const [action, source, target] = process.argv.slice(2),
   start = performance.now();
 let result;
+const phases = [];
+const onProgress = (phase) =>
+  phases.push({ phase, milliseconds: performance.now() - start });
 if (action === "capture")
   result = await capture({
     root: source,
@@ -25,11 +28,13 @@ if (action === "capture")
     output: target,
     password: "benchmark fixture passphrase",
     format: 2,
+    onProgress,
   });
 else if (action === "restore")
   result = await restore(source, {
     target,
     password: "benchmark fixture passphrase",
+    onProgress,
   });
 else if (action === "hash") result = { sha256: await hashFile(source) };
 else if (action === "encrypt") {
@@ -58,6 +63,7 @@ console.log(
     peakRssKiB: process.resourceUsage().maxRSS,
     currentRssBytes: process.memoryUsage().rss,
     architecture: process.arch,
+    phases,
     result,
   }),
 );

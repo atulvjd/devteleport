@@ -1,5 +1,7 @@
 # Guided dependency restore — development preview
 
+The current local candidate is **0.2.1**, with all guided setup, settings-only/empty pnpm support, ignored-file capture and live-console fixes. Earlier preview paths/counts below are historical. Consult [0.2.1 validation](RELEASE-0.2.1.md) for the current final artifact; public 0.2.0 downloads remain unchanged until separately published.
+
 ## Settings-only pnpm configuration follow-up (2 November 2026)
 
 A restore review reported zero package installs and a generic metadata blocker for a valid `pnpm-workspace.yaml` containing only `minimumReleaseAgeExclude`. Dependency planning now accepts a literal settings-only file without `packages`, and explicit `packages: []`, as root-only pnpm workspace configuration. It keeps unrelated nested npm projects as independent installs and does not use package.json workspace declarations to override a present pnpm workspace file. Unsupported/complex YAML still requires manual review; managed runtime provisioning remains blocked. Reference: [pnpm settings / packages](https://pnpm.io/settings#packages).

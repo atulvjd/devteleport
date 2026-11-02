@@ -1,5 +1,7 @@
 # Include ignored project files and secrets
 
+The local **0.2.1** release candidate includes the options described here. Public npm/GitHub 0.2.0 artifacts are unchanged until separately published. Earlier preview artifact paths and validation counts below describe historical checkpoints; use the 0.2.1 release report for the final candidate.
+
 The desktop Capture view has an optional **Include ignored files & secrets** checkbox. It is off by default and is not saved as a preference. Enable it, review the capture again, then create a new encrypted snapshot. Older snapshots do not contain files that were omitted at capture time.
 
 ## Projects exceeding 50,000 entries

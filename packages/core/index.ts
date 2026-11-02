@@ -1514,9 +1514,12 @@ export async function verifyFromSnapshot(
 export async function listWorkspace(
   directory = ".",
   policy: Pick<CaptureOptions, "includeIgnored" | "excludeGenerated"> = {},
+  exclusions: string[] = [],
 ) {
   const root = await fs.realpath(directory);
   const c = await config(root);
+  for (const prefix of exclusions) safePath(prefix);
+  c.exclude = [...(c.exclude ?? []), ...exclusions];
   const ignored = policy.includeIgnored
     ? null
     : await optional(

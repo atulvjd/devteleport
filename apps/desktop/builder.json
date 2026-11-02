@@ -7,9 +7,7 @@
   "files": [
     "apps/desktop/**",
     "package.json",
-    "LICENSE",
-    "README.md",
-    "docs/**"
+    "LICENSE"
   ],
   "extraMetadata": {
     "main": "apps/desktop/main.cjs"
