@@ -1,5 +1,13 @@
 # Guided dependency restore — development preview
 
+## Settings-only pnpm configuration follow-up (2 November 2026)
+
+A restore review reported zero package installs and a generic metadata blocker for a valid `pnpm-workspace.yaml` containing only `minimumReleaseAgeExclude`. Dependency planning now accepts a literal settings-only file without `packages`, and explicit `packages: []`, as root-only pnpm workspace configuration. It keeps unrelated nested npm projects as independent installs and does not use package.json workspace declarations to override a present pnpm workspace file. Unsupported/complex YAML still requires manual review; managed runtime provisioning remains blocked. Reference: [pnpm settings / packages](https://pnpm.io/settings#packages).
+
+Failed metadata review shows controlled reasons including the affected metadata path, without raw JSON parser snippets or file bodies. The desktop shows Needs attention, logs the blockers, disables Restore & install and does not claim zero packages were discovered or promise installation. Files-only recovery remains available after turning installation off and reviewing again.
+
+Read-only planning of the user's current source project now detects two independent installation locations: root `pnpm install --frozen-lockfile`, nested `npm ci --no-audit --no-fund`, with no local tool/runtime blockers. This did not decrypt the user's existing archive, install dependencies, modify the project or create a restore destination. Source-manifest evidence is `dist/dependency-review/project-plan.json`; existing archives can be reviewed by the fixed app without recapture.
+
 The receiver can review requirements before restoring, approve dependency installation once, then use the project's normal startup commands. This feature is in development source and the separate guided-restore preview build. The previously published npm 0.2.0 package and GitHub release asset have not been replaced.
 
 ## Desktop workflow

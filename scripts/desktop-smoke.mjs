@@ -15,6 +15,10 @@ try {
     "APP_SECRET=desktop-env-private-fixture\n",
   );
   await fs.writeFile(path.join(root, ".gitignore"), ".env*\nlocal-cache/\n");
+  await fs.writeFile(
+    path.join(root, "pnpm-workspace.yaml"),
+    "minimumReleaseAgeExclude:\n  - fixture-local-package\n",
+  );
   await fs.mkdir(path.join(root, "local-cache"));
   await fs.writeFile(
     path.join(root, "local-cache", "state.txt"),
@@ -31,6 +35,17 @@ try {
     );
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["add", "hello.txt", ".gitignore"], { cwd: root });
+  for (const dir of [
+    "node_modules/demo",
+    "packages/web/node_modules/demo",
+    ".next/cache",
+  ]) {
+    await fs.mkdir(path.join(root, dir), { recursive: true });
+    await fs.writeFile(
+      path.join(root, dir, "generated.txt"),
+      "reinstall or rebuild",
+    );
+  }
   await fs.mkdir(path.join(root, "cms"));
   for (const [dir, script] of [
     ["", "dev"],
@@ -182,6 +197,21 @@ try {
     await page.locator('[data-action="capture"].primary').isDisabled(),
     "Changing inclusion policy must invalidate the review",
   );
+  await page.locator("#excludeGenerated").check();
+  await page.locator('[data-action="capture"][data-dry="true"]').click();
+  await done();
+  const leanPreview = JSON.parse(await page.locator("#result").textContent());
+  assert(leanPreview.capturePolicy.excludeGenerated);
+  assert(leanPreview.omitted.includes("node_modules"));
+  assert(leanPreview.omitted.includes("packages/web/node_modules"));
+  assert(leanPreview.omitted.includes(".next"));
+  assert(!leanPreview.files.some((f) => f.path.endsWith("generated.txt")));
+  await page.locator("#excludeGenerated").uncheck();
+  assert(
+    await page.locator('[data-action="capture"].primary').isDisabled(),
+    "Changing generated-folder selection invalidates review",
+  );
+  await page.locator("#excludeGenerated").check();
   await page.locator('[data-action="capture"][data-dry="true"]').click();
   await done();
   assert((await page.locator("#captureReview").textContent()).includes(".env"));
@@ -236,7 +266,7 @@ try {
   );
   await fs.stat(archive);
   await fs.rm(root, { recursive: true });
-  await page.locator('[data-view="restore"]').click();
+  await page.locator('button[data-view="restore"]').click();
   await page.locator("#snapshot").fill(archive);
   const target = path.join(temp, "restored");
   await page.locator("#target").fill(target);
@@ -417,6 +447,105 @@ try {
   );
   assert.equal(settings.source, target);
   assert(!JSON.stringify(settings).includes("password"));
+  // A metadata failure is a blocked install, never a successful zero-package
+  // discovery. Use an actual authenticated malformed archive, not a UI stub.
+  const badRoot = path.join(temp, "bad-metadata");
+  await fs.mkdir(badRoot);
+  await fs.writeFile(path.join(badRoot, "package.json"), '{"name":"fixture"}');
+  await fs.mkdir(path.join(badRoot, "subproject"));
+  await fs.writeFile(
+    path.join(badRoot, "subproject", "package.json"),
+    '{"name":"fixture", BROKEN_private-parser-value}',
+  );
+  execFileSync(
+    process.execPath,
+    [
+      "apps/cli/main.ts",
+      "capture",
+      "--format",
+      "2",
+      "--root",
+      badRoot,
+      "--name",
+      "bad-metadata",
+      "--output",
+      temp,
+    ],
+    {
+      env: {
+        ...process.env,
+        DEVTELEPORT_PASSWORD: "desktop passphrase for testing",
+      },
+      stdio: "pipe",
+    },
+  );
+  await page.locator('button[data-view="restore"]').click();
+  await page.locator("#snapshot").fill(path.join(temp, "bad-metadata.dtp"));
+  await page.locator("#target").fill(path.join(temp, "blocked-restore"));
+  await page.locator('[data-action="restore"][data-dry="true"]').click();
+  await page.waitForFunction(
+    () =>
+      document.getElementById("cancel").hidden &&
+      document.getElementById("status").textContent === "Needs attention",
+  );
+  assert(await page.locator('[data-action="restore"].primary').isDisabled());
+  const blockedGuide = await page.locator("#restoreSetup").textContent();
+  assert(
+    blockedGuide.includes("Invalid package.json: subproject/package.json"),
+  );
+  assert(!blockedGuide.includes("No supported Node.js packages were found"));
+  assert(!blockedGuide.includes("will install these packages automatically"));
+  assert(
+    !(await page.locator("#consoleOutput").textContent()).includes(
+      "private-parser-value",
+    ),
+  );
+  assert(
+    (await page.locator("#consoleOutput").textContent()).includes(
+      "Needs attention",
+    ),
+  );
+  assert(
+    !(await page.locator("#consoleOutput").textContent()).includes(
+      "Verification found differences",
+    ),
+  );
+  assert(
+    (await page.locator("#consoleOutput").textContent()).includes(
+      "Archive reviewed. Dependency installation needs attention",
+    ),
+  );
+  assert.equal(
+    await page.locator("#consoleState").textContent(),
+    "Needs attention",
+  );
+  assert(
+    (await page.locator("#restoreReviewState").textContent()).includes(
+      "needs attention",
+    ),
+  );
+  await assert.rejects(fs.stat(path.join(temp, "blocked-restore")), {
+    code: "ENOENT",
+  });
+  await fs.mkdir("dist/dependency-review", { recursive: true });
+  await page.screenshot({
+    path: "dist/dependency-review/blocked-install-review.png",
+    fullPage: true,
+  });
+  await page.locator("#install").uncheck();
+  await page.locator('[data-action="restore"][data-dry="true"]').click();
+  await done();
+  assert(!(await page.locator('[data-action="restore"].primary').isDisabled()));
+  assert(
+    (
+      await page.locator('[data-action="restore"].primary').textContent()
+    ).includes("Restore files"),
+  );
+  native.blockedDependencyReview = {
+    actionDisabled: true,
+    filesOnlyAvailable: true,
+    diagnosticsPrivate: true,
+  };
   const backend = await page.evaluate(() =>
     window.teleport.operation({
       action: "diagnostics",

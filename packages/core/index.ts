@@ -1,4 +1,10 @@
 import { boundedRead, publishNoReplace } from "./atomic.ts";
+import {
+  capturePolicy,
+  generatedDirectories,
+  generatedWarnings,
+  ENTRY_LIMIT_ERROR,
+} from "./capture-policy.ts";
 import { reviewDependencies, installDependencies } from "./setup.ts";
 import {
   execText,
@@ -336,7 +342,7 @@ export async function enumerate(
   root: string,
   c: WorkspaceConfig,
   metadataOnly = false,
-  policy: Pick<CaptureOptions, "includeIgnored"> = {},
+  policy: Pick<CaptureOptions, "includeIgnored" | "excludeGenerated"> = {},
 ) {
   const files: SnapshotEntry[] = [],
     omitted: string[] = [];
@@ -354,6 +360,9 @@ export async function enumerate(
         ent.name.includes(".dtp.partial-") ||
         (!policy.includeIgnored && (excluded.has(ent.name) || sensitive(p))) ||
         p.endsWith(".dtp") ||
+        (policy.excludeGenerated &&
+          ent.isDirectory() &&
+          generatedDirectories.has(ent.name)) ||
         (c.exclude ?? []).some((x) => p === x || p.startsWith(x + "/"))
       ) {
         omitted.push(p);
@@ -408,8 +417,7 @@ export async function enumerate(
             data: "",
             checksum: "",
           });
-          if (files.length > 50000)
-            throw new Error("Too many workspace entries");
+          if (files.length > LIMITS.files) throw new Error(ENTRY_LIMIT_ERROR);
           continue;
         }
         if (st.size > LIMITS.file || (total += st.size) > LIMITS.archive)
@@ -443,7 +451,7 @@ export async function enumerate(
           data: data.toString("base64"),
         });
       } else throw new Error(`Unsupported filesystem entry: ${p}`);
-      if (files.length > LIMITS.files) throw new Error("Too many files");
+      if (files.length > LIMITS.files) throw new Error(ENTRY_LIMIT_ERROR);
     }
   }
   await walk();
@@ -583,8 +591,11 @@ export async function capture(options: CaptureOptions = {}) {
       report,
       lfs,
       name,
-      capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
-      warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
+      capturePolicy: capturePolicy(options),
+      warnings: [
+        ...(options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : []),
+        ...generatedWarnings(options),
+      ],
       fileCount: files.length,
       omitted,
       actions: [
@@ -698,7 +709,7 @@ export async function capture(options: CaptureOptions = {}) {
     );
   const manifest = {
     formatVersion: 1,
-    capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
+    capturePolicy: capturePolicy(options),
     name,
     createdAt: new Date().toISOString(),
     platform: report.platform,
@@ -772,7 +783,10 @@ export async function capture(options: CaptureOptions = {}) {
   return {
     output,
     capturePolicy: manifest.capturePolicy,
-    warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
+    warnings: [
+      ...(options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : []),
+      ...generatedWarnings(options),
+    ],
     fileCount: files.length,
     databases: databases.map((d) => d.name),
     volumes: volumes.map((v) => v.name),
@@ -789,7 +803,11 @@ export function validateManifest(value: unknown): Manifest {
     m.capturePolicy !== undefined &&
     (!m.capturePolicy ||
       typeof m.capturePolicy.includeIgnored !== "boolean" ||
-      Object.keys(m.capturePolicy).some((key) => key !== "includeIgnored"))
+      (m.capturePolicy.excludeGenerated !== undefined &&
+        typeof m.capturePolicy.excludeGenerated !== "boolean") ||
+      Object.keys(m.capturePolicy).some(
+        (key) => !["includeIgnored", "excludeGenerated"].includes(key),
+      ))
   )
     throw new Error("Invalid capture inclusion policy");
   if (
@@ -981,6 +999,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     );
   const warnings = [];
   if (m.capturePolicy?.includeIgnored) warnings.push(IGNORED_CAPTURE_WARNING);
+  warnings.push(...generatedWarnings(m.capturePolicy));
   if (
     options.install &&
     m.files.some((f) => f.path.split("/").includes("node_modules"))
@@ -1494,7 +1513,7 @@ export async function verifyFromSnapshot(
  */
 export async function listWorkspace(
   directory = ".",
-  policy: Pick<CaptureOptions, "includeIgnored"> = {},
+  policy: Pick<CaptureOptions, "includeIgnored" | "excludeGenerated"> = {},
 ) {
   const root = await fs.realpath(directory);
   const c = await config(root);

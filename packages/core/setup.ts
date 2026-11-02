@@ -14,6 +14,9 @@ import { findExecutable } from "./platform.ts";
 import type { SnapshotEntry } from "./types.ts";
 
 const maximum = 1024 * 1024;
+// Only these deliberately written messages may be shown in a failed review.
+// Native JSON parser errors can contain project file bodies or credentials.
+class DependencyReviewError extends Error {}
 const ignored = new Set([
   "node_modules",
   ".git",
@@ -209,7 +212,7 @@ export async function planDependencies(
     (e) => path.posix.basename(e.path) === "package.json",
   );
   if (manifests.length > 100)
-    throw new Error(
+    throw new DependencyReviewError(
       "Dependency review supports at most 100 package manifests. Split this workspace before automatic installation.",
     );
   const byPath = new Map(files.map((e) => [e.path, e]));
@@ -217,17 +220,25 @@ export async function planDependencies(
     const e = byPath.get(file);
     if (!e) return null;
     if ((e.size ?? 0) > maximum)
-      throw new Error("Setup metadata exceeds 1 MiB: " + file);
+      throw new DependencyReviewError("Setup metadata exceeds 1 MiB: " + file);
     const bytes = await read(e);
     if (bytes.length !== e.size || sha(bytes) !== e.checksum)
-      throw new Error("Setup metadata checksum mismatch: " + file);
+      throw new DependencyReviewError(
+        "Setup metadata checksum mismatch: " + file,
+      );
     return bytes.toString("utf8");
   };
   const parsed = new Map<string, Record<string, any>>();
   for (const file of manifests.sort((a, b) => a.path.localeCompare(b.path))) {
-    const value = JSON.parse((await readText(file.path))!);
+    let value;
+    const text = (await readText(file.path))!;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      throw new DependencyReviewError("Invalid package.json: " + file.path);
+    }
     if (!value || typeof value !== "object" || Array.isArray(value))
-      throw new Error("Invalid package.json: " + file.path);
+      throw new DependencyReviewError("Invalid package.json: " + file.path);
     parsed.set(path.posix.dirname(file.path), value);
   }
   const workspacePatterns = new Map<string, string[]>();
@@ -237,23 +248,81 @@ export async function planDependencies(
     const yaml = await readText(join(dir, "pnpm-workspace.yaml"));
     if (yaml) {
       if (
-        /^\s*(?:useNodeVersion|executionEnv|devEngines|engines)\s*:/m.test(yaml)
+        /^\s*["']?(?:useNodeVersion|executionEnv|devEngines|engines|nodeVersion|runtime|tools)["']?\s*:/m.test(
+          yaml,
+        )
       )
         managedRuntimeWorkspaces.add(dir);
       // Only the literal package list is interpreted, never YAML tags/code.
-      const section = yaml.match(/^packages:\s*\n((?:[ \t]+[^\n]*\n?)*)/m)?.[1];
-      patterns = section
-        ?.split("\n")
-        .filter((line) => line.trim() && !line.trim().startsWith("#"))
-        .map((line) =>
-          line.match(/^\s*-\s*['"]?([^'"#]+?)['"]?\s*(?:#.*)?$/)?.[1]?.trim(),
+      const field = yaml.match(
+        /^(?:packages|["']packages["'])[ \t]*:([^\n]*)/m,
+      );
+      if (
+        /(?:^|[\s:[,{])[&*!][^\s'"#]/m.test(yaml.replace(/#[^\n]*/g, "")) ||
+        yaml
+          .split("\n")
+          .some(
+            (line) =>
+              line.trim() &&
+              !/^\s/.test(line) &&
+              !line.startsWith("#") &&
+              !/^[A-Za-z][A-Za-z0-9_-]*:[ \t]*/.test(line),
+          )
+      )
+        throw new DependencyReviewError(
+          "Review " +
+            join(dir, "pnpm-workspace.yaml") +
+            ": complex YAML keys, merges, aliases and tags require manual setup review.",
         );
       if (
-        !patterns?.length ||
+        !field &&
+        // Settings-only support is deliberately literal: YAML merges, aliases,
+        // quoted/indented keys or tagged documents could hide package/runtime
+        // configuration. Keep these under manual review.
+        (/(?:^|[\s:[,{])[&*!][^\s'"#]/m.test(yaml.replace(/#[^\n]*/g, "")) ||
+          yaml
+            .split("\n")
+            .some(
+              (line) =>
+                line.trim() &&
+                !line.trim().startsWith("#") &&
+                !/^[A-Za-z][A-Za-z0-9_-]*:[ \t]*/.test(line) &&
+                !/^\s+-\s+/.test(line),
+            ))
+      )
+        throw new DependencyReviewError(
+          "Review " +
+            join(dir, "pnpm-workspace.yaml") +
+            ": settings-only automatic setup requires literal top-level settings and lists. Complex YAML needs manual review.",
+        );
+      const section = yaml.match(
+        /^packages:[ \t]*(?:#[^\n]*)?\r?\n((?:[ \t]+[^\n]*\n?)*)/m,
+      )?.[1];
+      // pnpm allows settings-only files: absent packages means root only.
+      // An explicit empty list is also root only. Unsupported present syntax
+      // must still block automatic execution rather than guess ownership.
+      patterns =
+        !field || /^\s*\[\s*\]\s*(?:#.*)?$/.test(field[1])
+          ? []
+          : section
+              ?.split("\n")
+              .filter((line) => line.trim() && !line.trim().startsWith("#"))
+              .map((line) =>
+                line
+                  .match(/^\s*-\s*['"]?([^'"#]+?)['"]?\s*(?:#.*)?$/)?.[1]
+                  ?.trim(),
+              );
+      if (
+        !patterns ||
+        (field &&
+          !patterns.length &&
+          !/^\s*\[\s*\]\s*(?:#.*)?$/.test(field[1])) ||
         patterns.some((p: unknown) => typeof p !== "string")
       )
-        throw new Error(
-          "Review this pnpm workspace configuration manually before installing dependencies.",
+        throw new DependencyReviewError(
+          "Review " +
+            join(dir, "pnpm-workspace.yaml") +
+            ": automatic setup supports a literal packages list, packages: [], or a settings-only file without packages. Restore files only if manual setup is needed.",
         );
     }
     if (patterns !== undefined) {
@@ -267,7 +336,7 @@ export async function planDependencies(
             p.includes("\\"),
         )
       )
-        throw new Error(
+        throw new DependencyReviewError(
           "Unsupported workspace package patterns in " +
             join(dir, "package.json"),
         );
@@ -623,7 +692,8 @@ export async function reviewDependencies(
 ): Promise<DependencyPlan> {
   try {
     return await planDependencies(entries, read);
-  } catch {
+  } catch (error) {
+    throwIfCancelled();
     // Unsupported project metadata must not prevent an ordinary files-only
     // restore of an otherwise valid archive. It does prevent code execution.
     return {
@@ -632,6 +702,7 @@ export async function reviewDependencies(
       packages: [],
       tools: [],
       blockers: [
+        ...(error instanceof DependencyReviewError ? [error.message] : []),
         "Dependency metadata could not be reviewed. Check package.json and workspace configuration manually, or restore with dependency installation off.",
       ],
       warnings: [],

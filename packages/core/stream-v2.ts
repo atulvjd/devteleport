@@ -1,4 +1,5 @@
 import { publishNoReplace } from "./atomic.ts";
+import { capturePolicy, generatedWarnings } from "./capture-policy.ts";
 import { reviewDependencies, installDependencies } from "./setup.ts";
 import { throwIfCancelled } from "./processes.ts";
 import fs from "node:fs/promises";
@@ -328,8 +329,11 @@ export async function captureV2(options: CaptureOptions) {
     return {
       report,
       name,
-      capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
-      warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
+      capturePolicy: capturePolicy(options),
+      warnings: [
+        ...(options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : []),
+        ...generatedWarnings(options),
+      ],
       formatVersion: 2,
       fileCount: reviewFiles.length,
       bytes,
@@ -482,7 +486,7 @@ export async function captureV2(options: CaptureOptions) {
         throw new Error("Workspace changed during capture: " + file);
     const m: Manifest = {
       formatVersion: 2,
-      capturePolicy: { includeIgnored: Boolean(options.includeIgnored) },
+      capturePolicy: capturePolicy(options),
       name,
       createdAt: new Date().toISOString(),
       platform: report.platform,
@@ -550,7 +554,10 @@ export async function captureV2(options: CaptureOptions) {
     return {
       output,
       capturePolicy: m.capturePolicy,
-      warnings: options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : [],
+      warnings: [
+        ...(options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : []),
+        ...generatedWarnings(options),
+      ],
       formatVersion: 2,
       fileCount: files.length,
       bytes: blobs(m).reduce((sum, b) => sum + b.size, 0),
@@ -687,6 +694,7 @@ export async function restoreV2(file: string, options: RestoreOptions) {
           ]
         : [];
     if (m.capturePolicy?.includeIgnored) warnings.push(IGNORED_CAPTURE_WARNING);
+    warnings.push(...generatedWarnings(m.capturePolicy));
     if (
       options.install &&
       m.files.some((f) => f.path.split("/").includes("node_modules"))

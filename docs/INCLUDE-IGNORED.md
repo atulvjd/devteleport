@@ -2,6 +2,18 @@
 
 The desktop Capture view has an optional **Include ignored files & secrets** checkbox. It is off by default and is not saved as a preference. Enable it, review the capture again, then create a new encrypted snapshot. Older snapshots do not contain files that were omitted at capture time.
 
+## Projects exceeding 50,000 entries
+
+Enable **Skip dependencies & build caches** alongside **Include ignored files & secrets**, then review again. This separate checkbox is also off by default and is not persisted. It omits directories named `node_modules`, `.next`, `.nuxt`, `.svelte-kit`, `.turbo`, `.cache`, `dist`, `build` and `coverage` at every project level. A regular file with one of those names remains eligible. Other ignored files, including `.env`, remain eligible; manual exclusions still win. Review omitted paths before approving: a folder named `build` or `dist` can contain work you want to keep.
+
+CLI equivalent: add `--include-ignored --exclude-generated`. The optional authenticated `capturePolicy.excludeGenerated` records the selection; both formats, restore warnings and directory diff respect it. Readers without any capture policy remain supported. The exact public 0.2.0 reader was checked against both new formats after source removal. Intermediate development previews that strictly validate the older policy shape may reject this new optional field; use this latest build to open it.
+
+The 50,000-entry cap remains in force. Projects with too many remaining source/Git/custom cache entries need additional exclusions or separate captures. Skipped dependencies must be installed after restore; generated outputs must be rebuilt. No snapshot is created by a failed review.
+
+On 2 November 2026, a read-only review of the user's previously failing workspace passed with these two choices: **711 entries / 31,029,787 file bytes**, with environment files retained and root/nested dependency/build directories omitted. This was a review only, not an actual capture or restore of that project. Local evidence: `dist/generated-folders/project-review.json` (contains local paths; do not publish without review).
+
+Latest preview: `dist/generated-folders/desktop/DevTeleport-generated-folders-preview.dmg`, SHA-256 `a943f50243e69e5718ab9b07695402cecf4a158e9f9a84f98f881e730a63f006`. Fresh 72 tests, source/packaged desktop, 32 layouts, 44 architecture/integrity and 3 DMG checks PASS. Evidence: `dist/evidence/generated-folders.json`. This supersedes the earlier include-ignored preview below; public artifacts and installed apps were not replaced. The current running old app needs to be closed and this new preview opened to use the checkbox.
+
 The corresponding development CLI option is:
 
 ```sh
@@ -34,3 +46,7 @@ Evidence is saved under `dist/include-ignored/` and `dist/evidence/include-ignor
 The larger desktop response exposed an exit/output race: the main process parsed JSON as soon as the utility process exited, even when output was still draining. The handler now waits for both streams before parsing, while retaining output/cancellation limits.
 
 This is current development source and a separate local preview. Existing public release artifacts and installed applications are not replaced. Preview bundle version remains 0.2.0 and needs a new version before public release. Signing/notarization, physical-device acceptance and full consolidated/hosted verification remain separate gates.
+
+Fresh local results (2 November 2026): **70 tests PASS, zero skips/failures**, including six inclusion-policy cases; strict checks PASS; actual source and packaged desktop opt-in/review/source-removal/restore PASS with a >64 KiB response and 600 Unicode filenames; **32 packaged layout combinations PASS**, zero renderer errors; **43 architecture/resource/signature checks PASS**; **3 actual-DMG checks PASS**. The original published 0.2.0 core restored new opt-in snapshots in both formats, identified by tarball SHA-256 `5e78786224e56247f27810c72929a0a7e57f46ab47d8be2f3a10c54591b92e3e`. Existing same-host two-app TLS transfer and restore also passed. The initial desktop run's truncated backend response was addressed by waiting for stream completion and preserving UTF-8 chunk boundaries. No fresh full consolidated or hosted CI result is claimed.
+
+Final local preview: `dist/include-ignored/desktop/DevTeleport-include-ignored-preview.dmg`, SHA-256 `dc48f1772ad28afb9939e2830f6f8fc5907f3b495e96c9cec9709b9d2609aad1`. ZIP/checksums are under `dist/include-ignored/`. The old published DMG is unchanged. The public CLI tarball was not regenerated or republished; its future package allowlist now includes this guide so the security-guide link remains valid.

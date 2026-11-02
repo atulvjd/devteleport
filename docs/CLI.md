@@ -34,6 +34,8 @@ Dependencies and known credential files are excluded by default. Configure crede
 
 Current development source supports `capture --include-ignored`: explicitly include `.env`, dependency folders, Git-ignored files and otherwise filtered credentials inside the encrypted snapshot. Additional configured exclusions and reserved metadata/size/safe-path protections remain active. Review and restore reports warn about sensitive contents; previews never display file bodies. Only use this for trusted recipients. Previously omitted files require a new snapshot. This flag is not in the previously published npm 0.2.0 package.
 
+Add `--exclude-generated` to skip dependency/build/cache directories at every level while leaving `.env` eligible with `--include-ignored`. Names skipped: `node_modules`, `.next`, `.nuxt`, `.svelte-kit`, `.turbo`, `.cache`, `dist`, `build`, `coverage`. Review the omitted paths and reinstall/rebuild after restore. The 50,000-entry limit still applies. This development flag is also absent from the published npm 0.2.0 package.
+
 ## Commands
 
 | Command                                        | Purpose and options                                                                                                                                    |

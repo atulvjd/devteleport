@@ -11,6 +11,7 @@ export interface CaptureOptions {
   includeDb?: boolean;
   includeVolumes?: boolean;
   includeIgnored?: boolean;
+  excludeGenerated?: boolean;
 }
 export interface RestoreOptions {
   target?: string;
@@ -84,7 +85,7 @@ export interface VolumeRecord {
 }
 export interface Manifest {
   formatVersion: number;
-  capturePolicy?: { includeIgnored: boolean };
+  capturePolicy?: { includeIgnored: boolean; excludeGenerated?: boolean };
   name: string;
   createdAt: string;
   platform: { os: string; architecture: string };

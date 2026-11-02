@@ -47,6 +47,79 @@ async function fixture(t) {
 }
 
 for (const format of [1, 2] as const) {
+  test(`format ${format}: ignored secrets remain included while generated folders are skipped at every level`, async (t) => {
+    const { root, temp } = await fixture(t);
+    for (const dir of [
+      "dist",
+      "build",
+      ".next",
+      "packages/web/node_modules",
+      "packages/web/.cache",
+      "packages/web/coverage",
+    ]) {
+      await fs.mkdir(path.join(root, dir), { recursive: true });
+      await fs.writeFile(path.join(root, dir, "generated.txt"), "rebuild me");
+    }
+    // A directory name can also be a real file; do not omit that file.
+    await fs.writeFile(
+      path.join(root, "coverage"),
+      "source file, not a folder",
+    );
+    const options = {
+      root,
+      format,
+      name: "lean",
+      output: temp,
+      includeIgnored: true,
+      excludeGenerated: true,
+    };
+    const preview = await capture({ ...options, dryRun: true });
+    assert(preview.files.some((f) => f.path === ".env"));
+    assert(preview.files.some((f) => f.path === "private/config.json"));
+    assert(preview.files.some((f) => f.path === "coverage"));
+    for (const dir of [
+      "node_modules",
+      "dist",
+      "build",
+      ".next",
+      "packages/web/node_modules",
+      "packages/web/.cache",
+      "packages/web/coverage",
+    ])
+      assert(preview.omitted.includes(dir), dir);
+    assert(!JSON.stringify(preview.files).includes("generated.txt"));
+    assert(!JSON.stringify(preview).includes(secret));
+    assert(preview.warnings.some((w) => w.includes("must be rebuilt")));
+    const archive = await capture({ ...options, password });
+    const metadata = await snapshotMetadata(archive.output, password);
+    assert.equal(metadata.capturePolicy?.excludeGenerated, true);
+    // Newly generated folders must not make a policy-aware diff exceed its limit.
+    await fs.mkdir(path.join(root, "packages/web/.turbo"));
+    await fs.writeFile(
+      path.join(root, "packages/web/.turbo/new.txt"),
+      "new cache",
+    );
+    assert(
+      (await diffSnapshotWithDirectory(archive.output, root, password))
+        .identical,
+    );
+    await fs.rm(root, { recursive: true });
+    const target = path.join(temp, "restored-lean");
+    const plan = await restore(archive.output, {
+      target,
+      password,
+      dryRun: true,
+    });
+    assert(plan.warnings.some((w) => w.includes("must be rebuilt")));
+    await restore(archive.output, { target, password });
+    assert(
+      (await fs.readFile(path.join(target, ".env"), "utf8")).includes(secret),
+    );
+    await assert.rejects(fs.stat(path.join(target, "node_modules")), {
+      code: "ENOENT",
+    });
+    assert((await verifyFromSnapshot(target, archive.output, password)).ok);
+  });
   test(`format ${format}: opt-in captures Git-ignored files, .env, dependencies and embedded credentials; default stays private`, async (t) => {
     const { root, temp } = await fixture(t);
     const ordinary = await capture({
@@ -205,6 +278,7 @@ test("CLI --include-ignored is explicit, captures .env, and keeps preview values
       "--output",
       temp,
       "--include-ignored",
+      "--exclude-generated",
       "--dry-run",
     ],
     { encoding: "utf8" },
@@ -212,6 +286,9 @@ test("CLI --include-ignored is explicit, captures .env, and keeps preview values
   const preview = JSON.parse(result);
   assert(preview.files.some((entry) => entry.path === ".env"));
   assert(preview.capturePolicy.includeIgnored);
+  assert(preview.capturePolicy.excludeGenerated);
+  assert(preview.omitted.includes("node_modules"));
+  assert(!preview.files.some((entry) => entry.path.startsWith("node_modules/")));
   assert(!result.includes(secret));
 });
 
@@ -231,6 +308,14 @@ test("legacy metadata without capture policy is accepted, and malformed policy i
       validateManifest({
         ...manifest,
         capturePolicy: { includeIgnored: "yes" },
+      }),
+    /inclusion policy/,
+  );
+  assert.throws(
+    () =>
+      validateManifest({
+        ...manifest,
+        capturePolicy: { includeIgnored: true, excludeGenerated: "yes" },
       }),
     /inclusion policy/,
   );

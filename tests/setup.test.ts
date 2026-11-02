@@ -9,6 +9,7 @@ import {
   setupDirectory,
   installDependencies,
   nodeSatisfies,
+  reviewDependencies,
 } from "../packages/core/setup.ts";
 import { capture, restore } from "../packages/core/index.ts";
 
@@ -135,6 +136,104 @@ test("pnpm workspace planning uses frozen locks and does not switch a nested npm
     "--frozen-lockfile",
   ]);
   assert.equal(plan.packages[1].manager, "npm");
+});
+
+test("settings-only and empty pnpm workspace lists retain root and independent package installs", async (t) => {
+  const { root, temp } = await fixture(t);
+  await fs.writeFile(
+    path.join(root, "package.json"),
+    JSON.stringify({
+      name: "frontend",
+      packageManager: "pnpm",
+      workspaces: ["cms"],
+      scripts: { dev: "node app.cjs" },
+    }),
+  );
+  await fs.writeFile(
+    path.join(root, "pnpm-lock.yaml"),
+    "lockfileVersion: '9.0'\n",
+  );
+  for (const yaml of [
+    "minimumReleaseAgeExclude:\n  - fixture-local-package\n",
+    "packages: []\n",
+    "packages: [] # root only\n",
+  ]) {
+    await fs.writeFile(path.join(root, "pnpm-workspace.yaml"), yaml);
+    const plan = await setupDirectory(root);
+    assert.equal(plan.packages.length, 2);
+    assert.equal(plan.packages[0].manager, "pnpm");
+    assert.equal(plan.packages[1].manager, "npm");
+    assert.equal(
+      plan.packages[1].installAt,
+      "cms",
+      "pnpm file overrides package.json workspace ownership",
+    );
+    assert(!plan.blockers.length, JSON.stringify(plan.blockers));
+  }
+  for (const format of [1, 2] as const) {
+    const archive = await capture({
+      root,
+      output: temp,
+      name: "settings-only-" + format,
+      password,
+      format,
+    });
+    const target = path.join(temp, "settings-restored-" + format);
+    const review = await restore(archive.output, {
+      target,
+      password,
+      dryRun: true,
+      install: true,
+      approveExecution: true,
+    });
+    assert.equal(review.dependencies.packages.length, 2);
+    assert(!review.dependencies.blockers.length);
+    await assert.rejects(fs.stat(target), { code: "ENOENT" });
+  }
+});
+
+test("unsupported pnpm YAML remains blocked and known review failures explain the affected file", async (t) => {
+  const { root } = await fixture(t);
+  for (const yaml of [
+    "packages: [apps/*]\n",
+    "packages:\n",
+    "defaults: &scope\n  packages: ['*']\n<<: *scope\n",
+    "'packages': ['*']\n",
+    "packages: []\n'useNodeVersion': '24.0.0'\n",
+    "packages: []\nsettings: &runtime\n  useNodeVersion: '24.0.0'\n<<: *runtime\n",
+  ]) {
+    await fs.writeFile(path.join(root, "pnpm-workspace.yaml"), yaml);
+    await assert.rejects(setupDirectory(root), /pnpm-workspace.yaml/);
+  }
+  await fs.writeFile(
+    path.join(root, "pnpm-workspace.yaml"),
+    "minimumReleaseAge: 60\nuseNodeVersion: '24.0.0'\n",
+  );
+  assert(
+    (await setupDirectory(root)).blockers.some((b) =>
+      b.includes("managed runtime"),
+    ),
+  );
+});
+
+test("failed dependency review never exposes parser file bodies as diagnostics", async () => {
+  const secret = "private-parser-fixture-value";
+  const body = Buffer.from('{"name":"fixture", BROKEN_' + secret + "}");
+  const crypto = await import("node:crypto");
+  const entry = {
+    path: "package.json",
+    type: "file" as const,
+    mode: 0o600,
+    size: body.length,
+    checksum: crypto.createHash("sha256").update(body).digest("hex"),
+    data: "",
+  };
+  const plan = await reviewDependencies([entry], async () => body);
+  assert.equal(plan.packages.length, 0);
+  assert(
+    plan.blockers.some((b) => b.includes("Invalid package.json: package.json")),
+  );
+  assert(!JSON.stringify(plan).includes(secret));
 });
 
 test("Node engine checks refuse mismatches and leave unknown ranges for manual review", () => {

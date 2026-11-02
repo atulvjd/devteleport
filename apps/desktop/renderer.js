@@ -253,11 +253,16 @@ function consoleResultMetrics(input, result) {
     metrics.push(["Volumes", String(result.volumes.length)]);
   if (input.action === "restore" && input.install)
     metrics.push([
-      "Package installs",
-      String(
-        new Set((result.dependencies?.packages || []).map((p) => p.installAt))
-          .size,
-      ),
+      result.dependencies?.blockers?.length
+        ? "Dependency setup"
+        : "Package installs",
+      result.dependencies?.blockers?.length
+        ? "Needs attention"
+        : String(
+            new Set(
+              (result.dependencies?.packages || []).map((p) => p.installAt),
+            ).size,
+          ),
     ]);
   if (input.action === "verify")
     metrics.push(["Verification", result.ok ? "Matched" : "Differences found"]);
@@ -280,7 +285,12 @@ function consoleResultMetrics(input, result) {
 function finishConsole(input, result, error) {
   if (!consoleRun || consoleRun.finished) return;
   clearInterval(consoleTimer);
-  const failed = error || result?.ok === false;
+  const setupBlocked =
+    input.dryRun &&
+    input.action === "restore" &&
+    input.install &&
+    result?.dependencies?.blockers?.length;
+  const failed = error || result?.ok === false || setupBlocked;
   consoleRun.state =
     error && /cancelled/i.test(error.message)
       ? "cancelled"
@@ -297,17 +307,21 @@ function finishConsole(input, result, error) {
             "",
           )
           .replace(/^DevTeleport:\s*/, "")
-      : failed
-        ? "Verification found differences. Review the result before continuing."
-        : input.dryRun
-          ? "Review complete. No project actions were executed."
-          : "Operation completed successfully.",
+      : setupBlocked
+        ? "Archive reviewed. Dependency installation needs attention; no project actions were executed."
+        : failed
+          ? "Verification found differences. Review the result before continuing."
+          : input.dryRun
+            ? "Review complete. No project actions were executed."
+            : "Operation completed successfully.",
   );
   consoleRun.metrics = result ? consoleResultMetrics(input, result) : [];
   for (const [label, value] of consoleRun.metrics)
     appendConsole("info", label + ": " + value);
   for (const warning of result?.warnings || [])
     appendConsole("warning", warning);
+  for (const blocker of result?.dependencies?.blockers || [])
+    appendConsole("warning", blocker);
   for (const problem of (result?.problems || []).slice(0, 100))
     appendConsole(
       "error",
@@ -500,23 +514,27 @@ function syncReviewActions() {
   for (const action of ["capture", "restore"]) {
     const valid = reviews.get(action) === reviewKey(inputFor(action));
     const button = document.querySelector(`[data-action="${action}"].primary`);
-    button.disabled = busy || !valid;
+    const blocked =
+      action === "restore" &&
+      $("install").checked &&
+      restoreDependencies?.blockers?.length;
+    button.disabled = busy || !valid || Boolean(blocked);
     if (action === "restore") {
-      const blocked =
-        $("install").checked && restoreDependencies?.blockers?.length;
-      if (blocked) button.disabled = true;
       button.firstChild.textContent = $("install").checked
         ? "Restore & install "
         : "Restore files ";
     }
     const panel = button.closest(".action-panel");
     panel.dataset.reviewed = String(valid);
-    $(action + "ReviewState").textContent = valid
-      ? "Review complete. Ready when you are."
-      : "Review " +
-        (action === "capture"
-          ? "your snapshot before creating it"
-          : "your snapshot before restoring it");
+    $(action + "ReviewState").textContent =
+      blocked && valid
+        ? "Archive reviewed. Dependency installation needs attention."
+        : valid
+          ? "Review complete. Ready when you are."
+          : "Review " +
+            (action === "capture"
+              ? "your snapshot before creating it"
+              : "your snapshot before restoring it");
     $(action + "Review").dataset.stale = String(!valid);
     document
       .querySelector(`[data-review-step="${action}"]`)
@@ -631,6 +649,12 @@ function renderReview(action, result, input) {
           ? "Included by explicit choice"
           : "Excluded by default",
       ],
+      [
+        "Dependencies & build caches",
+        input.excludeGenerated
+          ? "Excluded at every project level"
+          : "Follow other capture choices",
+      ],
       ["Excluded entries", String(result.omitted?.length ?? 0)],
     );
   else
@@ -690,9 +714,11 @@ function renderSetup(plan, input, restored) {
     ? input.install
       ? "Dependency installation completed. Open a terminal in the restored folder and use the startup commands below."
       : "Your files are ready. Install the dependencies below before starting the project."
-    : input.install
-      ? "After restoring, DevTeleport will install these packages automatically using your approval above. Review the commands before continuing."
-      : "Select ‘Restore and install dependencies’ to download these packages automatically after restore.";
+    : input.install && plan?.blockers?.length
+      ? "Dependency installation is blocked. Resolve the issues below and review again, or turn installation off to restore files only."
+      : input.install
+        ? "After restoring, DevTeleport will install these packages automatically using your approval above. Review the commands before continuing."
+        : "Select ‘Restore and install dependencies’ to download these packages automatically after restore.";
   for (const message of [
     ...(plan?.blockers || []),
     ...(plan?.warnings || []),
@@ -702,7 +728,7 @@ function renderSetup(plan, input, restored) {
     note.textContent = message;
     container.append(note);
   }
-  if (!plan?.packages?.length) {
+  if (!plan?.packages?.length && !plan?.blockers?.length) {
     const note = document.createElement("p");
     note.textContent =
       "No supported Node.js packages were found. Follow the project's README for its setup and startup commands.";
@@ -982,6 +1008,7 @@ function inputFor(action, dryRun = false) {
     includeDb: $("includeDb").checked,
     includeVolumes: $("includeVolumes").checked,
     includeIgnored: $("includeIgnored").checked,
+    excludeGenerated: $("excludeGenerated").checked,
     restoreDb: $("restoreDb").checked,
     restoreVolumes: $("restoreVolumes").checked,
     install: $("install").checked,
@@ -1071,32 +1098,41 @@ async function execute(input) {
         ? rendered.slice(0, 1024 * 1024) +
           "\n[Display truncated at 1 MiB; use the CLI for the complete report.]"
         : rendered;
-    const summary = input.dryRun
-      ? "Check the plan above. Change any options, then review again before continuing."
-      : input.action === "capture"
-        ? "Your encrypted snapshot was created and authenticated. Find it in your snapshot library."
-        : input.action === "restore"
-          ? input.install
-            ? "Your files were restored, dependencies installed and files verified. Follow the startup guide above."
-            : "Your files were restored and verified. Follow the dependency and startup guide above."
-          : input.action === "verify"
-            ? result.ok
-              ? "The workspace verification completed successfully."
-              : "Some entries differ. Review the technical details."
-            : "The operation completed. Technical details are available below.";
-    activity(
-      result.ok === false ? "error" : "success",
-      input.dryRun
-        ? "Your review is ready."
+    const setupBlocked =
+      input.dryRun &&
+      input.action === "restore" &&
+      input.install &&
+      result.dependencies?.blockers?.length;
+    const summary = setupBlocked
+      ? "Resolve the dependency setup issues below and review again, or turn installation off to restore files only."
+      : input.dryRun
+        ? "Check the plan above. Change any options, then review again before continuing."
         : input.action === "capture"
-          ? "Your snapshot is ready."
+          ? "Your encrypted snapshot was created and authenticated. Find it in your snapshot library."
           : input.action === "restore"
-            ? "Welcome back to your workspace."
-            : input.action === "inspect"
-              ? "Workspace inspected."
-              : "All done.",
+            ? input.install
+              ? "Your files were restored, dependencies installed and files verified. Follow the startup guide above."
+              : "Your files were restored and verified. Follow the dependency and startup guide above."
+            : input.action === "verify"
+              ? result.ok
+                ? "The workspace verification completed successfully."
+                : "Some entries differ. Review the technical details."
+              : "The operation completed. Technical details are available below.";
+    activity(
+      result.ok === false || setupBlocked ? "error" : "success",
+      setupBlocked
+        ? "Dependency setup needs attention."
+        : input.dryRun
+          ? "Your review is ready."
+          : input.action === "capture"
+            ? "Your snapshot is ready."
+            : input.action === "restore"
+              ? "Welcome back to your workspace."
+              : input.action === "inspect"
+                ? "Workspace inspected."
+                : "All done.",
       summary,
-      "Completed",
+      setupBlocked ? "Needs attention" : "Completed",
     );
     if (input.dryRun && ["capture", "restore"].includes(input.action))
       renderReview(input.action, result, input);

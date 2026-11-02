@@ -403,6 +403,18 @@ Choose a project above, then select Inspect.</pre>
               trust the recipient with. Extra exclusions and archive/path limits
               still apply.
             </p>
+            <label class="component selectable"
+              ><svg class="icon" aria-hidden="true"><use href="#i-box" /></svg
+              ><span
+                ><strong>Skip dependencies &amp; build caches</strong>
+                <small
+                  >Skip node_modules, .next, .nuxt, .svelte-kit, .turbo, .cache,
+                  dist, build and coverage folders at every level. Keeps .env
+                  when ignored files are included. Reinstall dependencies after
+                  restore.</small
+                > </span
+              ><input id="excludeGenerated" type="checkbox"
+            /></label>
             <p class="hint" id="componentHint">
               Files and Git work on their own. Optional components need entries
               in your project’s devteleport.json.

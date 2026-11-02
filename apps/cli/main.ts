@@ -99,6 +99,7 @@ const flags = new Set([
   "include-db",
   "include-volumes",
   "include-ignored",
+  "exclude-generated",
   "restore-volumes",
   "approve-volumes",
   "start",

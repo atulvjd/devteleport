@@ -288,6 +288,7 @@ ipcMain.handle("operation", async (event, input) => {
     if (input.includeDb) args.push("--include-db");
     if (input.includeVolumes) args.push("--include-volumes");
     if (input.includeIgnored) args.push("--include-ignored");
+    if (input.excludeGenerated) args.push("--exclude-generated");
     for (const prefix of (input.exclusions || "").split("\n").filter(Boolean))
       args.push("--exclude", prefix);
   } else if (input.action === "receive") {
