@@ -3,3 +3,4 @@ dist/
 *.dtp
 *.vsix
 .DS_Store
+output/

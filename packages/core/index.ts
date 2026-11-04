@@ -1272,6 +1272,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
       options.onProgress,
       options.onLog,
       options.password ? [options.password] : [],
+      { onInstallState: options.onInstallState },
     );
     postActions.push(
       ...installation.completed.map(

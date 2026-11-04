@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import {
   setupDirectory,
   installDependencies,
   nodeSatisfies,
   reviewDependencies,
+  type InstallationReport,
 } from "../packages/core/setup.ts";
 import { capture, restore } from "../packages/core/index.ts";
 
@@ -528,12 +529,14 @@ test("failed nested install preserves restored files and earlier successful inst
     format: 2,
   });
   const target = path.join(temp, "partial");
+  const reports: InstallationReport[] = [];
   await assert.rejects(
     restore(archive.output, {
       target,
       password,
       install: true,
       approveExecution: true,
+      onInstallState: (report) => reports.push(report),
     }),
     (error: Error) => {
       assert.match(error.message, /failed in cms/);
@@ -555,5 +558,187 @@ test("failed nested install preserves restored files and earlier successful inst
       ),
     ).status,
     "files-restored",
+  );
+  const failed = reports.at(-1)!;
+  assert.equal(failed.state, "failed");
+  assert.deepEqual(
+    failed.packages.map((pkg) => [pkg.directory, pkg.state]),
+    [
+      [".", "installed"],
+      ["cms", "failed"],
+    ],
+  );
+  assert(!JSON.stringify(reports).includes("private-fixture-value"));
+  assert(!JSON.stringify(reports).includes(password));
+  assert.equal(
+    reports[0].packages[0].state,
+    "pending",
+    "Report snapshots must not mutate after emission",
+  );
+
+  // Recover the existing destination in place. A successful root package must
+  // not run again when the user selects only the failed independent package.
+  await fs.writeFile(path.join(target, "installed.txt"), "keep-root-install");
+  await fs.writeFile(
+    path.join(target, "cms", "install.cjs"),
+    "require('node:fs').writeFileSync('installed.txt','retried');",
+  );
+  const review = await setupDirectory(target);
+  const retried = await setupDirectory(
+    target,
+    true,
+    true,
+    undefined,
+    undefined,
+    {
+      expectedPlanId: review.id,
+      installDirectories: ["cms"],
+      onInstallState: (report) => reports.push(report),
+    },
+  );
+  assert.deepEqual(
+    retried.installation?.completed.map((pkg) => pkg.directory),
+    ["cms"],
+  );
+  assert.deepEqual(
+    reports.at(-1)!.packages.map((pkg) => [pkg.directory, pkg.state]),
+    [
+      [".", "not-selected"],
+      ["cms", "installed"],
+    ],
+  );
+  assert.equal(
+    await fs.readFile(path.join(target, "installed.txt"), "utf8"),
+    "keep-root-install",
+  );
+  assert.equal(
+    await fs.readFile(path.join(target, "cms", "installed.txt"), "utf8"),
+    "retried",
+  );
+});
+
+test("setup retry requires current review, explicit approval and a valid independent package selection", async (t) => {
+  const { root } = await fixture(t);
+  const review = await setupDirectory(root);
+  for (const installDirectories of [
+    [],
+    ["missing"],
+    ["cms", "cms"],
+    ["../escape"],
+  ]) {
+    await assert.rejects(
+      setupDirectory(root, true, true, undefined, undefined, {
+        expectedPlanId: review.id,
+        installDirectories,
+      }),
+      /installation folders/,
+    );
+  }
+  await assert.rejects(
+    setupDirectory(root, true, false, undefined, undefined, {
+      expectedPlanId: review.id,
+      installDirectories: ["cms"],
+    }),
+    /explicit execution approval/,
+  );
+  await fs.appendFile(path.join(root, "cms", "package.json"), " ");
+  await assert.rejects(
+    setupDirectory(root, true, true, undefined, undefined, {
+      expectedPlanId: review.id,
+      installDirectories: ["cms"],
+    }),
+    /review changed/,
+  );
+  await assert.rejects(fs.stat(path.join(root, "installed.txt")), {
+    code: "ENOENT",
+  });
+  await assert.rejects(fs.stat(path.join(root, "cms", "installed.txt")), {
+    code: "ENOENT",
+  });
+});
+
+test("format 1 restore publishes per-package status and marks later installs not run", async (t) => {
+  const { root, temp } = await fixture(t);
+  await fs.writeFile(path.join(root, "install.cjs"), "process.exit(7);");
+  const archive = await capture({
+    root,
+    output: temp,
+    name: "failure-v1",
+    password,
+    format: 1,
+  });
+  const reports: InstallationReport[] = [];
+  const target = path.join(temp, "partial-v1");
+  await assert.rejects(
+    restore(archive.output, {
+      target,
+      password,
+      install: true,
+      approveExecution: true,
+      onInstallState: (report) => reports.push(report),
+    }),
+    /failed in \./,
+  );
+  assert.deepEqual(
+    reports.at(-1)!.packages.map((pkg) => [pkg.directory, pkg.state]),
+    [
+      [".", "failed"],
+      ["cms", "not-run"],
+    ],
+  );
+  assert((await fs.stat(path.join(target, "package.json"))).isFile());
+});
+
+test("CLI setup accepts a reviewed selective retry and emits safe structured package states", async (t) => {
+  const { root } = await fixture(t);
+  const review = await setupDirectory(root);
+  const command = spawnSync(
+    process.execPath,
+    [
+      "apps/cli/main.ts",
+      "setup",
+      root,
+      "--install",
+      "--approve-execution",
+      "--plan-id",
+      review.id,
+      "--install-at",
+      "cms",
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        DEVTELEPORT_PROGRESS: "1",
+        DEVTELEPORT_PASSWORD: password,
+      },
+    },
+  );
+  assert.equal(command.status, 0, command.stderr);
+  const result = JSON.parse(command.stdout);
+  assert.deepEqual(
+    result.installation.completed.map((pkg) => pkg.directory),
+    ["cms"],
+  );
+  const reports = command.stderr
+    .split("\n")
+    .filter((line) => line.startsWith("DTP_PROGRESS:"))
+    .map((line) => JSON.parse(line.slice(13)))
+    .filter((event) => event.kind === "installation");
+  assert.equal(reports.at(-1).report.state, "installed");
+  assert.deepEqual(
+    reports.at(-1).report.packages.map((pkg) => [pkg.directory, pkg.state]),
+    [
+      [".", "not-selected"],
+      ["cms", "installed"],
+    ],
+  );
+  assert(!JSON.stringify(reports).includes(password));
+  await assert.rejects(fs.stat(path.join(root, "installed.txt")), {
+    code: "ENOENT",
+  });
+  assert.equal(
+    await fs.readFile(path.join(root, "cms", "installed.txt"), "utf8"),
+    "ready",
   );
 });

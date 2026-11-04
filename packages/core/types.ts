@@ -17,6 +17,7 @@ export interface RestoreOptions {
   target?: string;
   onProgress?: (phase: string) => void;
   onLog?: (event: import("./activity.ts").ActivityOutput) => void;
+  onInstallState?: (report: import("./setup.ts").InstallationReport) => void;
   password?: string;
   dryRun?: boolean;
   restoreDb?: boolean;
@@ -122,4 +123,6 @@ export type CliOptions = CaptureOptions &
     key?: string;
     verifyKey?: string;
     includeGit?: boolean;
+    planId?: string;
+    installDirectories?: string[];
   };

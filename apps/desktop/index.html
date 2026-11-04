@@ -656,6 +656,25 @@ Choose a project above, then select Inspect.</pre>
             automatically.
           </p>
         </article>
+        <article class="card setup-recovery" id="setupRecovery" hidden aria-live="polite">
+          <span class="section-number">DEPENDENCY RECOVERY</span>
+          <h2>Continue setup in your restored project.</h2>
+          <p id="setupRetrySummary" class="card-intro"></p>
+          <label for="setupRetryTarget">Restored project</label>
+          <input id="setupRetryTarget" readonly aria-readonly="true" />
+          <p class="field-help">Your restored files stay in this folder. Select the package installations to retry. Earlier successes are shown as history; a new review checks the current project.</p>
+          <div id="setupAttemptPackages"></div>
+          <div id="setupRetryReview" class="review-summary" hidden></div>
+          <label class="setup-approval" for="approveSetup">
+            <input id="approveSetup" type="checkbox" />
+            <span>I approve running the reviewed install commands. They may download packages and execute lifecycle scripts with my permissions.</span>
+          </label>
+          <div class="row wrap">
+            <button id="reviewSetup">Review selected packages</button>
+            <button id="runSetup" class="primary" disabled>Retry dependency installation</button>
+          </div>
+          <p class="hint">Fix the reported network, tool or project issue before retrying. Installation does not start the application.</p>
+        </article>
       </section>
       <section data-pane="library" hidden>
         <article class="card">

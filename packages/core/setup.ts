@@ -77,6 +77,28 @@ export type DependencyPlan = {
   blockers: string[];
   warnings: string[];
 };
+export type InstallationReport = {
+  root: string;
+  state: "running" | "installed" | "failed" | "cancelled";
+  packages: {
+    directory: string;
+    command: string;
+    state:
+      | "pending"
+      | "running"
+      | "installed"
+      | "failed"
+      | "cancelled"
+      | "not-run"
+      | "not-selected";
+  }[];
+  message?: string;
+};
+export type SetupOptions = {
+  expectedPlanId?: string;
+  installDirectories?: string[];
+  onInstallState?: (report: InstallationReport) => void;
+};
 const sha = (bytes: Buffer | string) =>
   crypto.createHash("sha256").update(bytes).digest("hex");
 const join = (dir: string, name: string) =>
@@ -544,7 +566,8 @@ export async function planDependencies(
   const inputs = files
     .map((e) => ({ path: e.path, checksum: e.checksum!, size: e.size! }))
     .sort((a, b) => a.path.localeCompare(b.path));
-  const id = sha(JSON.stringify(inputs));
+  // Approval binds the reviewed native toolchain as well as project metadata.
+  const id = sha(JSON.stringify({ inputs, tools }));
   return {
     id,
     inputs,
@@ -582,6 +605,7 @@ export async function installDependencies(
   progress?: (phase: string) => void,
   onLog?: (event: ActivityOutput) => void,
   sensitiveValues: string[] = [],
+  options: SetupOptions = {},
 ) {
   if (!approved)
     throw new Error(
@@ -591,7 +615,47 @@ export async function installDependencies(
     throw new Error(
       "Dependency preflight needs attention: " + plan.blockers.join(" "),
     );
+  if (
+    options.expectedPlanId !== undefined &&
+    (!/^[a-f0-9]{64}$/.test(options.expectedPlanId) ||
+      options.expectedPlanId !== plan.id)
+  )
+    throw new Error(
+      "Dependency review changed. Review the current project and tools again before installing.",
+    );
+  const locations = plan.packages.filter((p) => p.directory === p.installAt),
+    selected = options.installDirectories;
+  if (
+    selected !== undefined &&
+    (!Array.isArray(selected) ||
+      !selected.length ||
+      new Set(selected).size !== selected.length ||
+      selected.some(
+        (directory) => !locations.some((p) => p.directory === directory),
+      ))
+  )
+    throw new Error(
+      "Select one or more distinct installation folders from the reviewed project.",
+    );
   root = await fs.realpath(root);
+  const report: InstallationReport = {
+    root,
+    state: "running",
+    packages: locations.map((pkg) => ({
+      directory: pkg.directory,
+      command: pkg.command.join(" "),
+      state:
+        !selected || selected.includes(pkg.directory)
+          ? "pending"
+          : "not-selected",
+    })),
+  };
+  const emit = () =>
+    options.onInstallState?.({
+      ...report,
+      packages: report.packages.map((pkg) => ({ ...pkg })),
+    });
+  emit();
   // Recheck every reviewed input before executing, including between packages:
   // a root lifecycle script must not silently change the CMS install plan.
   async function verifyInputs() {
@@ -619,64 +683,97 @@ export async function installDependencies(
         );
     }
   }
-  await verifyInputs();
   const completed: { directory: string; command: string; state: string }[] = [];
-  for (const pkg of plan.packages.filter((p) => p.directory === p.installAt)) {
-    throwIfCancelled();
-    if (completed.length) await verifyInputs();
-    const cwd = await checkedPath(root, pkg.directory),
-      tool = plan.tools.find((t) => t.name === pkg.manager)!;
-    progress?.(`Installing dependencies: ${pkg.directory} (${pkg.manager})`);
-    const secrets = activitySecrets(process.env, sensitiveValues);
-    const sinks = {
-      stdout: activityLineSink(
-        (text) => onLog?.({ stream: "stdout", text }),
-        secrets,
-      ),
-      stderr: activityLineSink(
-        (text) => onLog?.({ stream: "stderr", text }),
-        secrets,
-      ),
-    };
-    onLog?.({
-      stream: "system",
-      text: redactActivityText(
-        `[${pkg.directory}] $ ${pkg.command.join(" ")}`,
-        secrets,
-      ),
-    });
-    try {
-      await execText(tool.file!, pkg.command.slice(1), {
-        cwd,
-        env: toolEnvironment(pkg.manager),
-        timeout: 3600000,
-        maxBuffer: 8 * 1024 * 1024,
-        ...(onLog
-          ? {
-              onOutput: (stream: "stdout" | "stderr", chunk: Buffer) =>
-                sinks[stream].write(chunk),
-            }
-          : {}),
+  try {
+    await verifyInputs();
+    for (const pkg of locations.filter(
+      (p) => !selected || selected.includes(p.directory),
+    )) {
+      throwIfCancelled();
+      if (completed.length) await verifyInputs();
+      const cwd = await checkedPath(root, pkg.directory),
+        tool = plan.tools.find((t) => t.name === pkg.manager)!;
+      const status = report.packages.find(
+        (p) => p.directory === pkg.directory,
+      )!;
+      status.state = "running";
+      emit();
+      progress?.(`Installing dependencies: ${pkg.directory} (${pkg.manager})`);
+      const secrets = activitySecrets(process.env, sensitiveValues);
+      const sinks = {
+        stdout: activityLineSink(
+          (text) => onLog?.({ stream: "stdout", text }),
+          secrets,
+        ),
+        stderr: activityLineSink(
+          (text) => onLog?.({ stream: "stderr", text }),
+          secrets,
+        ),
+      };
+      onLog?.({
+        stream: "system",
+        text: redactActivityText(
+          `[${pkg.directory}] $ ${pkg.command.join(" ")}`,
+          secrets,
+        ),
       });
-    } catch {
-      // Raw tool output can contain registry credentials, URLs or script output.
-      throw new Error(
-        `Dependency installation failed in ${pkg.directory}. Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then retry this package's displayed command in a trusted terminal. Tool output was withheld to protect credentials.`,
-      );
-    } finally {
-      sinks.stdout.end();
-      sinks.stderr.end();
+      try {
+        await execText(tool.file!, pkg.command.slice(1), {
+          cwd,
+          env: toolEnvironment(pkg.manager),
+          timeout: 3600000,
+          maxBuffer: 8 * 1024 * 1024,
+          ...(onLog
+            ? {
+                onOutput: (stream: "stdout" | "stderr", chunk: Buffer) =>
+                  sinks[stream].write(chunk),
+              }
+            : {}),
+        });
+      } catch {
+        status.state = "failed";
+        // Raw tool output can contain registry credentials, URLs or script output.
+        throw new Error(
+          `Dependency installation failed in ${pkg.directory}. Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then retry this package's displayed command in a trusted terminal. Tool output was withheld to protect credentials.`,
+        );
+      } finally {
+        sinks.stdout.end();
+        sinks.stderr.end();
+      }
+      progress?.(`Dependencies installed: ${pkg.directory}`);
+      completed.push({
+        directory: pkg.directory,
+        command: pkg.command.join(" "),
+        state: "installed",
+      });
+      status.state = "installed";
+      emit();
     }
-    progress?.(`Dependencies installed: ${pkg.directory}`);
-    completed.push({
-      directory: pkg.directory,
-      command: pkg.command.join(" "),
-      state: "installed",
-    });
+    report.state = "installed";
+    emit();
+  } catch (error) {
+    let cancelled = false;
+    try {
+      throwIfCancelled();
+    } catch {
+      cancelled = true;
+    }
+    report.state = cancelled ? "cancelled" : "failed";
+    for (const pkg of report.packages) {
+      if (pkg.state === "running" || (cancelled && pkg.state === "failed"))
+        pkg.state = cancelled ? "cancelled" : "failed";
+      else if (pkg.state === "pending") pkg.state = "not-run";
+    }
+    report.message = cancelled
+      ? "Dependency installation was cancelled. Files and completed installations remain."
+      : "Dependency installation stopped. Files and completed installations remain. Review before retrying.";
+    emit();
+    throw error;
   }
   return {
     state: "installed",
     completed,
+    report,
     startup: plan.packages.map((p) => ({
       directory: p.directory,
       commands: p.scripts.map((s) => p.manager + " run " + s.name),
@@ -716,6 +813,7 @@ export async function setupDirectory(
   approved = false,
   progress?: (phase: string) => void,
   onLog?: (event: ActivityOutput) => void,
+  options: SetupOptions = {},
 ) {
   const root = await fs.realpath(directory),
     entries: SnapshotEntry[] = [];
@@ -772,6 +870,7 @@ export async function setupDirectory(
       await handle.close();
     }
   });
+  plan.id = sha(JSON.stringify({ root, id: plan.id }));
   return {
     root,
     ...plan,
@@ -783,6 +882,8 @@ export async function setupDirectory(
             approved,
             progress,
             onLog,
+            [],
+            options,
           ),
         }
       : {}),

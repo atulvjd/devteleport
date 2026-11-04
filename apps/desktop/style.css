@@ -813,6 +813,18 @@ summary:focus-visible {
 .setup-package details {
   margin: 12px 0;
 }
+.setup-recovery { margin-top: 24px; }
+.setup-recovery > input { width: 100%; margin-top: 8px; }
+.setup-attempt-package { display: flex; gap: 16px; align-items: flex-start; padding: 18px 0; border-bottom: 1px solid var(--border); }
+.setup-attempt-package input { flex: 0 0 auto; margin-top: 6px; }
+.setup-attempt-package .detail { flex: 1; min-width: 0; }
+.setup-attempt-package strong, .setup-attempt-package code { display: block; overflow-wrap: anywhere; }
+.setup-attempt-package code { margin-top: 6px; font-size: 12px; }
+.setup-attempt-state { font-size: 12px; font-weight: 600; flex: 0 1 auto; text-align: right; }
+.setup-attempt-state[data-state="failed"], .setup-attempt-state[data-state="cancelled"] { color: var(--danger); }
+.setup-approval { display: flex; gap: 12px; align-items: flex-start; margin: 22px 0; line-height: 1.6; }
+.setup-approval input { flex: 0 0 auto; margin-top: 6px; }
+@media (max-width: 900px) { .setup-attempt-package { flex-wrap: wrap; } .setup-attempt-state { flex-basis: 100%; text-align: left; padding-left: 30px; } }
 .field-help {
   font-size: 10px;
   margin: -11px 0 22px;

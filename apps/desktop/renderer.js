@@ -5,6 +5,10 @@ let preferences = {},
   lastData = {},
   workspaceInfo = null,
   restoreDependencies = null;
+let setupAttempt = null,
+  setupPreview = null,
+  setupSelection = new Set(),
+  setupReviewFingerprint = null;
 const titles = {
   dashboard: [
     "Workspace overview",
@@ -44,6 +48,7 @@ const navLabels = {
   workspace: "Workspace",
   capture: "Capture",
   restore: "Restore",
+  setup: "Dependency setup",
   library: "Snapshot library",
   transfer: "Transfer",
   settings: "Settings",
@@ -120,6 +125,8 @@ function consoleDuration(ms, precise = false) {
   );
 }
 function consoleStages(input) {
+  if (input.action === "setup")
+    return input.dryRun ? ["Review requirements"] : ["Review requirements", "Install dependencies"];
   if (input.action === "capture")
     return input.dryRun
       ? ["Inspect workspace", "Review saved files"]
@@ -287,9 +294,8 @@ function finishConsole(input, result, error) {
   clearInterval(consoleTimer);
   const setupBlocked =
     input.dryRun &&
-    input.action === "restore" &&
-    input.install &&
-    result?.dependencies?.blockers?.length;
+    ((input.action === "restore" && input.install && result?.dependencies?.blockers?.length) ||
+      (input.action === "setup" && result?.blockers?.length));
   const failed = error || result?.ok === false || setupBlocked;
   consoleRun.state =
     error && /cancelled/i.test(error.message)
@@ -798,6 +804,110 @@ function renderSetup(plan, input, restored) {
     container.append(item);
   }
 }
+function setupFingerprint() {
+  return JSON.stringify({ root: setupAttempt?.root,
+    directories: [...setupSelection].sort(), tools: $("toolDirectories").value });
+}
+function invalidateSetupReview() {
+  setupPreview = null;
+  setupReviewFingerprint = null;
+  $("approveSetup").checked = false;
+  $("setupRetryReview").hidden = true;
+  syncSetupActions();
+}
+function syncSetupActions() {
+  $("reviewSetup").disabled = busy || !setupAttempt || !setupSelection.size;
+  $("approveSetup").disabled = busy || !setupPreview || Boolean(setupPreview.blockers?.length);
+  $("runSetup").disabled = busy || !setupPreview || !$("approveSetup").checked ||
+    Boolean(setupPreview.blockers?.length) || setupReviewFingerprint !== setupFingerprint();
+  for (const checkbox of document.querySelectorAll("[data-setup-select]")) checkbox.disabled = busy;
+}
+function renderSetupRecovery(report) {
+  if (!report?.root || !Array.isArray(report.packages)) return;
+  const previous = setupAttempt;
+  // Progress reports can arrive before the persisted history is refreshed.
+  report = { ...report, packages: report.packages.map((pkg) => ({ ...pkg,
+    previouslyInstalled: pkg.previouslyInstalled || (pkg.state === "not-selected" &&
+      previous?.root === report.root && previous.packages.some((old) =>
+        old.directory === pkg.directory && (old.state === "installed" || old.previouslyInstalled))),
+  })) };
+  const changedAttempt = previous?.root !== report.root ||
+    (report.state !== "running" && (previous?.state === "running" || previous?.updatedAt !== report.updatedAt));
+  setupAttempt = report;
+  if (changedAttempt || !previous) {
+    setupSelection = new Set(report.packages.filter((pkg) =>
+      pkg.state !== "installed" && !pkg.previouslyInstalled).map((pkg) => pkg.directory));
+    invalidateSetupReview();
+  }
+  $("setupRecovery").hidden = false;
+  $("setupRetryTarget").value = report.root;
+  $("setupRetrySummary").textContent = report.state === "installed"
+    ? "The selected installations completed. Review again to reinstall any package. Configure services and use your startup commands when ready."
+    : report.state === "running"
+      ? "Installing the approved packages. Your files are already restored."
+      : (report.message || "Dependency setup stopped. Your restored files and earlier successful installations remain.");
+  const container = $("setupAttemptPackages");
+  container.replaceChildren();
+  const labels = { pending: "Pending", running: "Installing…", installed: "Installed",
+    failed: "Failed", cancelled: "Interrupted", "not-run": "Not run", "not-selected": "Not selected" };
+  for (const pkg of report.packages) {
+    const item = document.createElement("label"), checkbox = document.createElement("input"),
+      detail = document.createElement("span"), name = document.createElement("strong"),
+      command = document.createElement("code"), status = document.createElement("span");
+    item.className = "setup-attempt-package";
+    checkbox.type = "checkbox";
+    checkbox.dataset.setupSelect = "true";
+    checkbox.dataset.setupDirectory = pkg.directory;
+    checkbox.checked = setupSelection.has(pkg.directory);
+    checkbox.setAttribute("aria-label", "Retry installation in " + pkg.directory);
+    checkbox.onchange = () => {
+      if (checkbox.checked) setupSelection.add(pkg.directory); else setupSelection.delete(pkg.directory);
+      invalidateSetupReview();
+    };
+    detail.className = "detail";
+    name.textContent = pkg.directory === "." ? "Main project" : pkg.directory;
+    command.textContent = pkg.command;
+    status.className = "setup-attempt-state";
+    status.dataset.setupStatus = "true";
+    status.dataset.setupDirectory = pkg.directory;
+    status.dataset.state = pkg.state;
+    status.textContent = pkg.previouslyInstalled ? "Installed previously" : labels[pkg.state] || "Review required";
+    detail.append(name, command); item.append(checkbox, detail, status); container.append(item);
+  }
+  syncSetupActions();
+}
+function renderSetupRetryReview(plan, input) {
+  setupPreview = plan;
+  setupReviewFingerprint = setupFingerprint();
+  $("approveSetup").checked = false;
+  const panel = $("setupRetryReview");
+  panel.replaceChildren();
+  const title = document.createElement("h3");
+  title.textContent = "Review dependency retry";
+  panel.append(title);
+  for (const pkg of plan.packages || []) {
+    if (pkg.directory !== pkg.installAt || !input.installDirectories.includes(pkg.directory)) continue;
+    const command = document.createElement("p");
+    command.textContent = `${pkg.directory}: ${pkg.command.join(" ")}`;
+    panel.append(command);
+  }
+  for (const message of [...(plan.blockers || []), ...(plan.warnings || [])]) {
+    const note = document.createElement("p");
+    note.className = "field-help"; note.textContent = message; panel.append(note);
+  }
+  panel.hidden = false;
+  syncSetupActions();
+}
+function setupInput(dryRun) {
+  return { action: "setup", source: setupAttempt?.root, dryRun,
+    install: !dryRun, approveExecution: !dryRun && $("approveSetup").checked,
+    planId: setupPreview?.id, installDirectories: [...setupSelection],
+    toolDirectories: $("toolDirectories").value };
+}
+$("reviewSetup").onclick = () => execute(setupInput(true)).catch(() => {});
+$("runSetup").onclick = () => execute(setupInput(false)).catch(() => {});
+$("approveSetup").onchange = syncSetupActions;
+$("toolDirectories").addEventListener("input", invalidateSetupReview);
 function emptyState(container, iconName, title, copy, actionLabel, view) {
   const empty = document.createElement("div");
   empty.className = "empty-state";
@@ -867,6 +977,7 @@ function row(title, detail) {
 }
 async function refreshData() {
   lastData = await window.teleport.data();
+  if (lastData.lastSetup) renderSetupRecovery(lastData.lastSetup);
   const editor = $("editor");
   editor.replaceChildren();
   const automatic = document.createElement("option");
@@ -1029,6 +1140,7 @@ function setBusy(value) {
       button.disabled = value ? button.id !== "cancel" : button.id === "cancel";
   syncComponents();
   syncReviewActions();
+  syncSetupActions();
   $("consoleClear").disabled = value || !consoleRun;
 }
 async function execute(input) {
@@ -1100,9 +1212,8 @@ async function execute(input) {
         : rendered;
     const setupBlocked =
       input.dryRun &&
-      input.action === "restore" &&
-      input.install &&
-      result.dependencies?.blockers?.length;
+      ((input.action === "restore" && input.install && result.dependencies?.blockers?.length) ||
+        (input.action === "setup" && result.blockers?.length));
     const summary = setupBlocked
       ? "Resolve the dependency setup issues below and review again, or turn installation off to restore files only."
       : input.dryRun
@@ -1113,6 +1224,8 @@ async function execute(input) {
             ? input.install
               ? "Your files were restored, dependencies installed and files verified. Follow the startup guide above."
               : "Your files were restored and verified. Follow the dependency and startup guide above."
+            : input.action === "setup"
+              ? "The selected dependency installations completed. Use the startup guide when your services and environment are ready."
             : input.action === "verify"
               ? result.ok
                 ? "The workspace verification completed successfully."
@@ -1138,6 +1251,13 @@ async function execute(input) {
       renderReview(input.action, result, input);
     if (input.action === "restore" && !input.dryRun)
       renderSetup(result.dependencies, input, true);
+    if (input.action === "setup") {
+      if (input.dryRun) renderSetupRetryReview(result, input);
+      else {
+        renderSetup(result, { install: true }, true);
+        invalidateSetupReview();
+      }
+    }
     if (input.action === "inspect") {
       workspaceInfo = { source: input.source, report: result };
       renderInspector(result);
@@ -1159,6 +1279,9 @@ async function execute(input) {
     finishConsole(input, result);
     return result;
   } catch (error) {
+    if (input.action === "setup") invalidateSetupReview();
+    if (["setup", "restore"].includes(input.action))
+      await refreshData().catch(() => {});
     finishConsole(input, null, error);
     showError(error);
     throw error;
@@ -1301,6 +1424,10 @@ $("receiveButton").onclick = () =>
     toolDirectories: $("toolDirectories").value,
   }).catch(() => {});
 window.teleport.onProgress((progress) => {
+  if (progress.kind === "installation") {
+    renderSetupRecovery(progress.report);
+    return;
+  }
   if (progress.kind === "command") {
     if (consoleRun && !consoleRun.finished) {
       if (progress.action === consoleRun.action)

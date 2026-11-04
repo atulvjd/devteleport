@@ -93,6 +93,8 @@ const valued = new Set([
   "advertise",
   "port",
   "timeout",
+  "plan-id",
+  "install-at",
 ]);
 const flags = new Set([
   "dry-run",
@@ -127,13 +129,29 @@ try {
         options.exclusions.push(raw[++i]);
         continue;
       }
+      if (k === "install-at") {
+        options.installDirectories ??= [];
+        options.installDirectories.push(raw[++i]);
+        continue;
+      }
       (options as Record<string, string | boolean>)[
         k.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
       ] = valued.has(k) ? raw[++i] : true;
     } else positional.push(a);
   }
+  if (
+    command !== "setup" &&
+    (options.planId !== undefined || options.installDirectories !== undefined)
+  )
+    throw new Error("--plan-id and --install-at are supported only by setup.");
   if (process.env.DEVTELEPORT_PROGRESS === "1") {
     const secrets = activitySecrets();
+    options.onInstallState = (report) =>
+      process.stderr.write(
+        "DTP_PROGRESS:" +
+          JSON.stringify({ kind: "installation", report }) +
+          "\n",
+      );
     let outputBytes = 0,
       outputLimited = false;
     options.onLog = ({ stream, text }) => {
@@ -294,6 +312,11 @@ try {
         Boolean(options.approveExecution),
         options.onProgress,
         options.onLog,
+        {
+          expectedPlanId: options.planId,
+          installDirectories: options.installDirectories,
+          onInstallState: options.onInstallState,
+        },
       );
       break;
     case "capture":
