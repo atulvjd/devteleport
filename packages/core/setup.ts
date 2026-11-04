@@ -734,7 +734,7 @@ export async function installDependencies(
         status.state = "failed";
         // Raw tool output can contain registry credentials, URLs or script output.
         throw new Error(
-          `Dependency installation failed in ${pkg.directory}. Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then retry this package's displayed command in a trusted terminal. Tool output was withheld to protect credentials.`,
+          `Dependency installation failed in ${pkg.directory}. Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then review and retry installation. The displayed command can also be run in a trusted terminal. Tool output was withheld to protect credentials.`,
         );
       } finally {
         sinks.stdout.end();

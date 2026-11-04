@@ -273,25 +273,47 @@ ipcMain.handle("operation", async (event, input) => {
   if (input.action === "setup") {
     const stat = await fs.lstat(input.source);
     if (!stat.isDirectory() || stat.isSymbolicLink())
-      throw new Error("Select the original restored project directory, not a symbolic link.");
+      throw new Error(
+        "Select the original restored project directory, not a symbolic link.",
+      );
     const root = await fs.realpath(input.source);
     await dataWrites;
     if ((await localData()).lastSetup?.root !== root)
-      throw new Error("Choose dependency recovery for the last restored project.");
+      throw new Error(
+        "Choose dependency recovery for the last restored project.",
+      );
     const selection = input.installDirectories;
-    if (!Array.isArray(selection) || !selection.length || selection.length > 100 ||
-        selection.some((value) => typeof value !== "string" || value.length > 4096) ||
-        new Set(selection).size !== selection.length)
+    if (
+      !Array.isArray(selection) ||
+      !selection.length ||
+      selection.length > 100 ||
+      selection.some(
+        (value) => typeof value !== "string" || value.length > 4096,
+      ) ||
+      new Set(selection).size !== selection.length
+    )
       throw new Error("Select at least one package installation to review.");
-    setupIdentity = JSON.stringify({ root, device: stat.dev, inode: stat.ino,
-      selection: [...selection].sort(), tools: input.toolDirectories || "" });
+    setupIdentity = JSON.stringify({
+      root,
+      device: stat.dev,
+      inode: stat.ino,
+      selection: [...selection].sort(),
+      tools: input.toolDirectories || "",
+    });
     if (input.dryRun) setupReview = null;
     else {
       const review = setupReview;
       setupReview = null;
-      if (!input.install || input.approveExecution !== true ||
-          !review || review.identity !== setupIdentity || review.id !== input.planId)
-        throw new Error("Review this project's selected packages and explicitly approve dependency installation before retrying.");
+      if (
+        !input.install ||
+        input.approveExecution !== true ||
+        !review ||
+        review.identity !== setupIdentity ||
+        review.id !== input.planId
+      )
+        throw new Error(
+          "Review this project's selected packages and explicitly approve dependency installation before retrying.",
+        );
     }
   }
   const secrets = activitySecrets(process.env, [input.password || ""]);
@@ -368,7 +390,13 @@ ipcMain.handle("operation", async (event, input) => {
     }
     if (input.action === "setup") {
       if (input.dryRun) args.push("--dry-run");
-      else args.push("--install", "--approve-execution", "--plan-id", input.planId);
+      else
+        args.push(
+          "--install",
+          "--approve-execution",
+          "--plan-id",
+          input.planId,
+        );
       for (const directory of input.installDirectories)
         args.push("--install-at", directory);
     }
@@ -417,30 +445,69 @@ ipcMain.handle("operation", async (event, input) => {
       cancelled = false,
       installation = null;
     function rememberInstallation(report) {
-      if (!report || !path.isAbsolute(report.root) || !Array.isArray(report.packages) ||
-          report.packages.length > 100 ||
-          !["running", "installed", "failed", "cancelled"].includes(report.state)) return;
-      const states = ["pending", "running", "installed", "failed", "cancelled", "not-run", "not-selected"];
-      if (report.packages.some((pkg) => !pkg || typeof pkg.directory !== "string" ||
-          typeof pkg.command !== "string" || !states.includes(pkg.state))) return;
+      if (
+        !report ||
+        !path.isAbsolute(report.root) ||
+        !Array.isArray(report.packages) ||
+        report.packages.length > 100 ||
+        !["running", "installed", "failed", "cancelled"].includes(report.state)
+      )
+        return;
+      const states = [
+        "pending",
+        "running",
+        "installed",
+        "failed",
+        "cancelled",
+        "not-run",
+        "not-selected",
+      ];
+      if (
+        report.packages.some(
+          (pkg) =>
+            !pkg ||
+            typeof pkg.directory !== "string" ||
+            typeof pkg.command !== "string" ||
+            !states.includes(pkg.state),
+        )
+      )
+        return;
       installation = {
-        root: report.root, state: report.state,
+        root: report.root,
+        state: report.state,
         packages: report.packages.map(({ directory, command, state }) => ({
-          directory: safe(directory).slice(0, 4096), command: safe(command).slice(0, 4096), state,
+          directory: directory.slice(0, 4096),
+          command: command.slice(0, 4096),
+          state,
         })),
         updatedAt: new Date().toISOString(),
-        ...(typeof report.message === "string" ? { message: safe(report.message).slice(0, 4096) } : {}),
+        ...(typeof report.message === "string"
+          ? { message: safe(report.message).slice(0, 4096) }
+          : {}),
       };
-      sendToWindow("progress", { action: input.action, kind: "installation", report: installation });
+      sendToWindow("progress", {
+        action: input.action,
+        kind: "installation",
+        report: installation,
+      });
       const saved = installation;
       updateData((data) => {
-        const previous = data.lastSetup?.root === saved.root ? data.lastSetup : null;
+        const previous =
+          data.lastSetup?.root === saved.root ? data.lastSetup : null;
         // A partial retry does not erase earlier successful installation history.
-        data.lastSetup = { ...saved, packages: saved.packages.map((pkg) => ({
-          ...pkg, previouslyInstalled: pkg.state === "not-selected" &&
-            previous?.packages.some((old) => old.directory === pkg.directory &&
-              (old.state === "installed" || old.previouslyInstalled)),
-        })) };
+        data.lastSetup = {
+          ...saved,
+          packages: saved.packages.map((pkg) => ({
+            ...pkg,
+            previouslyInstalled:
+              pkg.state === "not-selected" &&
+              previous?.packages.some(
+                (old) =>
+                  old.directory === pkg.directory &&
+                  (old.state === "installed" || old.previouslyInstalled),
+              ),
+          })),
+        };
       }).catch(() => {});
     }
     const toolGroups = new Set();
@@ -488,7 +555,10 @@ ipcMain.handle("operation", async (event, input) => {
       if (!line.startsWith("DTP_PROGRESS:")) return;
       try {
         const value = JSON.parse(line.slice(13));
-        if (value.kind === "installation" && ["restore", "setup"].includes(input.action))
+        if (
+          value.kind === "installation" &&
+          ["restore", "setup"].includes(input.action)
+        )
           rememberInstallation(value.report);
         else if (
           value.kind === "output" &&
@@ -514,7 +584,7 @@ ipcMain.handle("operation", async (event, input) => {
       const lines = progressBuffer.split("\n");
       progressBuffer = lines.pop();
       for (const line of lines) progressLine(line);
-      if (progressBuffer.length > 128 * 1024) child.cancel();
+      if (progressBuffer.length > 1024 * 1024) child.cancel();
       stderr += data;
       if (stderr.length > 24 * 1024 * 1024) child.cancel();
     });
@@ -529,10 +599,21 @@ ipcMain.handle("operation", async (event, input) => {
       progressLine(progressBuffer + progressDecoder.end());
       running = null;
       if (installation?.state === "running")
-        rememberInstallation({ ...installation, state: cancelled ? "cancelled" : "failed",
-          message: "Installation stopped before completion. Restored files and earlier successful installs remain. Review before retrying.",
-          packages: installation.packages.map((pkg) => ({ ...pkg,
-            state: pkg.state === "running" ? (cancelled ? "cancelled" : "failed") : pkg.state === "pending" ? "not-run" : pkg.state,
+        rememberInstallation({
+          ...installation,
+          state: cancelled ? "cancelled" : "failed",
+          message:
+            "Installation stopped before completion. Restored files and earlier successful installs remain. Review before retrying.",
+          packages: installation.packages.map((pkg) => ({
+            ...pkg,
+            state:
+              pkg.state === "running"
+                ? cancelled
+                  ? "cancelled"
+                  : "failed"
+                : pkg.state === "pending"
+                  ? "not-run"
+                  : pkg.state,
           })),
         });
       await dataWrites.catch(() => {});
@@ -696,10 +777,19 @@ async function desktopData() {
   if (!running && data.lastSetup?.state === "running") {
     await updateData((value) => {
       if (value.lastSetup?.state !== "running") return;
-      value.lastSetup = { ...value.lastSetup, state: "cancelled",
-        message: "The previous installation was interrupted. Review the restored project before retrying.",
-        packages: value.lastSetup.packages.map((pkg) => ({ ...pkg,
-          state: pkg.state === "running" ? "cancelled" : pkg.state === "pending" ? "not-run" : pkg.state,
+      value.lastSetup = {
+        ...value.lastSetup,
+        state: "cancelled",
+        message:
+          "The previous installation was interrupted. Review the restored project before retrying.",
+        packages: value.lastSetup.packages.map((pkg) => ({
+          ...pkg,
+          state:
+            pkg.state === "running"
+              ? "cancelled"
+              : pkg.state === "pending"
+                ? "not-run"
+                : pkg.state,
         })),
       };
     });

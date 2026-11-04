@@ -98,7 +98,7 @@ async function approveAndRun(expected = "Completed") {
 }
 async function snapshotsOfPanel(stage) {
   for (const theme of ["dark", "light"]) {
-    await page.locator('[data-view="settings"]').click();
+    await page.locator('button[data-view="settings"]').click();
     await page.locator("#theme").selectOption(theme);
     await page.waitForFunction(
       (value) => document.documentElement.dataset.theme === value,
@@ -110,7 +110,7 @@ async function snapshotsOfPanel(stage) {
           BrowserWindow.getAllWindows()[0].setBounds({ width, height: 820 }),
         width,
       );
-      await page.locator('[data-view="restore"]').click();
+      await page.locator('button[data-view="restore"]').click();
       await page.locator("#setupRecovery").scrollIntoViewIfNeeded();
       const layout = await page.evaluate(() => ({
         width: innerWidth,
@@ -120,12 +120,10 @@ async function snapshotsOfPanel(stage) {
         layout.scroll <= layout.width + 1,
         `${stage} ${theme} ${width}: horizontal overflow`,
       );
-      await page
-        .locator("#setupRecovery")
-        .screenshot({
-          path: path.join(output, `${stage}-${theme}-${width}.png`),
-          animations: "disabled",
-        });
+      await page.locator("#setupRecovery").screenshot({
+        path: path.join(output, `${stage}-${theme}-${width}.png`),
+        animations: "disabled",
+      });
       record("retry panel layout", { stage, theme, width: layout.width });
     }
   }
@@ -166,7 +164,7 @@ try {
   await page.locator("#source").fill(source);
   await page.locator('[data-action="inspect"]').click();
   await finish();
-  await page.locator('[data-view="capture"]').click();
+  await page.locator('button[data-view="capture"]').click();
   await page.locator("#name").fill("retry-fixture");
   await page.locator("#output").fill(temp);
   await page.locator("#capturePassword").fill(passphrase);
@@ -176,7 +174,7 @@ try {
   await finish();
   const archive = path.join(temp, "retry-fixture.dtp");
   await fs.rm(source, { recursive: true });
-  await page.locator('[data-view="restore"]').click();
+  await page.locator('button[data-view="restore"]').click();
   await page.locator("#snapshot").fill(archive);
   await page.locator("#target").fill(target);
   await page.locator("#restorePassword").fill(passphrase);
@@ -212,7 +210,7 @@ try {
   app = null;
   await fs.unlink(archive);
   await launch();
-  await page.locator('[data-view="restore"]').click();
+  await page.locator('button[data-view="restore"]').click();
   assert(await page.locator("#setupRecovery").isVisible());
   assert.match(await status("."), /installed|succeeded/i);
   assert.match(await status("api"), /failed/i);
@@ -255,10 +253,10 @@ try {
 
   await review();
   await page.locator("#approveSetup").check();
-  await page.locator('[data-view="settings"]').click();
+  await page.locator('button[data-view="settings"]').click();
   const oldDirectories = await page.locator("#toolDirectories").inputValue();
   await page.locator("#toolDirectories").fill(oldDirectories + "\n" + temp);
-  await page.locator('[data-view="restore"]').click();
+  await page.locator('button[data-view="restore"]').click();
   assert(!(await page.locator("#approveSetup").isChecked()));
   assert(await page.locator("#runSetup").isDisabled());
   record("tool-directory changes invalidate retry approval");

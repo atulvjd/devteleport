@@ -126,7 +126,9 @@ function consoleDuration(ms, precise = false) {
 }
 function consoleStages(input) {
   if (input.action === "setup")
-    return input.dryRun ? ["Review requirements"] : ["Review requirements", "Install dependencies"];
+    return input.dryRun
+      ? ["Review requirements"]
+      : ["Review requirements", "Install dependencies"];
   if (input.action === "capture")
     return input.dryRun
       ? ["Inspect workspace", "Review saved files"]
@@ -294,7 +296,9 @@ function finishConsole(input, result, error) {
   clearInterval(consoleTimer);
   const setupBlocked =
     input.dryRun &&
-    ((input.action === "restore" && input.install && result?.dependencies?.blockers?.length) ||
+    ((input.action === "restore" &&
+      input.install &&
+      result?.dependencies?.blockers?.length) ||
       (input.action === "setup" && result?.blockers?.length));
   const failed = error || result?.ok === false || setupBlocked;
   consoleRun.state =
@@ -314,7 +318,9 @@ function finishConsole(input, result, error) {
           )
           .replace(/^DevTeleport:\s*/, "")
       : setupBlocked
-        ? "Archive reviewed. Dependency installation needs attention; no project actions were executed."
+        ? input.action === "setup"
+          ? "Review complete. Dependency installation needs attention; no project actions were executed."
+          : "Archive reviewed. Dependency installation needs attention; no project actions were executed."
         : failed
           ? "Verification found differences. Review the result before continuing."
           : input.dryRun
@@ -708,7 +714,7 @@ function renderReview(action, result, input) {
     syncReviewActions();
   }
 }
-function renderSetup(plan, input, restored) {
+function renderSetup(plan, input, restored, installation = null) {
   const panel = $("restoreSetup"),
     container = $("setupPackages");
   container.replaceChildren();
@@ -716,15 +722,17 @@ function renderSetup(plan, input, restored) {
   $("setupTitle").textContent = restored
     ? "Your workspace is restored."
     : "What this project needs";
-  $("setupIntro").textContent = restored
-    ? input.install
-      ? "Dependency installation completed. Open a terminal in the restored folder and use the startup commands below."
-      : "Your files are ready. Install the dependencies below before starting the project."
-    : input.install && plan?.blockers?.length
-      ? "Dependency installation is blocked. Resolve the issues below and review again, or turn installation off to restore files only."
-      : input.install
-        ? "After restoring, DevTeleport will install these packages automatically using your approval above. Review the commands before continuing."
-        : "Select ‘Restore and install dependencies’ to download these packages automatically after restore.";
+  $("setupIntro").textContent = installation
+    ? "The selected installations completed. Check each package's status in dependency recovery and use these commands when its requirements are ready."
+    : restored
+      ? input.install
+        ? "Dependency installation completed. Open a terminal in the restored folder and use the startup commands below."
+        : "Your files are ready. Install the dependencies below before starting the project."
+      : input.install && plan?.blockers?.length
+        ? "Dependency installation is blocked. Resolve the issues below and review again, or turn installation off to restore files only."
+        : input.install
+          ? "After restoring, DevTeleport will install these packages automatically using your approval above. Review the commands before continuing."
+          : "Select ‘Restore and install dependencies’ to download these packages automatically after restore.";
   for (const message of [
     ...(plan?.blockers || []),
     ...(plan?.warnings || []),
@@ -762,10 +770,15 @@ function renderSetup(plan, input, restored) {
     const install = document.createElement("p");
     install.textContent =
       pkg.installAt === pkg.directory
-        ? (restored && input.install
+        ? (restored &&
+          input.install &&
+          (!installation ||
+            installation.packages.some(
+              (p) => p.directory === pkg.installAt && p.state === "installed",
+            ))
             ? "Installed using: "
             : "Install in this folder: ") + pkg.command.join(" ")
-        : "Dependencies installed by workspace root: " + pkg.installAt;
+        : "Dependencies managed at workspace root: " + pkg.installAt;
     item.append(install);
     if (pkg.dependencies.length) {
       const details = document.createElement("details"),
@@ -805,8 +818,11 @@ function renderSetup(plan, input, restored) {
   }
 }
 function setupFingerprint() {
-  return JSON.stringify({ root: setupAttempt?.root,
-    directories: [...setupSelection].sort(), tools: $("toolDirectories").value });
+  return JSON.stringify({
+    root: setupAttempt?.root,
+    directories: [...setupSelection].sort(),
+    tools: $("toolDirectories").value,
+  });
 }
 function invalidateSetupReview() {
   setupPreview = null;
@@ -817,51 +833,89 @@ function invalidateSetupReview() {
 }
 function syncSetupActions() {
   $("reviewSetup").disabled = busy || !setupAttempt || !setupSelection.size;
-  $("approveSetup").disabled = busy || !setupPreview || Boolean(setupPreview.blockers?.length);
-  $("runSetup").disabled = busy || !setupPreview || !$("approveSetup").checked ||
-    Boolean(setupPreview.blockers?.length) || setupReviewFingerprint !== setupFingerprint();
-  for (const checkbox of document.querySelectorAll("[data-setup-select]")) checkbox.disabled = busy;
+  $("approveSetup").disabled =
+    busy || !setupPreview || Boolean(setupPreview.blockers?.length);
+  $("runSetup").disabled =
+    busy ||
+    !setupPreview ||
+    !$("approveSetup").checked ||
+    Boolean(setupPreview.blockers?.length) ||
+    setupReviewFingerprint !== setupFingerprint();
+  for (const checkbox of document.querySelectorAll("[data-setup-select]"))
+    checkbox.disabled = busy;
 }
 function renderSetupRecovery(report) {
   if (!report?.root || !Array.isArray(report.packages)) return;
   const previous = setupAttempt;
   // Progress reports can arrive before the persisted history is refreshed.
-  report = { ...report, packages: report.packages.map((pkg) => ({ ...pkg,
-    previouslyInstalled: pkg.previouslyInstalled || (pkg.state === "not-selected" &&
-      previous?.root === report.root && previous.packages.some((old) =>
-        old.directory === pkg.directory && (old.state === "installed" || old.previouslyInstalled))),
-  })) };
-  const changedAttempt = previous?.root !== report.root ||
-    (report.state !== "running" && (previous?.state === "running" || previous?.updatedAt !== report.updatedAt));
+  report = {
+    ...report,
+    packages: report.packages.map((pkg) => ({
+      ...pkg,
+      previouslyInstalled:
+        pkg.previouslyInstalled ||
+        (pkg.state === "not-selected" &&
+          previous?.root === report.root &&
+          previous.packages.some(
+            (old) =>
+              old.directory === pkg.directory &&
+              (old.state === "installed" || old.previouslyInstalled),
+          )),
+    })),
+  };
+  const changedAttempt =
+    previous?.root !== report.root ||
+    (report.state !== "running" &&
+      (previous?.state === "running" ||
+        previous?.updatedAt !== report.updatedAt));
   setupAttempt = report;
   if (changedAttempt || !previous) {
-    setupSelection = new Set(report.packages.filter((pkg) =>
-      pkg.state !== "installed" && !pkg.previouslyInstalled).map((pkg) => pkg.directory));
+    setupSelection = new Set(
+      report.packages
+        .filter((pkg) => pkg.state !== "installed" && !pkg.previouslyInstalled)
+        .map((pkg) => pkg.directory),
+    );
     invalidateSetupReview();
   }
   $("setupRecovery").hidden = false;
   $("setupRetryTarget").value = report.root;
-  $("setupRetrySummary").textContent = report.state === "installed"
-    ? "The selected installations completed. Review again to reinstall any package. Configure services and use your startup commands when ready."
-    : report.state === "running"
-      ? "Installing the approved packages. Your files are already restored."
-      : (report.message || "Dependency setup stopped. Your restored files and earlier successful installations remain.");
+  $("setupRetrySummary").textContent =
+    report.state === "installed"
+      ? "The selected installations completed. Review again to reinstall any package. Configure services and use your startup commands when ready."
+      : report.state === "running"
+        ? "Installing the approved packages. Your files are already restored."
+        : report.message ||
+          "Dependency setup stopped. Your restored files and earlier successful installations remain.";
   const container = $("setupAttemptPackages");
   container.replaceChildren();
-  const labels = { pending: "Pending", running: "Installing…", installed: "Installed",
-    failed: "Failed", cancelled: "Interrupted", "not-run": "Not run", "not-selected": "Not selected" };
+  const labels = {
+    pending: "Pending",
+    running: "Installing…",
+    installed: "Installed",
+    failed: "Failed",
+    cancelled: "Interrupted",
+    "not-run": "Not run",
+    "not-selected": "Not selected",
+  };
   for (const pkg of report.packages) {
-    const item = document.createElement("label"), checkbox = document.createElement("input"),
-      detail = document.createElement("span"), name = document.createElement("strong"),
-      command = document.createElement("code"), status = document.createElement("span");
+    const item = document.createElement("label"),
+      checkbox = document.createElement("input"),
+      detail = document.createElement("span"),
+      name = document.createElement("strong"),
+      command = document.createElement("code"),
+      status = document.createElement("span");
     item.className = "setup-attempt-package";
     checkbox.type = "checkbox";
     checkbox.dataset.setupSelect = "true";
     checkbox.dataset.setupDirectory = pkg.directory;
     checkbox.checked = setupSelection.has(pkg.directory);
-    checkbox.setAttribute("aria-label", "Retry installation in " + pkg.directory);
+    checkbox.setAttribute(
+      "aria-label",
+      "Retry installation in " + pkg.directory,
+    );
     checkbox.onchange = () => {
-      if (checkbox.checked) setupSelection.add(pkg.directory); else setupSelection.delete(pkg.directory);
+      if (checkbox.checked) setupSelection.add(pkg.directory);
+      else setupSelection.delete(pkg.directory);
       invalidateSetupReview();
     };
     detail.className = "detail";
@@ -871,8 +925,12 @@ function renderSetupRecovery(report) {
     status.dataset.setupStatus = "true";
     status.dataset.setupDirectory = pkg.directory;
     status.dataset.state = pkg.state;
-    status.textContent = pkg.previouslyInstalled ? "Installed previously" : labels[pkg.state] || "Review required";
-    detail.append(name, command); item.append(checkbox, detail, status); container.append(item);
+    status.textContent = pkg.previouslyInstalled
+      ? "Installed previously"
+      : labels[pkg.state] || "Review required";
+    detail.append(name, command);
+    item.append(checkbox, detail, status);
+    container.append(item);
   }
   syncSetupActions();
 }
@@ -886,23 +944,35 @@ function renderSetupRetryReview(plan, input) {
   title.textContent = "Review dependency retry";
   panel.append(title);
   for (const pkg of plan.packages || []) {
-    if (pkg.directory !== pkg.installAt || !input.installDirectories.includes(pkg.directory)) continue;
+    if (
+      pkg.directory !== pkg.installAt ||
+      !input.installDirectories.includes(pkg.directory)
+    )
+      continue;
     const command = document.createElement("p");
     command.textContent = `${pkg.directory}: ${pkg.command.join(" ")}`;
     panel.append(command);
   }
   for (const message of [...(plan.blockers || []), ...(plan.warnings || [])]) {
     const note = document.createElement("p");
-    note.className = "field-help"; note.textContent = message; panel.append(note);
+    note.className = "field-help";
+    note.textContent = message;
+    panel.append(note);
   }
   panel.hidden = false;
   syncSetupActions();
 }
 function setupInput(dryRun) {
-  return { action: "setup", source: setupAttempt?.root, dryRun,
-    install: !dryRun, approveExecution: !dryRun && $("approveSetup").checked,
-    planId: setupPreview?.id, installDirectories: [...setupSelection],
-    toolDirectories: $("toolDirectories").value };
+  return {
+    action: "setup",
+    source: setupAttempt?.root,
+    dryRun,
+    install: !dryRun,
+    approveExecution: !dryRun && $("approveSetup").checked,
+    planId: setupPreview?.id,
+    installDirectories: [...setupSelection],
+    toolDirectories: $("toolDirectories").value,
+  };
 }
 $("reviewSetup").onclick = () => execute(setupInput(true)).catch(() => {});
 $("runSetup").onclick = () => execute(setupInput(false)).catch(() => {});
@@ -1212,10 +1282,14 @@ async function execute(input) {
         : rendered;
     const setupBlocked =
       input.dryRun &&
-      ((input.action === "restore" && input.install && result.dependencies?.blockers?.length) ||
+      ((input.action === "restore" &&
+        input.install &&
+        result.dependencies?.blockers?.length) ||
         (input.action === "setup" && result.blockers?.length));
     const summary = setupBlocked
-      ? "Resolve the dependency setup issues below and review again, or turn installation off to restore files only."
+      ? input.action === "setup"
+        ? "Resolve the dependency setup issues below and review the selected packages again. Your restored files remain available."
+        : "Resolve the dependency setup issues below and review again, or turn installation off to restore files only."
       : input.dryRun
         ? "Check the plan above. Change any options, then review again before continuing."
         : input.action === "capture"
@@ -1226,11 +1300,11 @@ async function execute(input) {
               : "Your files were restored and verified. Follow the dependency and startup guide above."
             : input.action === "setup"
               ? "The selected dependency installations completed. Use the startup guide when your services and environment are ready."
-            : input.action === "verify"
-              ? result.ok
-                ? "The workspace verification completed successfully."
-                : "Some entries differ. Review the technical details."
-              : "The operation completed. Technical details are available below.";
+              : input.action === "verify"
+                ? result.ok
+                  ? "The workspace verification completed successfully."
+                  : "Some entries differ. Review the technical details."
+                : "The operation completed. Technical details are available below.";
     activity(
       result.ok === false || setupBlocked ? "error" : "success",
       setupBlocked
@@ -1254,7 +1328,12 @@ async function execute(input) {
     if (input.action === "setup") {
       if (input.dryRun) renderSetupRetryReview(result, input);
       else {
-        renderSetup(result, { install: true }, true);
+        renderSetup(
+          result,
+          { install: true },
+          true,
+          result.installation?.report,
+        );
         invalidateSetupReview();
       }
     }

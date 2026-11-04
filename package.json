@@ -22,6 +22,7 @@
     "test:docker": "DEVTELEPORT_TEST_DOCKER=1 node --test tests/docker.test.ts",
     "test:e2e": "node --test tests/express.e2e.ts",
     "test:desktop": "npm run build:backend && node scripts/desktop-smoke.mjs",
+    "test:desktop:setup": "npm run build:backend && node scripts/desktop-setup-retry.mjs",
     "test:package": "node scripts/package-smoke.mjs",
     "test:full": "node --test tests/full.e2e.ts",
     "build:backend": "node scripts/build-backend.mjs",
