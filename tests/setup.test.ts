@@ -135,6 +135,9 @@ test("pnpm workspace planning uses frozen locks and does not switch a nested npm
     "pnpm",
     "install",
     "--frozen-lockfile",
+    "--prod=false",
+    "--dev=false",
+    "--optional",
   ]);
   assert.equal(plan.packages[1].manager, "npm");
 });
@@ -489,7 +492,7 @@ test("unsupported package manager blocks automatic execution before restore but 
   const { root, temp } = await fixture(t);
   await fs.writeFile(
     path.join(root, "cms", "package.json"),
-    '{"name":"cms","packageManager":"yarn@4.0.0"}',
+    '{"name":"cms","packageManager":"unsupported-manager@1.0.0"}',
   );
   const archive = await capture({
     root,

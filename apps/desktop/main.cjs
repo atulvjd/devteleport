@@ -450,7 +450,13 @@ ipcMain.handle("operation", async (event, input) => {
         !path.isAbsolute(report.root) ||
         !Array.isArray(report.packages) ||
         report.packages.length > 100 ||
-        !["running", "installed", "failed", "cancelled"].includes(report.state)
+        ![
+          "not-started",
+          "running",
+          "installed",
+          "failed",
+          "cancelled",
+        ].includes(report.state)
       )
         return;
       const states = [
@@ -468,6 +474,9 @@ ipcMain.handle("operation", async (event, input) => {
             !pkg ||
             typeof pkg.directory !== "string" ||
             typeof pkg.command !== "string" ||
+            (pkg.key !== undefined && typeof pkg.key !== "string") ||
+            (pkg.ecosystem !== undefined &&
+              typeof pkg.ecosystem !== "string") ||
             !states.includes(pkg.state),
         )
       )
@@ -475,11 +484,15 @@ ipcMain.handle("operation", async (event, input) => {
       installation = {
         root: report.root,
         state: report.state,
-        packages: report.packages.map(({ directory, command, state }) => ({
-          directory: directory.slice(0, 4096),
-          command: command.slice(0, 4096),
-          state,
-        })),
+        packages: report.packages.map(
+          ({ directory, command, state, key, ecosystem }) => ({
+            directory: directory.slice(0, 4096),
+            command: command.slice(0, 4096),
+            state,
+            ...(key ? { key: key.slice(0, 4096) } : {}),
+            ...(ecosystem ? { ecosystem: ecosystem.slice(0, 100) } : {}),
+          }),
+        ),
         updatedAt: new Date().toISOString(),
         ...(typeof report.message === "string"
           ? { message: safe(report.message).slice(0, 4096) }
@@ -503,7 +516,7 @@ ipcMain.handle("operation", async (event, input) => {
               pkg.state === "not-selected" &&
               previous?.packages.some(
                 (old) =>
-                  old.directory === pkg.directory &&
+                  (old.key || old.directory) === (pkg.key || pkg.directory) &&
                   (old.state === "installed" || old.previouslyInstalled),
               ),
           })),
@@ -644,6 +657,29 @@ ipcMain.handle("operation", async (event, input) => {
         );
       try {
         const result = JSON.parse(stdout);
+        if (
+          input.action === "restore" &&
+          !input.dryRun &&
+          !input.install &&
+          result.dependencies?.packages?.length
+        ) {
+          rememberInstallation({
+            root: await fs.realpath(input.target),
+            state: "not-started",
+            message:
+              "Your files are restored. Select the projects whose dependencies you want to install, then review and approve their commands.",
+            packages: result.dependencies.packages
+              .filter((pkg) => pkg.directory === pkg.installAt)
+              .map((pkg) => ({
+                directory: pkg.directory,
+                command: pkg.command.join(" "),
+                state: "not-run",
+                ...(pkg.installKey ? { key: pkg.installKey } : {}),
+                ...(pkg.ecosystem ? { ecosystem: pkg.ecosystem } : {}),
+              })),
+          });
+          await dataWrites;
+        }
         if (input.action === "setup" && input.dryRun)
           setupReview = { identity: setupIdentity, id: result.id };
         if (input.action === "history")

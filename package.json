@@ -1,6 +1,6 @@
 {
   "name": "devteleport",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,7 +12,7 @@
   "scripts": {
     "dev:website": "node scripts/serve-website.mjs",
     "build:website": "node scripts/build-website.mjs",
-    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts tests/wait-for-port.test.ts tests/setup.test.ts tests/activity.test.ts tests/include-ignored.test.ts tests/release-failures.test.ts",
+    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts tests/wait-for-port.test.ts tests/setup.test.ts tests/activity.test.ts tests/include-ignored.test.ts tests/release-failures.test.ts tests/dependency-collection.test.ts tests/ecosystems.test.ts tests/python-setup.test.ts tests/polyglot-setup.test.ts",
     "check": "tsc --noEmit && node --check apps/desktop/main.cjs && node --check apps/vscode-extension/extension.cjs",
     "desktop": "npm run build:backend && node scripts/launch-desktop.mjs",
     "package:cli": "node scripts/package.mjs",
@@ -23,6 +23,7 @@
     "test:e2e": "node --test tests/express.e2e.ts",
     "test:desktop": "npm run build:backend && node scripts/desktop-smoke.mjs",
     "test:desktop:setup": "npm run build:backend && node scripts/desktop-setup-retry.mjs",
+    "test:desktop:dependencies": "npm run build:backend && node scripts/desktop-dependency-collection.mjs",
     "test:package": "node scripts/package-smoke.mjs",
     "test:full": "node --test tests/full.e2e.ts",
     "build:backend": "node scripts/build-backend.mjs",

@@ -426,7 +426,7 @@ try {
         database:
           "capture --include-db; restore --restore-db --approve-db --db-config TRUSTED_CONFIG",
         install:
-          "restore --install --approve-execution installs reviewed npm/pnpm packages, including independent subprojects; setup DIR previews requirements; setup DIR --install --approve-execution retries installation. Lifecycle scripts may execute.",
+          "restore --install --approve-execution installs reviewed dependencies using supported native project managers; setup DIR previews detected projects; setup DIR --install --approve-execution retries installation. Build files, plugins and lifecycle scripts may execute. Runtimes must already be available.",
       };
   }
   console.log(JSON.stringify(result, null, 2));

@@ -2,7 +2,7 @@
   "name": "devteleport",
   "displayName": "DevTeleport",
   "description": "Capture and restore encrypted local development workspaces",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "devteleport-local",
   "engines": {
     "vscode": "^1.96.0"

@@ -1,4 +1,4 @@
-# MASTER BUILD PROMPT — DEVTELEPORT
+capture tests pass for both archive formats, including restoring .env, ignored folders and copied dependencies after deleting the source.# MASTER BUILD PROMPT — DEVTELEPORT
 
 ## ROLE
 

@@ -64,6 +64,7 @@ jobs:
       - run: test "$(uname -m)" = arm64
       - run: npm run test:desktop
       - run: npm run test:desktop:setup
+      - run: npm run test:desktop:dependencies
       - run: npm run test:desktop:transfer
       - run: |
           if [ "$(uname -m)" = "arm64" ]; then dtp_code_platform=darwin-arm64; else dtp_code_platform=darwin; fi
@@ -90,6 +91,9 @@ jobs:
           DEVTELEPORT_APP_BINARY: dist/desktop/mac-arm64/DevTeleport.app/Contents/MacOS/DevTeleport
           DEVTELEPORT_EXPECT_ARCH: arm64
       - run: node scripts/desktop-setup-retry.mjs
+        env:
+          DEVTELEPORT_APP_BINARY: dist/desktop/mac-arm64/DevTeleport.app/Contents/MacOS/DevTeleport
+      - run: node scripts/desktop-dependency-collection.mjs
         env:
           DEVTELEPORT_APP_BINARY: dist/desktop/mac-arm64/DevTeleport.app/Contents/MacOS/DevTeleport
       - run: node scripts/desktop-visual.mjs

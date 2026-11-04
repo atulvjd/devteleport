@@ -1,6 +1,6 @@
 # Retry dependency installation in the desktop
 
-The development source now supports retrying dependency installation in an already restored project. A failed installation no longer requires another restore or a second destination folder. This follow-up retains source version **0.2.1**; it has not been included in a new released installer.
+The local **0.2.2 release candidate** supports retrying dependency installation in an already restored project. A failed installation no longer requires another restore or a second destination folder. The final local DMG and fresh 21-stage gate are documented in [0.2.2 validation](RELEASE-0.2.2.md). Public downloads remain unchanged until publication; older 0.2.1 preview evidence below is historical.
 
 ## Desktop workflow
 
@@ -47,7 +47,7 @@ devteleport setup /path/to/restored-project --install --approve-execution \
 
 Use `node apps/cli/main.ts` instead of `devteleport` when testing these changes from this checkout. Previously published CLI packages do not gain source changes automatically. `--dry-run` remains read-only.
 
-## Validation — 4 November 2026
+## Earlier feature-preview validation — 4 November 2026
 
 Fresh local strict checks and **86 core tests passed, with zero failures or skips**. The existing source desktop smoke also passed. The focused regression passed against both source Electron and the final separately packaged ARM64 app, using a real offline npm failure/retry flow with disposable independent projects. It verified source removal, partial installation status, preserved files, relaunch recovery, refused execution without a reviewed approval, read-only review, stale metadata refusal, tool-directory invalidation, selected retry without reinstalling the earlier success, and cancellation of an installer descendant. The snapshot was removed before retry to prove that retry does not restore another copy.
 
@@ -56,3 +56,8 @@ Each focused run checked eight panel layouts across failure/success, dark/light 
 Aggregate evidence is `dist/evidence/dependency-retry.json`; source acceptance is preserved in `dist/evidence/desktop-setup-retry-source.json`, final packaged acceptance in `dist/evidence/desktop-setup-retry.json`, and architecture results in `dist/setup-retry/architecture.json`. Screenshots are under `dist/setup-retry/`. Re-run with `npm run test:desktop:setup` after building the backend. CI now contains source and packaged retry checks, but this follow-up has not been pushed or verified in hosted CI.
 
 The older 19-stage/82-test release report describes the existing 0.2.1 artifact. No fresh full release gate or new DMG is claimed here. Existing released installers and installations remain unchanged. Preserve user checkpoint `456b49e`, earlier `d2919bf` and newer work. Consult the latest [status](STATUS.md) for later validation or packaging updates.
+
+
+## Expanded dependency collection — development source
+
+Current development source expands project detection and approved dependency setup beyond npm/pnpm to Python and other common language ecosystems. Read [Dependency collection and installation](DEPENDENCY-COLLECTION.md) for the adapter matrix, selective setup after a files-only restore, private Python environments, installation keys and validation limits. Earlier manager-support tables and test counts in this document describe their recorded checkpoints.

@@ -813,6 +813,21 @@ summary:focus-visible {
 .setup-package details {
   margin: 12px 0;
 }
+.dependency-collection {
+  border: 1px solid var(--line);
+  background: var(--tint);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 22px 0;
+}
+.dependency-collection p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.dependency-group {
+  overflow-wrap: anywhere;
+}
 .setup-recovery {
   margin-top: 24px;
 }

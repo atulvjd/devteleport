@@ -102,6 +102,18 @@ if (checks[0].status === "PASS") {
     },
   );
   await stage(
+    "packaged-dependency-retry",
+    process.execPath,
+    ["scripts/desktop-setup-retry.mjs"],
+    { DEVTELEPORT_APP_BINARY: path.join(bundle, "Contents/MacOS/DevTeleport") },
+  );
+  await stage(
+    "packaged-dependency-collection",
+    process.execPath,
+    ["scripts/desktop-dependency-collection.mjs"],
+    { DEVTELEPORT_APP_BINARY: path.join(bundle, "Contents/MacOS/DevTeleport") },
+  );
+  await stage(
     "desktop-visual-layout",
     process.execPath,
     ["scripts/desktop-visual.mjs"],
@@ -113,7 +125,7 @@ if (checks[0].status === "PASS") {
 const report = {
   createdAt: new Date().toISOString(),
   checks,
-  ok: checks.length >= 14 && checks.every((check) => check.status === "PASS"),
+  ok: checks.length === 21 && checks.every((check) => check.status === "PASS"),
   releaseGates: [
     {
       name: "Developer ID signing and notarization",

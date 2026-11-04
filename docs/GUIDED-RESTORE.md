@@ -1,6 +1,6 @@
 # Guided dependency restore — development preview
 
-The current local candidate is **0.2.1**, with all guided setup, settings-only/empty pnpm support, ignored-file capture and live-console fixes. Earlier preview paths/counts below are historical. Consult [0.2.1 validation](RELEASE-0.2.1.md) for the current final artifact; public 0.2.0 downloads remain unchanged until separately published.
+The current local candidate is **0.2.2**, adding multi-language dependency collection and in-place desktop retry to the earlier guided setup, ignored-file capture and live-console fixes. Consult [0.2.2 validation](RELEASE-0.2.2.md) for the final local artifact and 21-stage gate. Earlier preview paths/counts below are historical; public downloads remain unchanged until separately published.
 
 ## Settings-only pnpm configuration follow-up (2 November 2026)
 
@@ -80,3 +80,8 @@ The existing two-app TLS transfer and independent restore regression also passed
 Preview DMG: `dist/guided-restore/desktop/DevTeleport-guided-restore-preview.dmg` (SHA-256 `34f1cfdda48bececb4463957f989ce188fd6b04778d19ed6d7c5362b7737547b`). ZIP and verified checksums are alongside it / in `dist/guided-restore/SHA256SUMS`. Its bundle remains version 0.2.0 for this local preview; it must receive a new version before public release. The preview is ad-hoc sealed, without Developer ID signing/notarization. Existing Applications installations and the old published DMG were preserved.
 
 Command behavior references: [npm ci](https://docs.npmjs.com/cli/commands/npm-ci/), [pnpm install](https://pnpm.io/cli/install), [pnpm manager version handling](https://github.com/pnpm/pnpm.io/blob/main/docs/settings/cli.md).
+
+
+## Expanded dependency collection — development source
+
+Current development source expands project detection and approved dependency setup beyond npm/pnpm to Python and other common language ecosystems. Read [Dependency collection and installation](DEPENDENCY-COLLECTION.md) for the adapter matrix, selective setup after a files-only restore, private Python environments, installation keys and validation limits. Earlier manager-support tables and test counts in this document describe their recorded checkpoints.

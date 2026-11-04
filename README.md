@@ -1,4 +1,4 @@
-# DevTeleport 0.2.1 — Apple Silicon release candidate
+# DevTeleport 0.2.2 — Apple Silicon release candidate
 
 **Your development environment. Anywhere. Exactly where you left off.**
 
@@ -6,7 +6,7 @@ Capture saved development state on one Mac, transfer an encrypted snapshot, and 
 
 **Development release candidate, not production-certified.** Signing/notarization and physical two-Mac acceptance remain release gates. [Current status](docs/STATUS.md) · [Apple Silicon release report](docs/APPLE-SILICON-RELEASE.md).
 
-Version 0.2.1 release preparation includes guided npm/pnpm setup, live operation output, optional ignored-file/secrets capture, separate dependency/build exclusions and improved failure handling. See [0.2.1 release notes](docs/RELEASE-NOTES-0.2.1.md). Public npm/GitHub downloads remain unchanged until separately published.
+Version 0.2.2 adds multi-language dependency collection, approved installation and in-place desktop retry with per-project status. It includes the earlier live console, optional ignored-file/secrets capture and generated-folder exclusions. See [0.2.2 release notes](docs/RELEASE-NOTES-0.2.2.md) and [dependency collection](docs/DEPENDENCY-COLLECTION.md). Public npm/GitHub downloads remain unchanged until separately published.
 
 ## Install and begin
 
@@ -99,9 +99,11 @@ Helpers use a public `python:3.13-alpine` image, native ARM64 when running nativ
 
 ### Dependency execution
 
-Ordinary restoration executes no project code. The current development source adds a guided dependency preview to restore: review the detected packages, then select **Restore and install dependencies**. After one explicit approval, supported npm/pnpm packages are installed in their restored directories, including independent subprojects such as `cms`. Workspace members share their declared workspace root's install. The completion guide lists the declared `dev`, `develop`, `start` and `dev:*` commands and their working directories; applications are not started automatically.
+Ordinary restoration executes no project code. Review detected projects, then select **Restore and install dependencies**. After explicit approval, supported native package managers install their declared libraries. The adapters cover Node.js, Python, Java, Go, Rust, Ruby, PHP, .NET and Dart/Flutter; unsupported formats and missing tools remain visible blockers. Workspace members share their declared root action where ownership can be established. Node startup scripts and other project guidance appear after setup; applications are not started automatically.
 
-With approval, npm uses `ci` when a lockfile exists and `install` otherwise. pnpm uses frozen-lockfile installation when possible, and explicitly permits a new lockfile when none exists. Missing locks mean dependency versions will be resolved rather than reproduced exactly. Installing may use the network and execute lifecycle scripts with the user's permissions. Missing/incompatible Node/package-manager versions, conflicting lockfiles or unsupported managers block automatic installation before the destination is created; files-only recovery remains available. Yarn/Bun and non-Node projects need manual setup. System tools are not installed automatically. Credentials must be supplied separately when they were not included in the snapshot or need different destination values. Corepack provisioning is disabled, and snapshot passphrases are removed from installer environments.
+Existing locks select clean, frozen, immutable or locked installation where the manager supports it. Missing locks permit version resolution rather than exact reproduction. Installing may use the network and execute build files, plugins or lifecycle scripts with the user's permissions. System runtimes, SDKs and credentials must already be configured; the app does not provision them. Python uses a private project virtual environment. Missing/incompatible tools and unsupported metadata block automatic execution; files-only recovery remains available. Corepack provisioning is disabled, and snapshot passphrases are removed from installer environments.
+
+After files-only recovery or an installation failure, **Dependency recovery** lets you select projects, review their current commands and approve installation in the existing folder. Earlier successful installs remain visible, and unrelated unselected projects' missing tools do not block the selection. Read [the retry guide](docs/DEPENDENCY-RETRY.md). Some new adapters have planner/dispatcher coverage without native SDK download acceptance; consult the [coverage matrix](docs/DEPENDENCY-COLLECTION.md).
 
 ```sh
 # Preview authenticated requirements before a new destination is created:

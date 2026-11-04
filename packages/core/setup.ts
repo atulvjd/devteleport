@@ -12,6 +12,12 @@ import {
 } from "./activity.ts";
 import { findExecutable } from "./platform.ts";
 import type { SnapshotEntry } from "./types.ts";
+import {
+  isEcosystemMetadata,
+  planEcosystems,
+  executeEcosystem,
+} from "./ecosystems.ts";
+import { pythonMetadata, planPython, executePython } from "./python-setup.ts";
 
 const maximum = 1024 * 1024;
 // Only these deliberately written messages may be shown in a failed review.
@@ -27,6 +33,18 @@ const ignored = new Set([
   "vendor",
   ".next",
   ".yarn",
+  ".venv",
+  "venv",
+  ".gradle",
+  ".dart_tool",
+  ".pub-cache",
+  "target",
+  "bin",
+  "obj",
+  "__pycache__",
+  ".tox",
+  ".mypy_cache",
+  ".pytest_cache",
 ]);
 const lockManagers: Record<string, string> = {
   "package-lock.json": "npm",
@@ -39,7 +57,13 @@ const lockManagers: Record<string, string> = {
 const relevant = (file: string) => {
   const parts = file.split("/");
   return (
-    !parts.slice(0, -1).some((p) => ignored.has(p) || p.startsWith(".")) &&
+    !parts
+      .slice(0, -1)
+      .some(
+        (p) =>
+          ignored.has(p) ||
+          (p.startsWith(".") && ![".cargo", ".mvn", ".bundle"].includes(p)),
+      ) &&
     (parts.at(-1) === "package.json" ||
       parts.at(-1)! in lockManagers ||
       [
@@ -49,11 +73,21 @@ const relevant = (file: string) => {
         ".env.example",
         ".env.sample",
         ".env.template",
-      ].includes(parts.at(-1)!))
+        ".npmrc",
+        ".yarnrc.yml",
+        ".pnpmfile.cjs",
+        "bunfig.toml",
+      ].includes(parts.at(-1)!) ||
+      isEcosystemMetadata(file) ||
+      pythonMetadata(file))
   );
 };
 type Tool = { name: string; file: string | null; version: string | null };
 export type DependencyPackage = {
+  ecosystem?: string;
+  runtimeTools?: string[];
+  dependencyGroups?: Record<string, string[]>;
+  installKey?: string;
   directory: string;
   name: string;
   framework: string;
@@ -79,8 +113,10 @@ export type DependencyPlan = {
 };
 export type InstallationReport = {
   root: string;
-  state: "running" | "installed" | "failed" | "cancelled";
+  state: "not-started" | "running" | "installed" | "failed" | "cancelled";
   packages: {
+    key?: string;
+    ecosystem?: string;
     directory: string;
     command: string;
     state:
@@ -189,6 +225,11 @@ function toolEnvironment(manager?: string): NodeJS.ProcessEnv {
     COREPACK_ENABLE_NETWORK: "0",
     COREPACK_ENABLE_PROJECT_SPEC: "0",
     COREPACK_ENABLE_AUTO_PIN: "0",
+    GOTOOLCHAIN: "local",
+    RUSTUP_AUTO_INSTALL: "0",
+    UV_PYTHON_DOWNLOADS: "never",
+    UV_NO_MANAGED_PYTHON: "1",
+    YARN_IGNORE_PATH: "1",
   };
   delete env.DEVTELEPORT_PASSWORD;
   delete env.DEVTELEPORT_NEWER_PASSWORD;
@@ -202,23 +243,65 @@ function toolEnvironment(manager?: string): NodeJS.ProcessEnv {
   return env;
 }
 async function toolsFor(names: string[]): Promise<Tool[]> {
+  const allowed = new Set([
+    "node",
+    "npm",
+    "pnpm",
+    "yarn",
+    "bun",
+    "python3",
+    "uv",
+    "poetry",
+    "java",
+    "mvn",
+    "gradle",
+    "go",
+    "cargo",
+    "rustc",
+    "ruby",
+    "bundle",
+    "php",
+    "composer",
+    "dotnet",
+    "dart",
+    "flutter",
+  ]);
   const dirs = (process.env.PATH || "")
     .split(path.delimiter)
     .filter(path.isAbsolute);
   return Promise.all(
     [...new Set(names)].map(async (name) => {
+      if (!allowed.has(name)) return { name, file: null, version: null };
       const file = await findExecutable(name, dirs);
       let version: string | null = null;
       if (file)
         try {
           // Never probe package managers from inside an untrusted project.
-          const out = await execText(file, ["--version"], {
-            cwd: os.tmpdir(),
-            env: toolEnvironment(name),
-            timeout: 5000,
-            maxBuffer: 65536,
-          });
-          version = out.stdout.trim().split("\n")[0];
+          const out = await execText(
+            file,
+            name === "go"
+              ? ["version"]
+              : name === "java"
+                ? ["-version"]
+                : ["--version"],
+            {
+              cwd: os.tmpdir(),
+              env: toolEnvironment(name),
+              timeout: 5000,
+              maxBuffer: 65536,
+            },
+          );
+          const output = (out.stdout + "\n" + out.stderr).trim();
+          version =
+            output.match(
+              /(?:Gradle|Apache Maven|go version go|Bundler version|PHP|ruby|Python|cargo|rustc|Dart SDK version:|Flutter|(?:openjdk|java) version)\s+["']?([^\s"']+)/i,
+            )?.[1] ||
+            output
+              .split("\n")
+              .find((line) => /\d+\.\d+/.test(line))
+              ?.trim()
+              .slice(0, 200) ||
+            null;
         } catch {}
       return { name, file, version };
     }),
@@ -406,11 +489,27 @@ export async function planDependencies(
       .sort((a, b) => b[0].length - a[0].length);
     const installAt = owners[0]?.[0] ?? dir;
     const { manager, conflict } = managerFor(installAt);
-    const deps = Object.keys({
-      ...pkg.dependencies,
-      ...pkg.devDependencies,
-      ...pkg.optionalDependencies,
-    }).sort();
+    const dependencyGroups: Record<string, string[]> = {};
+    for (const [field, group] of [
+      ["dependencies", "runtime"],
+      ["devDependencies", "development"],
+      ["optionalDependencies", "optional"],
+      ["peerDependencies", "peer"],
+    ]) {
+      const value = pkg[field];
+      if (
+        value !== undefined &&
+        (!value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.values(value).some((entry) => typeof entry !== "string"))
+      )
+        throw new DependencyReviewError(
+          "Invalid dependency declarations in " + join(dir, "package.json"),
+        );
+      dependencyGroups[group] = Object.keys(value || {}).sort();
+    }
+    const deps = [...new Set(Object.values(dependencyGroups).flat())].sort();
     const frameworks: [string, string][] = [
       ["next", "Next.js"],
       ["@strapi/strapi", "Strapi"],
@@ -435,7 +534,7 @@ export async function planDependencies(
       blockers.push(
         "Review the workspace's managed runtime settings manually before automatic setup.",
       );
-    if (!["npm", "pnpm"].includes(manager))
+    if (!["npm", "pnpm", "yarn", "bun"].includes(manager))
       blockers.push(
         `Automatic ${manager} installation is not supported yet. Install this package manually.`,
       );
@@ -466,7 +565,12 @@ export async function planDependencies(
       manager === "npm"
         ? byPath.has(join(installAt, "package-lock.json")) ||
           byPath.has(join(installAt, "npm-shrinkwrap.json"))
-        : byPath.has(join(installAt, "pnpm-lock.yaml"));
+        : manager === "pnpm"
+          ? byPath.has(join(installAt, "pnpm-lock.yaml"))
+          : manager === "yarn"
+            ? byPath.has(join(installAt, "yarn.lock"))
+            : byPath.has(join(installAt, "bun.lock")) ||
+              byPath.has(join(installAt, "bun.lockb"));
     if (!locked)
       warnings.push(
         "No lockfile: installation resolves dependency versions and creates a new lockfile.",
@@ -490,6 +594,9 @@ export async function planDependencies(
         command: String(command).slice(0, 2000),
       }));
     packages.push({
+      ecosystem: "Node.js",
+      runtimeTools: ["node"],
+      dependencyGroups,
       directory: dir,
       name: typeof pkg.name === "string" ? pkg.name.slice(0, 200) : dir,
       framework:
@@ -510,14 +617,35 @@ export async function planDependencies(
               "pnpm",
               "install",
               locked ? "--frozen-lockfile" : "--no-frozen-lockfile",
+              "--prod=false",
+              "--dev=false",
+              "--optional",
             ]
-          : [manager, locked ? "ci" : "install", "--no-audit", "--no-fund"],
+          : manager === "npm"
+            ? [
+                manager,
+                locked ? "ci" : "install",
+                "--no-audit",
+                "--no-fund",
+                "--include=dev",
+                "--include=optional",
+                "--include=peer",
+              ]
+            : [manager, "install", ...(locked ? ["--frozen-lockfile"] : [])],
       scripts,
       environmentKeys: [...environmentKeys].sort(),
       blockers,
       warnings,
     });
   }
+  packages.push(
+    ...(await planPython(files, readText)),
+    ...(await planEcosystems(files, readText)),
+  );
+  if (packages.length > 100)
+    throw new DependencyReviewError(
+      "Dependency review supports at most 100 projects. Split this workspace before automatic installation.",
+    );
   packages.sort(
     (a, b) =>
       (a.directory === "." ? 0 : a.directory.split("/").length) -
@@ -526,19 +654,28 @@ export async function planDependencies(
   );
   const tools = packages.length
     ? await toolsFor([
-        "node",
-        ...packages
-          .map((p) => p.manager)
-          .filter((m) => ["npm", "pnpm"].includes(m)),
+        ...packages.flatMap((p) => [...(p.runtimeTools || []), p.manager]),
       ])
     : [];
   for (const pkg of packages) {
-    for (const name of ["node", pkg.manager]) {
+    for (const name of new Set([...(pkg.runtimeTools || []), pkg.manager])) {
       const tool = tools.find((t) => t.name === name);
-      if (["node", "npm", "pnpm"].includes(name) && !tool?.version)
+      if (!tool?.version)
         pkg.blockers.push(
           `Install a working native ${name} tool before automatic dependency installation.`,
         );
+    }
+    if (pkg.manager === "yarn") {
+      const major = Number(
+        tools.find((tool) => tool.name === "yarn")?.version?.split(".")[0],
+      );
+      const locked = byPath.has(join(pkg.installAt, "yarn.lock"));
+      pkg.command = [
+        "yarn",
+        "install",
+        ...(locked ? [major >= 2 ? "--immutable" : "--frozen-lockfile"] : []),
+        ...(major < 2 ? ["--production=false", "--non-interactive"] : []),
+      ];
     }
     if (pkg.requiredManager) {
       const tool = tools.find((t) => t.name === pkg.manager);
@@ -598,6 +735,29 @@ async function checkedPath(root: string, relative: string) {
   }
   return file;
 }
+function selectionBlockers(plan: DependencyPlan, selected?: string[]) {
+  if (selected === undefined) return plan.blockers;
+  const locations = plan.packages.filter(
+    (pkg) => pkg.directory === pkg.installAt,
+  );
+  if (
+    !Array.isArray(selected) ||
+    !selected.length ||
+    new Set(selected).size !== selected.length ||
+    selected.some(
+      (key) =>
+        !locations.some((pkg) => (pkg.installKey || pkg.directory) === key),
+    )
+  )
+    throw new Error(
+      "Select one or more distinct installation folders from the reviewed project.",
+    );
+  return plan.packages
+    .filter((pkg) => selected.includes(pkg.installKey || pkg.installAt))
+    .flatMap((pkg) =>
+      pkg.blockers.map((message) => `${pkg.directory}: ${message}`),
+    );
+}
 export async function installDependencies(
   root: string,
   plan: DependencyPlan,
@@ -611,9 +771,10 @@ export async function installDependencies(
     throw new Error(
       "Dependency installation requires explicit execution approval.",
     );
-  if (plan.blockers.length)
+  const blockers = selectionBlockers(plan, options.installDirectories);
+  if (blockers.length)
     throw new Error(
-      "Dependency preflight needs attention: " + plan.blockers.join(" "),
+      "Dependency preflight needs attention: " + blockers.join(" "),
     );
   if (
     options.expectedPlanId !== undefined &&
@@ -623,29 +784,20 @@ export async function installDependencies(
     throw new Error(
       "Dependency review changed. Review the current project and tools again before installing.",
     );
+  const keyFor = (pkg: DependencyPackage) => pkg.installKey || pkg.directory;
   const locations = plan.packages.filter((p) => p.directory === p.installAt),
     selected = options.installDirectories;
-  if (
-    selected !== undefined &&
-    (!Array.isArray(selected) ||
-      !selected.length ||
-      new Set(selected).size !== selected.length ||
-      selected.some(
-        (directory) => !locations.some((p) => p.directory === directory),
-      ))
-  )
-    throw new Error(
-      "Select one or more distinct installation folders from the reviewed project.",
-    );
   root = await fs.realpath(root);
   const report: InstallationReport = {
     root,
     state: "running",
     packages: locations.map((pkg) => ({
+      ...(pkg.installKey ? { key: pkg.installKey } : {}),
+      ...(pkg.ecosystem ? { ecosystem: pkg.ecosystem } : {}),
       directory: pkg.directory,
       command: pkg.command.join(" "),
       state:
-        !selected || selected.includes(pkg.directory)
+        !selected || selected.includes(keyFor(pkg))
           ? "pending"
           : "not-selected",
     })),
@@ -687,14 +839,14 @@ export async function installDependencies(
   try {
     await verifyInputs();
     for (const pkg of locations.filter(
-      (p) => !selected || selected.includes(p.directory),
+      (p) => !selected || selected.includes(keyFor(p)),
     )) {
       throwIfCancelled();
       if (completed.length) await verifyInputs();
       const cwd = await checkedPath(root, pkg.directory),
         tool = plan.tools.find((t) => t.name === pkg.manager)!;
       const status = report.packages.find(
-        (p) => p.directory === pkg.directory,
+        (p) => (p.key || p.directory) === keyFor(pkg),
       )!;
       status.state = "running";
       emit();
@@ -718,23 +870,47 @@ export async function installDependencies(
         ),
       });
       try {
-        await execText(tool.file!, pkg.command.slice(1), {
-          cwd,
-          env: toolEnvironment(pkg.manager),
-          timeout: 3600000,
-          maxBuffer: 8 * 1024 * 1024,
-          ...(onLog
-            ? {
-                onOutput: (stream: "stdout" | "stderr", chunk: Buffer) =>
-                  sinks[stream].write(chunk),
-              }
-            : {}),
-        });
+        const env = toolEnvironment(pkg.manager);
+        const run = async (
+          file: string,
+          args: string[],
+          overrideEnv?: NodeJS.ProcessEnv,
+        ) => {
+          const resolved = path.isAbsolute(file)
+            ? file
+            : plan.tools.find((entry) => entry.name === file)?.file;
+          if (!resolved)
+            throw new Error("Reviewed native tool is unavailable: " + file);
+          throwIfCancelled();
+          return execText(resolved, args, {
+            cwd,
+            env: overrideEnv || env,
+            timeout: 3600000,
+            maxBuffer: 8 * 1024 * 1024,
+            ...(onLog
+              ? {
+                  onOutput: (stream: "stdout" | "stderr", chunk: Buffer) =>
+                    sinks[stream].write(chunk),
+                }
+              : {}),
+          });
+        };
+        const handled =
+          (await executePython(
+            pkg,
+            cwd,
+            tool.file!,
+            run,
+            env,
+            plan.tools.find((entry) => entry.name === "python3")?.file ||
+              undefined,
+          )) || (await executeEcosystem(pkg, cwd, tool.file!, run, env));
+        if (!handled) await run(tool.file!, pkg.command.slice(1));
       } catch {
         status.state = "failed";
         // Raw tool output can contain registry credentials, URLs or script output.
         throw new Error(
-          `Dependency installation failed in ${pkg.directory}. Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then review and retry installation. The displayed command can also be run in a trusted terminal. Tool output was withheld to protect credentials.`,
+          `Dependency installation failed in ${pkg.directory} (${pkg.ecosystem || pkg.manager}). Restored files and earlier successful installs remain. Review network access, package-manager script policy and the project's dependency requirements, then review and retry installation. The displayed command can also be run in a trusted terminal. Tool output was withheld to protect credentials.`,
         );
       } finally {
         sinks.stdout.end();
@@ -829,7 +1005,11 @@ export async function setupDirectory(
       if (entry.isSymbolicLink() || ignored.has(entry.name)) continue;
       const relative = dir ? dir + "/" + entry.name : entry.name;
       if (entry.isDirectory()) {
-        if (!entry.name.startsWith(".")) await walk(relative);
+        if (
+          !entry.name.startsWith(".") ||
+          [".cargo", ".mvn", ".bundle"].includes(entry.name)
+        )
+          await walk(relative);
       } else if (entry.isFile() && relevant(relative)) {
         const file = path.join(root, relative),
           stat = await fs.stat(file),
@@ -871,9 +1051,11 @@ export async function setupDirectory(
     }
   });
   plan.id = sha(JSON.stringify({ root, id: plan.id }));
+  const blockers = selectionBlockers(plan, options.installDirectories);
   return {
     root,
     ...plan,
+    blockers,
     ...(install
       ? {
           installation: await installDependencies(

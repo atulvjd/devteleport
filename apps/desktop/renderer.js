@@ -745,12 +745,13 @@ function renderSetup(plan, input, restored, installation = null) {
   if (!plan?.packages?.length && !plan?.blockers?.length) {
     const note = document.createElement("p");
     note.textContent =
-      "No supported Node.js packages were found. Follow the project's README for its setup and startup commands.";
+      "No supported dependency manifests were found. Follow the project's README for its setup and startup commands.";
     container.append(note);
   }
   for (const pkg of plan?.packages || []) {
     const item = document.createElement("div");
     item.className = "setup-package";
+    item.dataset.ecosystem = pkg.ecosystem || "Node.js";
     const heading = document.createElement("h3"),
       description = document.createElement("p");
     heading.textContent =
@@ -758,7 +759,7 @@ function renderSetup(plan, input, restored, installation = null) {
         ? "Main project · " + pkg.name
         : pkg.directory + " · " + pkg.name;
     description.textContent =
-      `${pkg.framework} · ${pkg.manager} · ${pkg.dependencies.length} declared dependencies` +
+      `${pkg.ecosystem || "Node.js"} · ${pkg.framework} · ${pkg.manager} · ${pkg.dependencies.length} declared dependencies` +
       (pkg.requiredNode ? " · Node " + pkg.requiredNode : "");
     item.append(heading, description);
     for (const warning of pkg.warnings) {
@@ -774,7 +775,9 @@ function renderSetup(plan, input, restored, installation = null) {
           input.install &&
           (!installation ||
             installation.packages.some(
-              (p) => p.directory === pkg.installAt && p.state === "installed",
+              (p) =>
+                (p.key || p.directory) === (pkg.installKey || pkg.installAt) &&
+                p.state === "installed",
             ))
             ? "Installed using: "
             : "Install in this folder: ") + pkg.command.join(" ")
@@ -783,9 +786,22 @@ function renderSetup(plan, input, restored, installation = null) {
     if (pkg.dependencies.length) {
       const details = document.createElement("details"),
         summary = document.createElement("summary"),
-        names = document.createElement("p");
+        names = document.createElement("div");
       summary.textContent = "Dependencies to install";
-      names.textContent = pkg.dependencies.join(", ");
+      const groups = pkg.dependencyGroups || { declared: pkg.dependencies };
+      for (const [group, libraries] of Object.entries(groups)) {
+        if (!libraries.length) continue;
+        const section = document.createElement("p"),
+          label = document.createElement("strong"),
+          list = document.createElement("span");
+        section.className = "dependency-group";
+        section.dataset.dependencyGroup = group;
+        label.textContent =
+          group[0].toUpperCase() + group.slice(1) + ` (${libraries.length}): `;
+        list.textContent = libraries.join(", ");
+        section.append(label, list);
+        names.append(section);
+      }
       details.append(summary, names);
       item.append(details);
     }
@@ -811,10 +827,34 @@ function renderSetup(plan, input, restored, installation = null) {
     if (!pkg.scripts.length) {
       const p = document.createElement("p");
       p.textContent =
-        "No dev, develop or start script is declared. See this package's README.";
+        pkg.ecosystem && pkg.ecosystem !== "Node.js"
+          ? "Follow this project's README for its build and startup commands. Dependency setup does not start the application."
+          : "No dev, develop or start script is declared. See this package's README.";
       item.append(p);
     }
     container.append(item);
+  }
+  const collection = $("dependencyCollection");
+  collection.replaceChildren();
+  collection.hidden = !plan?.packages?.length;
+  if (plan?.packages?.length) {
+    const ecosystems = [
+        ...new Set(plan.packages.map((pkg) => pkg.ecosystem || "Node.js")),
+      ],
+      declarations = plan.packages.reduce(
+        (sum, pkg) => sum + pkg.dependencies.length,
+        0,
+      ),
+      locations = plan.packages.filter(
+        (pkg) => pkg.installAt === pkg.directory,
+      ).length,
+      heading = document.createElement("strong"),
+      explanation = document.createElement("p");
+    heading.textContent = `${plan.packages.length} projects · ${declarations} identified library declarations · ${locations} installations`;
+    explanation.textContent =
+      ecosystems.join(" · ") +
+      ". Package managers resolve and download transitive libraries from the project's manifests and lockfiles. Private feeds need credentials; optional or platform-specific packages may be skipped by their manager.";
+    collection.append(heading, explanation);
   }
 }
 function setupFingerprint() {
@@ -858,7 +898,7 @@ function renderSetupRecovery(report) {
           previous?.root === report.root &&
           previous.packages.some(
             (old) =>
-              old.directory === pkg.directory &&
+              (old.key || old.directory) === (pkg.key || pkg.directory) &&
               (old.state === "installed" || old.previouslyInstalled),
           )),
     })),
@@ -873,7 +913,7 @@ function renderSetupRecovery(report) {
     setupSelection = new Set(
       report.packages
         .filter((pkg) => pkg.state !== "installed" && !pkg.previouslyInstalled)
-        .map((pkg) => pkg.directory),
+        .map((pkg) => pkg.key || pkg.directory),
     );
     invalidateSetupReview();
   }
@@ -898,6 +938,7 @@ function renderSetupRecovery(report) {
     "not-selected": "Not selected",
   };
   for (const pkg of report.packages) {
+    const selectionKey = pkg.key || pkg.directory;
     const item = document.createElement("label"),
       checkbox = document.createElement("input"),
       detail = document.createElement("span"),
@@ -907,23 +948,27 @@ function renderSetupRecovery(report) {
     item.className = "setup-attempt-package";
     checkbox.type = "checkbox";
     checkbox.dataset.setupSelect = "true";
-    checkbox.dataset.setupDirectory = pkg.directory;
-    checkbox.checked = setupSelection.has(pkg.directory);
+    checkbox.dataset.setupDirectory = selectionKey;
+    checkbox.checked = setupSelection.has(selectionKey);
     checkbox.setAttribute(
       "aria-label",
       "Retry installation in " + pkg.directory,
     );
     checkbox.onchange = () => {
-      if (checkbox.checked) setupSelection.add(pkg.directory);
-      else setupSelection.delete(pkg.directory);
+      if (checkbox.checked) setupSelection.add(selectionKey);
+      else setupSelection.delete(selectionKey);
       invalidateSetupReview();
     };
     detail.className = "detail";
-    name.textContent = pkg.directory === "." ? "Main project" : pkg.directory;
+    name.textContent =
+      (pkg.directory === "." ? "Main project" : pkg.directory) +
+      (pkg.ecosystem && pkg.ecosystem !== "Node.js"
+        ? " · " + pkg.ecosystem
+        : "");
     command.textContent = pkg.command;
     status.className = "setup-attempt-state";
     status.dataset.setupStatus = "true";
-    status.dataset.setupDirectory = pkg.directory;
+    status.dataset.setupDirectory = selectionKey;
     status.dataset.state = pkg.state;
     status.textContent = pkg.previouslyInstalled
       ? "Installed previously"
@@ -946,7 +991,7 @@ function renderSetupRetryReview(plan, input) {
   for (const pkg of plan.packages || []) {
     if (
       pkg.directory !== pkg.installAt ||
-      !input.installDirectories.includes(pkg.directory)
+      !input.installDirectories.includes(pkg.installKey || pkg.directory)
     )
       continue;
     const command = document.createElement("p");

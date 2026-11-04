@@ -610,8 +610,9 @@ Choose a project above, then select Inspect.</pre>
               ><span
                 ><strong>Restore and install dependencies</strong
                 ><small
-                  >Downloads dependencies for npm/pnpm packages, including a
-                  separate CMS. May run lifecycle scripts.</small
+                  >Downloads declared libraries using each supported project's
+                  package manager. Review the detected projects and commands
+                  first. May run build or lifecycle scripts.</small
                 ></span
               ><input id="install" type="checkbox"
             /></label>
@@ -649,6 +650,11 @@ Choose a project above, then select Inspect.</pre>
           <span class="section-number">03 / GET RUNNING</span>
           <h2 id="setupTitle">Your startup guide</h2>
           <p id="setupIntro" class="card-intro"></p>
+          <div
+            id="dependencyCollection"
+            class="dependency-collection"
+            hidden
+          ></div>
           <div id="setupPackages"></div>
           <p class="hint">
             Credentials and system tools are configured separately. Startup
