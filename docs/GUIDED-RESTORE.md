@@ -23,6 +23,8 @@ The receiver can review requirements before restoring, approve dependency instal
 5. Select **Restore & install**. DevTeleport authenticates/restores the files, installs the approved package dependencies, and verifies the captured files.
 6. Open a terminal in the restored folder and use the commands shown under **Your startup guide**.
 
+If installation fails or is interrupted, the current desktop source offers **Dependency recovery** to review and retry selected installations in the same restored folder. Read [Retry dependency installation](DEPENDENCY-RETRY.md) for the workflow, per-package statuses, approval requirements and current preview validation.
+
 For a project with a separate CMS, the guide can show `npm run dev` in the main directory and `npm run develop` inside `cms`. Both independent packages receive their own dependency installation. DevTeleport does not automatically run application servers, choose arbitrary scripts, install system tools, start databases or generate credentials.
 
 ## Supported installation behavior
