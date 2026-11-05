@@ -2,7 +2,7 @@
 
 DevTeleport can detect several project types in the same workspace, collect a static preview of their declared libraries, and run the appropriate dependency manager after review and explicit approval. The package manager downloads the direct and transitive dependencies from the project's manifests, lockfiles and configured registries. DevTeleport does not guess library versions or download each library itself.
 
-This feature is included in the local **0.2.2 release candidate**, with its final DMG at `dist/releases/v0.2.2/DevTeleport V0.2.2.dmg`. The fresh complete native gate passed 21 stages; see [0.2.2 validation](RELEASE-0.2.2.md). Existing public downloads do not gain changes automatically, and local packaging is not publication. The earlier source/preview checks below retain their historical scope.
+This feature is included in the public **npm 0.2.2 CLI** and the local **0.2.2 desktop candidate**, with its final DMG at `dist/releases/v0.2.2/DevTeleport V0.2.2.dmg`. The fresh complete native gate passed 21 stages; see [0.2.2 validation](RELEASE-0.2.2.md) and [verified npm publication](NPM-RELEASE.md). Desktop/VSIX publication is separate. The earlier source/preview checks below retain their historical scope.
 
 ## Desktop workflow
 

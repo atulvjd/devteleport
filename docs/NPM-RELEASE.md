@@ -1,6 +1,23 @@
-# Public npm CLI release — published
+# Public npm CLI release — 0.2.2 published
 
-**devteleport@0.2.0 is publicly available on npm and tagged latest.** Published under account `atulwn` with explicit user authorization and npm browser/security-key confirmation on 31 October 2026 (Asia/Kolkata).
+**devteleport@0.2.2 is publicly available on npm and tagged latest.** The user explicitly requested the update and completed npm browser login and separate security approval on 4 November 2026 (Asia/Kolkata). The previously saved login had expired; a fresh login authenticated account `atulwn`. npm accepted the publish, processed it briefly, and then exposed the actual 0.2.2 version and latest tag. No duplicate publication was attempted.
+
+```sh
+npm install --global devteleport@latest
+devteleport help
+```
+
+The exact reviewed 28-file CLI tarball was published without rebuilding: `dist/devteleport-0.2.2.tgz`, **78,343 bytes**, SHA-256 `1e7f0aeeafc40afacc846b10f896be93d2a844bf3f62f34322e4324c1b6884db`, integrity `sha512-cV0QJJxVqlLEvsqdcx4edvbJ7qYT7fOe4HREOyMWixpQ/die1etvDsPizGvDeqFd7NlFCS2pzbpkBN4GRQ4h0g==`. Registry integrity matched exactly. The allowlist/metadata/privacy review and publication dry run passed. The root monorepo remains private; only the prepared standalone CLI tarball was uploaded.
+
+A fresh **unversioned public-name** installation into a temporary global prefix and empty independent npm cache selected 0.2.2. It passed help, inspection, Node runtime/development/optional/peer inventory, Python detection, format 2 capture, unchanged diff exit 0, changed diff exit 2, original-source deletion, restore and authenticated original-archive verification. The disposable prefix/cache/fixtures were removed; the user's existing global installation was not replaced. No fixture dependency downloads or language-runtime provisioning were needed for this public-install check.
+
+This publishes the CLI only; the desktop DMG, VSIX, source Git push/tag, hosted CI and Apple signing/notarization remain separate actions. Existing SDK/runtime/manual acceptance limits still apply. The 21-stage/111-test local release gate is documented in [0.2.2 validation](RELEASE-0.2.2.md); the public-install check is additional evidence for the exact registry package.
+
+New evidence (also copied into `dist/releases/v0.2.2/evidence/`): `npm-0.2.2-artifact.json`, `npm-0.2.2-dry-run.json`, `npm-0.2.2-publication.json`, `npm-0.2.2-registry.json` and `npm-public-install-0.2.2.json` under `dist/evidence/`. Never publish this name/version again; future changes require a new version. No tokens, passwords, security codes or recovery codes are included in these records.
+
+## Historical 0.2.0 publication
+
+**devteleport@0.2.0 was published and tagged latest on 31 October 2026.** It remains an older public version; latest is now 0.2.2. The historical record below describes that earlier publication under account `atulwn` with explicit user authorization and npm browser/security-key confirmation.
 
 Package page: https://www.npmjs.com/package/devteleport
 

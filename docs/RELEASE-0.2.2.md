@@ -2,6 +2,8 @@
 
 Prepared 4 November 2026. The local native Apple Silicon release candidate includes multi-language dependency collection and in-place desktop setup retry. All required local runtime checks passed; Apple distribution trust and external/manual acceptance remain separate gates. See [release notes](RELEASE-NOTES-0.2.2.md) and [adapter coverage](DEPENDENCY-COLLECTION.md).
 
+**npm publication follow-up, 4 November 2026:** the user subsequently authorized and approved publication of the exact final CLI tarball. `devteleport@0.2.2` is public with latest=0.2.2; registry integrity and a fresh public-name installation passed independent verification. See [NPM-RELEASE.md](NPM-RELEASE.md). The preparation record below remains historical where it states that no publication had yet occurred. No desktop/VSIX upload or Git push/tag was performed by the agent.
+
 ## Final installer
 
 - File: `dist/releases/v0.2.2/DevTeleport V0.2.2.dmg`.

@@ -6,7 +6,7 @@ Capture saved development state on one Mac, transfer an encrypted snapshot, and 
 
 **Development release candidate, not production-certified.** Signing/notarization and physical two-Mac acceptance remain release gates. [Current status](docs/STATUS.md) · [Apple Silicon release report](docs/APPLE-SILICON-RELEASE.md).
 
-Version 0.2.2 adds multi-language dependency collection, approved installation and in-place desktop retry with per-project status. It includes the earlier live console, optional ignored-file/secrets capture and generated-folder exclusions. See [0.2.2 release notes](docs/RELEASE-NOTES-0.2.2.md) and [dependency collection](docs/DEPENDENCY-COLLECTION.md). Public npm/GitHub downloads remain unchanged until separately published.
+Version 0.2.2 adds multi-language dependency collection, approved installation and in-place desktop retry with per-project status. It includes the earlier live console, optional ignored-file/secrets capture and generated-folder exclusions. See [0.2.2 release notes](docs/RELEASE-NOTES-0.2.2.md) and [dependency collection](docs/DEPENDENCY-COLLECTION.md). The CLI is public on npm as **devteleport@0.2.2**, tagged latest; desktop and VS Code downloads are separate distributions.
 
 ## Install and begin
 
@@ -115,7 +115,7 @@ devteleport setup /path/to/new-project
 devteleport setup /path/to/new-project --install --approve-execution
 ```
 
-These additions are in development source; the previously published npm 0.2.0 package and GitHub DMG have not been replaced. Use `node apps/cli/main.ts` or `npm run desktop` from this checkout for the new workflow. See [guided restore](docs/GUIDED-RESTORE.md).
+These additions are included in the public npm **0.2.2 CLI** and the local 0.2.2 desktop candidate. Use `npm install --global devteleport@latest` for the CLI, or `npm run desktop` from this checkout for the desktop. See [guided restore](docs/GUIDED-RESTORE.md).
 
 ## Pair and transfer over your LAN
 
