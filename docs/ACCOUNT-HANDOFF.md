@@ -1,6 +1,9 @@
 # DevTeleport — complete development handoff
 
 
+Publication complete — 27 November 2026. [v0.2.3](https://github.com/atulvjd/devteleport/releases/tag/v0.2.3) is public with the final ARM64 DMG and verified SHA-256. Five hosted CI jobs passed in [run 45892816292](https://github.com/atulvjd/devteleport/actions/runs/45892816292) after the test-only inspection-wait correction `3d8ccd2`. Source/release commits and annotated tag were pushed. The tag targets application release commit `e5e2b6c`. Read the latest STATUS and RELEASE-0.2.3 report. No npm or Marketplace publication occurred in this operation.
+
+
 Latest release preparation — 27 November 2026. The user explicitly authorized focused commits, pushing to origin/main and publishing the final DMG through GitHub Releases. Product/lockfile/extension version is 0.2.3. All 22 native stages and 116 tests passed against the rebuilt v0.2.3 app. Read RELEASE-0.2.3.md and the top of STATUS.md for artifact identity and publication status. Preserve the earlier 0.2.2 artifacts.
 
 

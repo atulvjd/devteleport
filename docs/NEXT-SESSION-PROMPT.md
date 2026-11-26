@@ -60,3 +60,6 @@ Latest follow-up, 27 November 2026: read docs/WORKSPACE-READINESS.md and docs/WO
 
 
 Release follow-up: product, lockfile and extension have been versioned to 0.2.3, and the final rebuilt v0.2.3 native gate passed 22 stages and 116 tests. The user authorized focused commits, push to the same origin and DMG publication through GitHub Releases. Read docs/RELEASE-0.2.3.md and latest docs/STATUS.md for the actual publication result. Earlier 0.2.2/uncommitted-preview statements are historical.
+
+
+Publication completed: GitHub prerelease v0.2.3 is public at https://github.com/atulvjd/devteleport/releases/tag/v0.2.3, containing the final ARM64 DMG. Uploaded SHA-256 verified. All five hosted CI jobs passed in run 45892816292 after the test-only wait correction 3d8ccd2. The release tag remains on e5e2b6c. See latest STATUS and RELEASE-0.2.3. npm and Marketplace were not published by this operation.

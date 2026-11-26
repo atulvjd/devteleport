@@ -1,6 +1,9 @@
 # DevTeleport development status — 2026-11-27
 
 
+**v0.2.3 PUBLISHED — 27 November 2026.** The requested DMG is public in the same repository at [DevTeleport v0.2.3](https://github.com/atulvjd/devteleport/releases/tag/v0.2.3), marked as an Apple Silicon development prerelease. GitHub's uploaded-asset SHA-256 matches the reviewed final artifact, and publication was verified through the unauthenticated public API. Focused core, desktop, regression/CI and versioned-release commits were pushed. Hosted [verification](https://github.com/atulvjd/devteleport/actions/runs/45892816292) passed all five jobs across Linux, Apple Silicon, Intel Mac, integrations and applications. Initial hosted desktop inspection waits timed out at 30 seconds; the dedicated follow-up commit `3d8ccd2` allows the existing 120-second native-tool deadline to complete while retaining assertions. The release tag remains on the verified application release commit `e5e2b6c`; the follow-up changes only test waits. Local release validation remains 22/22 stages and 116 tests. Read [RELEASE-0.2.3.md](RELEASE-0.2.3.md). npm publication was not part of this operation.
+
+
 **v0.2.3 release preparation — 27 November 2026.** Root, lockfile, extension and rebuilt app identify as 0.2.3. The final native gate passed all 22 stages and 116 core/security tests. The DMG is prepared for an explicitly requested GitHub prerelease in the same repository. Read [RELEASE-0.2.3.md](RELEASE-0.2.3.md) and [release notes](RELEASE-NOTES-0.2.3.md). Earlier preview/publication checkpoints below remain historical.
 
 
