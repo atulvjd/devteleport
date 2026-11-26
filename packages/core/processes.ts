@@ -134,21 +134,21 @@ export function spawnBuffered(
     : undefined;
   child.stdout!.on("data", (chunk: Buffer) => {
     out += chunk.length;
-    if (out > maximum) {
+    if (!options.streamOnly && out > maximum) {
       error = new Error("Tool output exceeds limit");
       kill(child, "SIGKILL");
     } else {
-      stdout.push(chunk);
+      if (!options.streamOnly) stdout.push(chunk);
       options.onOutput?.("stdout", chunk);
     }
   });
   child.stderr!.on("data", (chunk: Buffer) => {
     err += chunk.length;
-    if (err > maximum) {
+    if (!options.streamOnly && err > maximum) {
       error = new Error("Tool diagnostics exceed limit");
       kill(child, "SIGKILL");
     } else {
-      stderr.push(chunk);
+      if (!options.streamOnly) stderr.push(chunk);
       options.onOutput?.("stderr", chunk);
     }
   });
@@ -168,6 +168,7 @@ export function spawnBuffered(
   return child;
 }
 export type ToolOptions = ExecFileOptions & {
+  streamOnly?: boolean;
   detached?: boolean;
   onOutput?: (stream: "stdout" | "stderr", chunk: Buffer) => void;
 };

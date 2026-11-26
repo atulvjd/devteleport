@@ -92,6 +92,7 @@ export type DependencyPackage = {
   name: string;
   framework: string;
   manager: string;
+  requiredPython?: string | null;
   requiredNode: string | null;
   requiredManager: string | null;
   nodeCompatible: boolean | null;

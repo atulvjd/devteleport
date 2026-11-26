@@ -1,4 +1,4 @@
-import {publishNoReplace} from "./atomic.ts";
+import { publishNoReplace } from "./atomic.ts";
 import { execText, trackChild, registerCleanup } from "./processes.ts";
 import fs from "node:fs/promises";
 import { createReadStream, createWriteStream, constants } from "node:fs";
@@ -275,7 +275,7 @@ export async function receiveSnapshot(options: {
         } finally {
           await input.close();
         }
-        if (!["DTP1", "DTP2"].includes(magic.toString()))
+        if (!["DTP1", "DTP2", "DTP3"].includes(magic.toString()))
           throw new Error(
             "Received file is not a supported DevTeleport snapshot",
           );

@@ -1,3 +1,5 @@
+import { previewEnvironment, scanEnvironment } from "./environment.ts";
+import { restoreReadiness } from "./readiness.ts";
 import { publishNoReplace } from "./atomic.ts";
 import { capturePolicy, generatedWarnings } from "./capture-policy.ts";
 import { reviewDependencies, installDependencies } from "./setup.ts";
@@ -64,7 +66,7 @@ export async function isV2(file: string) {
   try {
     const b = Buffer.alloc(4);
     await handle.read(b, 0, 4, 0);
-    return b.toString() === "DTP2";
+    return ["DTP2", "DTP3"].includes(b.toString());
   } finally {
     await handle.close();
   }
@@ -97,9 +99,9 @@ async function present(file: string) {
   }
 }
 type BlobMeta = { size: number; checksum: string };
-function blobs(m: Manifest): BlobMeta[] {
+function blobs(m: Manifest, stored = false): BlobMeta[] {
   return [
-    ...m.files.filter((f) => f.type === "file"),
+    ...m.files.filter((f) => f.type === "file" && (!stored || !f.inherited)),
     ...m.databases,
     ...(m.volumes ?? []),
   ] as BlobMeta[];
@@ -108,7 +110,7 @@ function validateV2(value: unknown): Manifest {
   const m = value as Manifest;
   if (
     !m ||
-    m.formatVersion !== 2 ||
+    ![2, 3].includes(m.formatVersion) ||
     !Array.isArray(m.files) ||
     !Array.isArray(m.databases) ||
     !Array.isArray(m.volumes ?? [])
@@ -120,6 +122,20 @@ function validateV2(value: unknown): Manifest {
     (m.volumes ?? []).length > 50
   )
     throw new Error("Snapshot metadata count exceeds limits");
+  if (m.formatVersion === 3) {
+    if (!m.incremental || !/^[a-f0-9]{64}$/.test(m.incremental.baseSha256))
+      throw new Error("Invalid incremental base identity");
+  } else if (
+    m.incremental ||
+    m.files.some((file) => file.inherited !== undefined)
+  )
+    throw new Error("Invalid incremental metadata in full archive");
+  for (const file of m.files)
+    if (
+      file.inherited !== undefined &&
+      (typeof file.inherited !== "boolean" || file.type !== "file")
+    )
+      throw new Error("Invalid inherited file");
   // Reuse the existing path, reserved-name, collision, parent and symlink validator.
   validateManifest({
     ...m,
@@ -244,6 +260,12 @@ export async function captureV2(options: CaptureOptions) {
   options.onProgress?.("Analyzing streaming capture");
   const report = await inspect(options.root ?? "."),
     c = await config(report.root);
+  const environmentSchema = (
+    await scanEnvironment(report.root, [
+      ...(c.exclude ?? []),
+      ...(options.exclusions ?? []),
+    ])
+  ).files.map(({ path, keys }) => ({ path, keys }));
   if (
     report.git?.indexEntries
       .split("\0")
@@ -297,6 +319,14 @@ export async function captureV2(options: CaptureOptions) {
       ...(c.exclude ?? []),
       relativeOutput.split(path.sep).join("/"),
     ];
+  const baseMetadata = options.base
+    ? await snapshotMetadata(options.base, options.password)
+    : null;
+  if (baseMetadata && baseMetadata.formatVersion !== 2)
+    throw new Error(
+      "Choose a full format 2 base. Incremental chains are not supported.",
+    );
+  const baseSha256 = options.base ? await hashFile(options.base) : null;
   const listing = await enumerate(report.root, c, true, options),
     name = options.name ?? path.basename(report.root);
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(name))
@@ -320,6 +350,7 @@ export async function captureV2(options: CaptureOptions) {
       if (
         file.type === "file" &&
         !options.includeIgnored &&
+        !options.envFiles?.includes(file.path) &&
         !file.path.startsWith(".git/") &&
         (await embeddedSecret(path.join(report.root, file.path), file.size))
       ) {
@@ -329,12 +360,22 @@ export async function captureV2(options: CaptureOptions) {
     return {
       report,
       name,
+      environmentSchema,
+      ...(options.envFiles !== undefined
+        ? { environmentFiles: [...options.envFiles] }
+        : {}),
       capturePolicy: capturePolicy(options),
       warnings: [
         ...(options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : []),
         ...generatedWarnings(options),
       ],
-      formatVersion: 2,
+      formatVersion: options.base ? 3 : 2,
+      incremental: baseSha256
+        ? {
+            baseSha256,
+            note: "Keep this base archive with the incremental snapshot. Both use the same passphrase.",
+          }
+        : undefined,
       fileCount: reviewFiles.length,
       bytes,
       omitted: reviewOmitted,
@@ -404,7 +445,11 @@ export async function captureV2(options: CaptureOptions) {
             highWaterMark: V2_LIMITS.chunk,
             autoClose: false,
           })) {
-            if (!options.includeIgnored && !f.path.startsWith(".git/")) {
+            if (
+              !options.includeIgnored &&
+              !options.envFiles?.includes(f.path) &&
+              !f.path.startsWith(".git/")
+            ) {
               const text = tail + chunk.toString("latin1");
               if (
                 /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}/.test(
@@ -484,8 +529,33 @@ export async function captureV2(options: CaptureOptions) {
     for (const [file, stamp] of fingerprints)
       if (fingerprint(await fs.lstat(path.join(report.root, file))) !== stamp)
         throw new Error("Workspace changed during capture: " + file);
+    let reusedBytes = 0;
+    if (baseMetadata) {
+      const previous = new Map(
+        baseMetadata.files
+          .filter((file) => file.type === "file")
+          .map((file) => [file.path, file]),
+      );
+      let payloadIndex = 0;
+      for (const file of files) {
+        if (file.type !== "file") continue;
+        const old = previous.get(file.path);
+        if (old && old.size === file.size && old.checksum === file.checksum) {
+          file.inherited = true;
+          reusedBytes += file.size;
+          payloads.splice(payloadIndex, 1);
+        } else payloadIndex++;
+      }
+      if ((await hashFile(options.base!)) !== baseSha256)
+        throw new Error("Base archive changed during capture");
+    }
     const m: Manifest = {
-      formatVersion: 2,
+      formatVersion: baseMetadata ? 3 : 2,
+      ...(baseSha256 ? { incremental: { baseSha256 } } : {}),
+      environmentSchema,
+      ...(options.envFiles !== undefined
+        ? { environmentFiles: [...options.envFiles] }
+        : {}),
       capturePolicy: capturePolicy(options),
       name,
       createdAt: new Date().toISOString(),
@@ -510,7 +580,7 @@ export async function captureV2(options: CaptureOptions) {
     const length = Buffer.alloc(4);
     length.writeUInt32BE(metadata.length);
     const header = Buffer.concat([
-        Buffer.from("DTP2"),
+        Buffer.from(baseMetadata ? "DTP3" : "DTP2"),
         crypto.randomBytes(16),
         crypto.randomBytes(12),
       ]),
@@ -558,7 +628,10 @@ export async function captureV2(options: CaptureOptions) {
         ...(options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : []),
         ...generatedWarnings(options),
       ],
-      formatVersion: 2,
+      formatVersion: m.formatVersion,
+      incremental: m.incremental,
+      reusedBytes,
+      storedBytes: blobs(m, true).reduce((sum, blob) => sum + blob.size, 0),
       fileCount: files.length,
       bytes: blobs(m).reduce((sum, b) => sum + b.size, 0),
       databases: databases.map((d) => d.name),
@@ -587,7 +660,7 @@ async function authenticate(file: string, password: string | undefined) {
   } finally {
     await source.close();
   }
-  if (header.subarray(0, 4).toString() !== "DTP2")
+  if (!["DTP2", "DTP3"].includes(header.subarray(0, 4).toString()))
     throw new Error("Unsupported streaming format");
   await available(os.tmpdir(), size);
   const work = await fs.mkdtemp(path.join(os.tmpdir(), ".devteleport-v2-"));
@@ -658,13 +731,18 @@ async function authenticate(file: string, password: string | undefined) {
       if ((await handle.read(data, 0, length, 4)).bytesRead !== length)
         throw new Error("Truncated metadata");
       metadata = validateV2(JSON.parse(data.toString("utf8")));
+      if (
+        header.subarray(0, 4).toString() !==
+        (metadata.formatVersion === 3 ? "DTP3" : "DTP2")
+      )
+        throw new Error("Archive header/version mismatch");
       offset = 4 + length;
     } finally {
       await handle.close();
     }
     if (
       (await fs.stat(payload)).size !==
-      offset + blobs(metadata).reduce((sum, b) => sum + b.size, 0)
+      offset + blobs(metadata, true).reduce((sum, b) => sum + b.size, 0)
     )
       throw new Error("Streaming payload size mismatch");
     return { work, payload, metadata, offset };
@@ -675,12 +753,96 @@ async function authenticate(file: string, password: string | undefined) {
     key?.fill(0);
   }
 }
+async function openSnapshot(
+  file: string,
+  password: string | undefined,
+  base?: string,
+) {
+  const decoded = await authenticate(file, password);
+  if (decoded.metadata.formatVersion !== 3) return decoded;
+  let baseDecoded: Awaited<ReturnType<typeof authenticate>> | undefined;
+  try {
+    if (!base)
+      throw new Error(
+        "This incremental snapshot requires its full base archive. Select --base before restoring or comparing.",
+      );
+    if ((await hashFile(base)) !== decoded.metadata.incremental!.baseSha256)
+      throw new Error("Wrong incremental base archive");
+    baseDecoded = await authenticate(base, password);
+    if (baseDecoded.metadata.formatVersion !== 2)
+      throw new Error("Incremental base must be a full format 2 archive");
+    const baseEntries = new Map<
+      string,
+      { entry: SnapshotEntry; offset: number }
+    >();
+    let baseOffset = baseDecoded.offset;
+    for (const entry of baseDecoded.metadata.files.filter(
+      (entry) => entry.type === "file",
+    )) {
+      baseEntries.set(entry.path, { entry, offset: baseOffset });
+      baseOffset += entry.size!;
+    }
+    const full = path.join(decoded.work, "resolved-payload");
+    await available(
+      decoded.work,
+      blobs(decoded.metadata).reduce((sum, blob) => sum + blob.size, 0),
+    );
+    const handle = await fs.open(full, "wx", 0o600);
+    let offset = decoded.offset;
+    try {
+      for (const blob of [
+        ...decoded.metadata.files.filter((entry) => entry.type === "file"),
+        ...decoded.metadata.databases,
+        ...(decoded.metadata.volumes ?? []),
+      ]) {
+        throwIfCancelled();
+        const inherited = "inherited" in blob && blob.inherited;
+        const original = inherited
+          ? baseEntries.get((blob as SnapshotEntry).path)
+          : undefined;
+        if (
+          inherited &&
+          (!original ||
+            original.entry.checksum !== blob.checksum ||
+            original.entry.size !== blob.size)
+        )
+          throw new Error("Incremental base file mismatch");
+        const source = inherited ? baseDecoded.payload : decoded.payload;
+        const start = inherited ? original!.offset : offset;
+        const hash = crypto.createHash("sha256");
+        for await (const chunk of range(source, start, blob.size!)) {
+          hash.update(chunk);
+          let written = 0;
+          while (written < chunk.length)
+            written += (
+              await handle.write(chunk, written, chunk.length - written)
+            ).bytesWritten;
+        }
+        if (hash.digest("hex") !== blob.checksum)
+          throw new Error("Incremental payload checksum mismatch");
+        if (!inherited) offset += blob.size!;
+      }
+    } finally {
+      await handle.close();
+    }
+    if ((await hashFile(base)) !== decoded.metadata.incremental!.baseSha256)
+      throw new Error("Base archive changed during authentication");
+    return { ...decoded, payload: full, offset: 0 };
+  } catch (error) {
+    await fs.rm(decoded.work, { recursive: true, force: true });
+    throw error;
+  } finally {
+    if (baseDecoded)
+      await fs.rm(baseDecoded.work, { recursive: true, force: true });
+  }
+}
 export async function snapshotMetadata(
   file: string,
   password: string | undefined,
+  base?: string,
 ): Promise<Manifest> {
   if (!(await isV2(file))) return readSnapshot(file, password);
-  const decoded = await authenticate(file, password);
+  const decoded = await openSnapshot(file, password, base);
   try {
     let offset = decoded.offset;
     for (const b of blobs(decoded.metadata)) {
@@ -696,7 +858,7 @@ export async function snapshotMetadata(
 }
 export async function restoreV2(file: string, options: RestoreOptions) {
   options.onProgress?.("Authenticating entire streaming archive");
-  const decoded = await authenticate(file, options.password);
+  const decoded = await openSnapshot(file, options.password, options.base);
   const m = decoded.metadata,
     target = path.resolve(options.target ?? m.name);
   let stage: string | undefined,
@@ -758,7 +920,37 @@ export async function restoreV2(file: string, options: RestoreOptions) {
         chunks.push(Buffer.from(chunk));
       return Buffer.concat(chunks);
     });
+    const readEntry = async (entry: SnapshotEntry) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of range(
+        decoded.payload,
+        offsets.get(entry.path)!,
+        entry.size!,
+      ))
+        chunks.push(Buffer.from(chunk));
+      return Buffer.concat(chunks);
+    };
+    const environment = await previewEnvironment(m.files, readEntry);
+    const readiness = await restoreReadiness({
+      target,
+      bytes: blobs(m).reduce((sum, blob) => sum + blob.size, 0),
+      dependencies,
+      tools,
+      environment,
+      environmentSchema: m.environmentSchema,
+      install: options.install,
+      dbConfig: options.dbConfig,
+      restoreDb: options.restoreDb,
+      restoreVolumes: options.restoreVolumes,
+      databases: m.databases.map((item) => item.name),
+      volumes: (m.volumes ?? []).map((item) => item.name),
+    });
     const plan = {
+      readiness,
+      environment,
+      git: m.git,
+      omitted: m.omitted,
+      files: m.files.map(({ data, ...file }) => file),
       dependencies,
       tools,
       databaseDetails: m.databases.map(
@@ -772,7 +964,8 @@ export async function restoreV2(file: string, options: RestoreOptions) {
       ),
       target,
       capturePolicy: m.capturePolicy ?? { includeIgnored: false },
-      formatVersion: 2,
+      formatVersion: m.formatVersion,
+      incremental: m.incremental,
       fileCount: m.files.length,
       bytes: blobs(m).reduce((sum, b) => sum + b.size, 0),
       databases: m.databases.map((d) => d.name),
@@ -795,6 +988,7 @@ export async function restoreV2(file: string, options: RestoreOptions) {
       }
       return plan;
     }
+
     if (options.install && !options.approveExecution)
       throw new Error("Dependency scripts require --approve-execution");
     if (options.install && dependencies.blockers.length)
@@ -809,6 +1003,14 @@ export async function restoreV2(file: string, options: RestoreOptions) {
     if (tools.some((t) => !t.available && t.tool !== "git"))
       throw new Error(
         "Install missing native tools before approved post-restore operations.",
+      );
+    if (!readiness.ready)
+      throw new Error(
+        "Restore readiness needs attention: " +
+          readiness.checks
+            .filter((check) => check.state === "blocked")
+            .map((check) => check.name + ". " + check.fix)
+            .join(" "),
       );
     await fs.mkdir(path.dirname(target), { recursive: true });
     await available(path.dirname(target), plan.bytes);

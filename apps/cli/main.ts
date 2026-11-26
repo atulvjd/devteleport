@@ -4,6 +4,8 @@ import type {
   CliOptions,
   RestoreOptions,
 } from "../../packages/core/types.ts";
+import { scanEnvironment } from "../../packages/core/environment.ts";
+import { runProject } from "../../packages/core/startup.ts";
 import { setupDirectory } from "../../packages/core/setup.ts";
 import {
   activitySecrets,
@@ -95,6 +97,10 @@ const valued = new Set([
   "timeout",
   "plan-id",
   "install-at",
+  "base",
+  "env-file",
+  "package-directory",
+  "script",
 ]);
 const flags = new Set([
   "dry-run",
@@ -124,6 +130,12 @@ try {
         throw new Error(`Unknown option: ${a}`);
       if (valued.has(k) && (!raw[i + 1] || raw[i + 1].startsWith("--")))
         throw new Error(`Missing value: ${a}`);
+      if (k === "env-file") {
+        options.envFiles ??= [];
+        const file = raw[++i];
+        if (file !== "none") options.envFiles.push(file);
+        continue;
+      }
       if (k === "exclude") {
         options.exclusions ??= [];
         options.exclusions.push(raw[++i]);
@@ -140,7 +152,7 @@ try {
     } else positional.push(a);
   }
   if (
-    command !== "setup" &&
+    !["setup", "run-project"].includes(command ?? "") &&
     (options.planId !== undefined || options.installDirectories !== undefined)
   )
     throw new Error("--plan-id and --install-at are supported only by setup.");
@@ -224,6 +236,7 @@ try {
         const metadata = await snapshotMetadata(
           positional[0],
           await password(),
+          options.base,
         );
         result = {
           ...metadata,
@@ -305,6 +318,16 @@ try {
     case "inspect":
       result = await inspect(options.root ?? positional[0] ?? ".");
       break;
+    case "environment":
+      result = await scanEnvironment(options.root ?? positional[0] ?? ".");
+      break;
+    case "run-project":
+      result = await runProject(options.root ?? positional[0] ?? ".", {
+        ...options,
+        onLog:
+          options.onLog ?? ((event) => process.stderr.write(event.text + "\n")),
+      });
+      break;
     case "setup":
       result = await setupDirectory(
         options.root ?? positional[0] ?? ".",
@@ -321,12 +344,13 @@ try {
       break;
     case "capture":
       options.format ??= 2;
+      if (options.base) options.password = await password();
       if (!options.dryRun) {
         const review = await capture({ ...options, dryRun: true });
         process.stderr.write(
           JSON.stringify(
             {
-              root: review.report?.root,
+              root: "report" in review ? review.report?.root : undefined,
               fileCount: review.fileCount,
               omitted: review.omitted,
               warnings: review.warnings,
@@ -354,6 +378,7 @@ try {
             positional[0] ?? ".",
             options["snapshot"],
             await password(),
+            options.base,
           )
         : await verify(positional[0] ?? ".");
       if (!result.ok) process.exitCode = 2;
@@ -364,7 +389,10 @@ try {
           "Provide a snapshot, then a folder or --snapshot NEWER.dtp",
         );
       const pass = await password();
-      const opts = { includeGit: Boolean(options["includeGit"]) };
+      const opts = {
+        includeGit: Boolean(options["includeGit"]),
+        base: options.base,
+      };
       result = options["snapshot"]
         ? await diffSnapshots(
             positional[0],
@@ -406,7 +434,7 @@ try {
       if (!positional[0] || !options.target)
         throw new Error("Provide a snapshot and --target destination.dtp");
       const { readSnapshot } = await import("../../packages/core/index.ts");
-      await snapshotMetadata(positional[0], await password());
+      await snapshotMetadata(positional[0], await password(), options.base);
       await fs.copyFile(
         positional[0],
         options.target,
@@ -420,7 +448,7 @@ try {
         throw new Error("Unknown command: " + command);
       result = {
         usage:
-          "devteleport inspect | capture --name NAME [--include-db] [--include-volumes] [--include-ignored] [--exclude-generated] [--dry-run] | restore FILE --target DIR [--dry-run] | setup DIR [--install --approve-execution] [--dry-run] | verify DIR [--snapshot FILE] | diff FILE [DIR | --snapshot NEWER] [--include-git] | recover DIR | history DIR | services DIR [--start --approve-execution] | export/import FILE --target FILE | keygen --target PREFIX | sign FILE --key PRIVATE | check-signature FILE --key PUBLIC",
+          "devteleport environment DIR | run-project DIR --dry-run | run-project DIR --package-directory DIR --script NAME --plan-id ID --approve-execution | inspect | capture --name NAME [--include-db] [--include-volumes] [--include-ignored] [--exclude-generated] [--env-file PATH] [--base FULL.dtp] [--dry-run] | restore FILE --target DIR [--base FULL.dtp] [--dry-run] | setup DIR [--install --approve-execution] [--dry-run] | verify DIR [--snapshot FILE] | diff FILE [DIR | --snapshot NEWER] [--include-git] | recover DIR | history DIR | services DIR [--start --approve-execution] | export/import FILE --target FILE | keygen --target PREFIX | sign FILE --key PRIVATE | check-signature FILE --key PUBLIC",
         security:
           "Encrypted snapshots require a passphrase. Never put passphrases in command arguments. Use interactive input or DEVTELEPORT_PASSWORD.",
         database:

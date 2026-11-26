@@ -1,6 +1,8 @@
 /** Trusted caller options. Snapshot data is separately validated before extraction. */
 export interface CaptureOptions {
   format?: 1 | 2;
+  base?: string;
+  envFiles?: string[];
   exclusions?: string[];
   root?: string;
   onProgress?: (phase: string) => void;
@@ -14,6 +16,7 @@ export interface CaptureOptions {
   excludeGenerated?: boolean;
 }
 export interface RestoreOptions {
+  base?: string;
   target?: string;
   onProgress?: (phase: string) => void;
   onLog?: (event: import("./activity.ts").ActivityOutput) => void;
@@ -62,6 +65,7 @@ export type SnapshotEntry = {
   target?: string;
   size?: number;
   checksum?: string;
+  inherited?: boolean;
 } & (
   | { type: "file"; data: string; size: number; checksum: string }
   | { type: "directory" }
@@ -86,7 +90,14 @@ export interface VolumeRecord {
 }
 export interface Manifest {
   formatVersion: number;
-  capturePolicy?: { includeIgnored: boolean; excludeGenerated?: boolean };
+  environmentFiles?: string[];
+  environmentSchema?: { path: string; keys: string[] }[];
+  incremental?: { baseSha256: string };
+  capturePolicy?: {
+    includeIgnored: boolean;
+    excludeGenerated?: boolean;
+    envFiles?: string[];
+  };
   name: string;
   createdAt: string;
   platform: { os: string; architecture: string };
@@ -107,6 +118,8 @@ export interface Manifest {
 }
 export type CliOptions = CaptureOptions &
   RestoreOptions & {
+    packageDirectory?: string;
+    script?: string;
     start?: boolean;
     cleanup?: string;
     approveCleanup?: boolean;

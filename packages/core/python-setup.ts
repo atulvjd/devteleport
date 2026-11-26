@@ -399,6 +399,8 @@ export async function planPython(
         )?.[1] || (dir === "." ? "Python project" : path.posix.basename(dir)),
       framework: "Python",
       manager,
+      requiredPython:
+        hint || (await readText(at(dir, ".python-version")))?.trim() || null,
       requiredNode: null,
       requiredManager: null,
       nodeCompatible: null,

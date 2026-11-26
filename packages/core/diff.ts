@@ -8,6 +8,12 @@ export interface DiffChange {
   reasons: string[];
 }
 export interface DiffResult {
+  context?: {
+    git: unknown;
+    databases: string[];
+    volumes: string[];
+    omitted: string[];
+  };
   from: string;
   to: string;
   identical: boolean;
@@ -25,6 +31,7 @@ export interface DiffResult {
 }
 export interface DiffOptions {
   includeGit?: boolean;
+  base?: string;
 }
 
 const isGitInternal = (p: string) => p === ".git" || p.startsWith(".git/");
@@ -102,7 +109,7 @@ export async function diffSnapshotWithDirectory(
   password: string,
   options: DiffOptions = {},
 ) {
-  const manifest = await snapshotMetadata(snapshot, password);
+  const manifest = await snapshotMetadata(snapshot, password, options.base);
   const captured = new Set(manifest.files.map((entry) => entry.path));
   const omitted = Array.isArray(manifest.omitted)
     ? manifest.omitted.filter((entry) => typeof entry === "string")
@@ -117,7 +124,7 @@ export async function diffSnapshotWithDirectory(
   );
   const { files } = await listWorkspace(
     directory,
-    manifest.capturePolicy,
+    { ...manifest.capturePolicy, envFiles: manifest.environmentFiles ?? manifest.capturePolicy?.envFiles },
     exclusions,
   );
   // Files capture skipped for holding credentials were never in the snapshot.
@@ -126,12 +133,20 @@ export async function diffSnapshotWithDirectory(
       .filter((o) => o.endsWith(" (embedded credential detected)"))
       .map((o) => o.replace(/ \(embedded credential detected\)$/, "")),
   );
-  return diffEntries(
-    manifest.files,
-    files.filter((f) => !secret.has(f.path)),
-    { from: snapshot, to: directory },
-    options,
-  );
+  return {
+    ...diffEntries(
+      manifest.files,
+      files.filter((f) => !secret.has(f.path)),
+      { from: snapshot, to: directory },
+      options,
+    ),
+    context: {
+      git: manifest.git,
+      databases: manifest.databases.map((item) => item.name),
+      volumes: (manifest.volumes ?? []).map((item) => item.name),
+      omitted: manifest.omitted,
+    },
+  };
 }
 
 /** What changed between two snapshots. Read-only. */
@@ -142,7 +157,7 @@ export async function diffSnapshots(
   newerPassword: string = password,
   options: DiffOptions = {},
 ) {
-  const a = await snapshotMetadata(older, password);
-  const b = await snapshotMetadata(newer, newerPassword);
+  const a = await snapshotMetadata(older, password, options.base);
+  const b = await snapshotMetadata(newer, newerPassword, options.base);
   return diffEntries(a.files, b.files, { from: older, to: newer }, options);
 }

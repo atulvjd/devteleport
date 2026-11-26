@@ -59,7 +59,7 @@ export async function signSnapshot(
   } finally {
     await handle.close();
   }
-  if (!["DTP1", "DTP2"].includes(magic.toString()))
+  if (!["DTP1", "DTP2", "DTP3"].includes(magic.toString()))
     throw new Error("Invalid snapshot format");
   const key = crypto.createPrivateKey({
     key: await bounded(keyPath, 16384),

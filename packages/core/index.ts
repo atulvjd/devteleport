@@ -14,6 +14,12 @@ import {
 } from "./processes.ts";
 import { verifyLfsCompleteness } from "./lfs.ts";
 import { captureVolume, restoreVolume } from "./docker.ts";
+import {
+  isEnvironmentFile,
+  previewEnvironment,
+  scanEnvironment,
+} from "./environment.ts";
+import { restoreReadiness } from "./readiness.ts";
 import type {
   CaptureOptions,
   WorkspaceConfig,
@@ -342,7 +348,10 @@ export async function enumerate(
   root: string,
   c: WorkspaceConfig,
   metadataOnly = false,
-  policy: Pick<CaptureOptions, "includeIgnored" | "excludeGenerated"> = {},
+  policy: Pick<
+    CaptureOptions,
+    "includeIgnored" | "excludeGenerated" | "envFiles"
+  > = {},
 ) {
   const files: SnapshotEntry[] = [],
     omitted: string[] = [];
@@ -354,16 +363,28 @@ export async function enumerate(
     for (const ent of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       const p = rel ? `${rel}/${ent.name}` : ent.name;
       safePath(p);
+      const selectedEnvironment = policy.envFiles?.includes(p);
+      const leadsToEnvironment = policy.envFiles?.some((file) =>
+        file.startsWith(p + "/"),
+      );
       if (
         ent.name === ".devteleport" ||
         ent.name.startsWith(".devteleport-") ||
         ent.name.includes(".dtp.partial-") ||
-        (!policy.includeIgnored && (excluded.has(ent.name) || sensitive(p))) ||
+        (!policy.includeIgnored &&
+          !selectedEnvironment &&
+          !leadsToEnvironment &&
+          (excluded.has(ent.name) || sensitive(p))) ||
+        (policy.envFiles !== undefined &&
+          isEnvironmentFile(p) &&
+          !selectedEnvironment) ||
         p.endsWith(".dtp") ||
         (policy.excludeGenerated &&
           ent.isDirectory() &&
           generatedDirectories.has(ent.name)) ||
-        (c.exclude ?? []).some((x) => p === x || p.startsWith(x + "/"))
+        (!selectedEnvironment &&
+          !leadsToEnvironment &&
+          (c.exclude ?? []).some((x) => p === x || p.startsWith(x + "/")))
       ) {
         omitted.push(p);
         continue;
@@ -434,6 +455,7 @@ export async function enumerate(
           );
         if (
           !policy.includeIgnored &&
+          !selectedEnvironment &&
           !p.startsWith(".git/") &&
           /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}/.test(
             data.toString("utf8"),
@@ -505,6 +527,14 @@ export async function dbEnv(c: WorkspaceConfig, d: DatabaseConfig | undefined) {
   return { ...cleanEnv, ...localConnection(c, d) };
 }
 export async function capture(options: CaptureOptions = {}) {
+  if (options.base && options.format !== 2)
+    throw new Error(
+      "Incremental capture requires --format 2 and a full format 2 base.",
+    );
+  for (const file of options.envFiles ?? []) {
+    safePath(file);
+    if (!isEnvironmentFile(file)) throw new Error("Select only .env files");
+  }
   if (options.format === 2)
     return (await import("./stream-v2.ts")).captureV2(options);
   options.onProgress?.("Analyzing workspace");
@@ -518,6 +548,12 @@ export async function capture(options: CaptureOptions = {}) {
       "Submodules require separate complete captures; partial submodule snapshots are refused.",
     );
   const c = await config(report.root);
+  const environmentSchema = (
+    await scanEnvironment(report.root, [
+      ...(c.exclude ?? []),
+      ...(options.exclusions ?? []),
+    ])
+  ).files.map(({ path, keys }) => ({ path, keys }));
   for (const prefix of options.exclusions ?? []) {
     safePath(prefix);
     c.exclude = [...(c.exclude ?? []), prefix];
@@ -591,6 +627,10 @@ export async function capture(options: CaptureOptions = {}) {
       report,
       lfs,
       name,
+      environmentSchema,
+      ...(options.envFiles !== undefined
+        ? { environmentFiles: [...options.envFiles] }
+        : {}),
       capturePolicy: capturePolicy(options),
       warnings: [
         ...(options.includeIgnored ? [IGNORED_CAPTURE_WARNING] : []),
@@ -709,6 +749,10 @@ export async function capture(options: CaptureOptions = {}) {
     );
   const manifest = {
     formatVersion: 1,
+    environmentSchema,
+    ...(options.envFiles !== undefined
+      ? { environmentFiles: [...options.envFiles] }
+      : {}),
     capturePolicy: capturePolicy(options),
     name,
     createdAt: new Date().toISOString(),
@@ -805,8 +849,14 @@ export function validateManifest(value: unknown): Manifest {
       typeof m.capturePolicy.includeIgnored !== "boolean" ||
       (m.capturePolicy.excludeGenerated !== undefined &&
         typeof m.capturePolicy.excludeGenerated !== "boolean") ||
+      (m.capturePolicy.envFiles !== undefined &&
+        (!Array.isArray(m.capturePolicy.envFiles) ||
+          m.capturePolicy.envFiles.some(
+            (file) => typeof file !== "string" || !isEnvironmentFile(file),
+          ))) ||
       Object.keys(m.capturePolicy).some(
-        (key) => !["includeIgnored", "excludeGenerated"].includes(key),
+        (key) =>
+          !["includeIgnored", "excludeGenerated", "envFiles"].includes(key),
       ))
   )
     throw new Error("Invalid capture inclusion policy");
@@ -821,6 +871,33 @@ export function validateManifest(value: unknown): Manifest {
     !Array.isArray(m.databases)
   )
     throw new Error("Invalid manifest");
+  if (m.environmentFiles !== undefined) {
+    if (!Array.isArray(m.environmentFiles) || m.environmentFiles.length > 500)
+      throw new Error("Invalid environment selection");
+    for (const file of m.environmentFiles) {
+      safePath(file);
+      if (!isEnvironmentFile(file))
+        throw new Error("Invalid environment selection");
+    }
+  }
+  if (m.environmentSchema !== undefined) {
+    if (!Array.isArray(m.environmentSchema) || m.environmentSchema.length > 500)
+      throw new Error("Invalid environment schema");
+    for (const file of m.environmentSchema) {
+      safePath(file.path);
+      if (
+        !isEnvironmentFile(file.path) ||
+        !Array.isArray(file.keys) ||
+        file.keys.length > 10000 ||
+        file.keys.some(
+          (key) =>
+            typeof key !== "string" ||
+            !/^[A-Za-z_][A-Za-z0-9_]{0,255}$/.test(key),
+        )
+      )
+        throw new Error("Invalid environment variable names");
+    }
+  }
   const seen = new Map<string, SnapshotEntry>();
   let total = 0;
   for (const f of m.files) {
@@ -1017,9 +1094,13 @@ export async function restore(file: string, options: RestoreOptions = {}) {
   const requiredTools = [
     ...(m.git ? ["git"] : []),
     ...(options.restoreDb ? ["pg_restore", "psql"] : []),
+    ...(options.restoreVolumes ? ["docker"] : []),
   ];
   options.onProgress?.("Checking project requirements");
   const dependencies = await reviewDependencies(m.files, async (entry) =>
+    Buffer.from(entry.data!, "base64"),
+  );
+  const environment = await previewEnvironment(m.files, async (entry) =>
     Buffer.from(entry.data!, "base64"),
   );
   const tools = await Promise.all(
@@ -1036,7 +1117,26 @@ export async function restore(file: string, options: RestoreOptions = {}) {
           .map((tool) => tool.tool)
           .join(", "),
     );
+  const readiness = await restoreReadiness({
+    target,
+    bytes: m.files.reduce((sum, file) => sum + (file.size ?? 0), 0),
+    dependencies,
+    tools,
+    environment,
+    environmentSchema: m.environmentSchema,
+    install: options.install,
+    dbConfig: options.dbConfig,
+    restoreDb: options.restoreDb,
+    restoreVolumes: options.restoreVolumes,
+    databases: m.databases.map((item) => item.name),
+    volumes: (m.volumes ?? []).map((item) => item.name),
+  });
   const plan = {
+    readiness,
+    environment,
+    git: m.git,
+    omitted: m.omitted,
+    files: m.files.map(({ data, ...file }) => file),
     target,
     capturePolicy: m.capturePolicy ?? { includeIgnored: false },
     dependencies,
@@ -1051,6 +1151,7 @@ export async function restore(file: string, options: RestoreOptions = {}) {
     ],
   };
   if (options.dryRun) return plan;
+
   if (options.restoreVolumes && !options.approveVolumes)
     throw new Error(
       "Volume restoration requires --approve-volumes and a trusted external destination mapping.",
@@ -1074,6 +1175,14 @@ export async function restore(file: string, options: RestoreOptions = {}) {
   )
     throw new Error(
       "Install missing tools before requesting post-restore operations.",
+    );
+  if (!readiness.ready)
+    throw new Error(
+      "Restore readiness needs attention: " +
+        readiness.checks
+          .filter((check) => check.state === "blocked")
+          .map((check) => check.name + ". " + check.fix)
+          .join(" "),
     );
   await fs.mkdir(path.dirname(target), { recursive: true });
   options.onProgress?.("Restoring source and Git files");
@@ -1306,7 +1415,7 @@ export async function verify(
         ),
       );
   const problems = [];
-  if (![1, 2].includes(m.formatVersion) || !Array.isArray(m.files))
+  if (![1, 2, 3].includes(m.formatVersion) || !Array.isArray(m.files))
     throw new Error("Invalid verification inventory");
   for (const f of m.files) {
     safePath(f.path);
@@ -1369,10 +1478,12 @@ export async function history(directory = ".") {
         file: path.resolve(directory, f),
         bytes: st.size,
         modifiedAt: st.mtime.toISOString(),
-        status: ["DTP1", "DTP2"].includes(format)
+        status: ["DTP1", "DTP2", "DTP3"].includes(format)
           ? "encrypted format " + format.slice(3) + "; unlock to verify"
           : "unrecognized or incompatible snapshot",
-        formatVersion: format === "DTP1" ? 1 : format === "DTP2" ? 2 : null,
+        formatVersion: ["DTP1", "DTP2", "DTP3"].includes(format)
+          ? Number(format.slice(3))
+          : null,
       });
     }
   }
@@ -1501,10 +1612,11 @@ export async function verifyFromSnapshot(
   directory: string,
   snapshot: string,
   password: string,
+  base?: string,
 ) {
   const manifest = await (
     await import("./stream-v2.ts")
-  ).snapshotMetadata(snapshot, password);
+  ).snapshotMetadata(snapshot, password, base);
   return verify(directory, manifest);
 }
 /**
@@ -1514,7 +1626,10 @@ export async function verifyFromSnapshot(
  */
 export async function listWorkspace(
   directory = ".",
-  policy: Pick<CaptureOptions, "includeIgnored" | "excludeGenerated"> = {},
+  policy: Pick<
+    CaptureOptions,
+    "includeIgnored" | "excludeGenerated" | "envFiles"
+  > = {},
   exclusions: string[] = [],
 ) {
   const root = await fs.realpath(directory);
