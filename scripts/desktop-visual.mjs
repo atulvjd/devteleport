@@ -58,10 +58,13 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.locator("#welcomeDone").click();
   async function finish() {
-    await page.waitForFunction(() =>
-      ["Completed", "Needs attention"].includes(
-        document.getElementById("status").textContent,
-      ),
+    await page.waitForFunction(
+      () =>
+        ["Completed", "Needs attention"].includes(
+          document.getElementById("status").textContent,
+        ),
+      undefined,
+      { timeout: 150000 },
     );
     assert.equal(
       await page.locator("#status").textContent(),

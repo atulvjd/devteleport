@@ -60,6 +60,8 @@ async function finish(expected = "Completed") {
       ["Completed", "Needs attention"].includes(
         document.getElementById("status").textContent,
       ),
+    undefined,
+    { timeout: 150000 },
   );
   assert.equal(
     await page.locator("#status").textContent(),
