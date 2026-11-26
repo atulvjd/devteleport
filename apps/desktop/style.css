@@ -1624,3 +1624,41 @@ dialog .row {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Readiness and comparison share the application's existing card typography. */
+#restoreReadinessPanel,
+#comparisonResult,
+#captureReview,
+#restoreReview,
+#startupCommands {
+  overflow-wrap: anywhere;
+}
+.readiness-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 0 24px;
+}
+[data-pane="comparison"] label {
+  display: block;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+#compareWorkspace {
+  margin-top: 16px;
+}
+#startupPanel > .check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 20px 0;
+}
+#startupPanel > .check input {
+  flex: 0 0 auto;
+}
+#environmentSelection .component {
+  gap: 12px;
+}
+#captureBase,
+#restoreBase {
+  min-width: 0;
+}

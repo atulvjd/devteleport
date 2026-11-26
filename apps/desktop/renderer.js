@@ -10,6 +10,10 @@ let setupAttempt = null,
   setupSelection = new Set(),
   setupReviewFingerprint = null;
 const titles = {
+  comparison: [
+    "Compare workspace",
+    "Review file changes and captured development components.",
+  ],
   dashboard: [
     "Workspace overview",
     "Everything you need to pick up where you left off.",
@@ -44,6 +48,7 @@ const titles = {
   ],
 };
 const navLabels = {
+  comparison: "Compare workspace",
   dashboard: "Overview",
   workspace: "Workspace",
   capture: "Capture",
@@ -528,8 +533,8 @@ function syncReviewActions() {
     const button = document.querySelector(`[data-action="${action}"].primary`);
     const blocked =
       action === "restore" &&
-      $("install").checked &&
-      restoreDependencies?.blockers?.length;
+      (restoreReadiness?.ready === false ||
+        ($("install").checked && restoreDependencies?.blockers?.length));
     button.disabled = busy || !valid || Boolean(blocked);
     if (action === "restore") {
       button.firstChild.textContent = $("install").checked
@@ -540,7 +545,9 @@ function syncReviewActions() {
     panel.dataset.reviewed = String(valid);
     $(action + "ReviewState").textContent =
       blocked && valid
-        ? "Archive reviewed. Dependency installation needs attention."
+        ? $("install").checked && restoreDependencies?.blockers?.length
+          ? "Archive reviewed. Dependency installation needs attention."
+          : "Archive reviewed. Restore readiness needs attention."
         : valid
           ? "Review complete. Ready when you are."
           : "Review " +
@@ -707,10 +714,13 @@ function renderReview(action, result, input) {
     note.textContent = warning;
     target.append(note);
   }
+  renderInventory(target, result);
   target.hidden = false;
   if (action === "restore") {
+    restoreReadiness = result.readiness;
     restoreDependencies = result.dependencies;
     renderSetup(result.dependencies, input, false);
+    renderReadiness(target, result);
     syncReviewActions();
   }
 }
@@ -726,7 +736,7 @@ function renderSetup(plan, input, restored, installation = null) {
     ? "The selected installations completed. Check each package's status in dependency recovery and use these commands when its requirements are ready."
     : restored
       ? input.install
-        ? "Dependency installation completed. Open a terminal in the restored folder and use the startup commands below."
+        ? "Dependency installation completed. Review and approve a startup command below when your configuration is ready."
         : "Your files are ready. Install the dependencies below before starting the project."
       : input.install && plan?.blockers?.length
         ? "Dependency installation is blocked. Resolve the issues below and review again, or turn installation off to restore files only."
@@ -1092,6 +1102,7 @@ function row(title, detail) {
 }
 async function refreshData() {
   lastData = await window.teleport.data();
+  $("startupPanel").hidden = !lastData.lastRestore?.verified;
   if (lastData.lastSetup) renderSetupRecovery(lastData.lastSetup);
   const editor = $("editor");
   editor.replaceChildren();
@@ -1231,6 +1242,13 @@ function inputFor(action, dryRun = false) {
     password: $(action === "capture" ? "capturePassword" : "restorePassword")
       .value,
     toolDirectories: $("toolDirectories").value,
+    base:
+      $(action === "capture" ? "captureBase" : "restoreBase").value ||
+      undefined,
+    envFiles:
+      action === "capture" && environmentSelection !== null
+        ? [...environmentSelection].sort()
+        : undefined,
     includeDb: $("includeDb").checked,
     includeVolumes: $("includeVolumes").checked,
     includeIgnored: $("includeIgnored").checked,
@@ -1256,6 +1274,7 @@ function setBusy(value) {
   syncComponents();
   syncReviewActions();
   syncSetupActions();
+  syncStartup();
   $("consoleClear").disabled = value || !consoleRun;
 }
 async function execute(input) {
@@ -1313,6 +1332,7 @@ async function execute(input) {
         action: "snapshot-info",
         source: result.output,
         password: input.password,
+        base: input.base,
         toolDirectories: input.toolDirectories,
       });
       result.archiveVerified = true;
@@ -1382,6 +1402,9 @@ async function execute(input) {
         invalidateSetupReview();
       }
     }
+    if (input.action === "restore" && !input.dryRun)
+      $("startupPanel").hidden = false;
+    if (input.action === "diff") renderComparison(result);
     if (input.action === "inspect") {
       workspaceInfo = { source: input.source, report: result };
       renderInspector(result);
@@ -1561,6 +1584,7 @@ window.teleport.onProgress((progress) => {
     return;
   }
   if (progress.kind === "output") {
+    if (consoleRun?.action === "run-project") showStartupUrls(progress.text);
     if (consoleRun && !consoleRun.finished)
       appendConsole(
         progress.stream === "stderr"
@@ -1648,6 +1672,7 @@ for (const element of document.querySelectorAll("input, textarea, select")) {
       )
     ) {
       $("restoreSetup").hidden = true;
+      $("restoreReadinessPanel").hidden = true;
       restoreDependencies = null;
     }
     if (element.id === "source") syncComponents();
@@ -1666,4 +1691,312 @@ for (const button of document.querySelectorAll("[data-toggle-password]")) {
     button.setAttribute("aria-pressed", String(show));
     button.setAttribute("aria-label", (show ? "Hide" : "Show") + " passphrase");
   };
+}
+
+let environmentSelection = null;
+let restoreReadiness = null;
+let startupPreview = null;
+const startupUrls = new Set();
+for (const [button, field, kind] of [
+  ["chooseCaptureBase", "captureBase", "snapshot"],
+  ["chooseRestoreBase", "restoreBase", "snapshot"],
+  ["chooseCompareSnapshot", "compareSnapshot", "snapshot"],
+  ["chooseCompareDirectory", "compareDirectory", "directory"],
+  ["chooseCompareBase", "compareBase", "snapshot"],
+])
+  $(button).onclick = async () => {
+    try {
+      const value = await window.teleport.choose(kind);
+      if (value) {
+        $(field).value = value;
+        $(field).dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    } catch (error) {
+      showError(error);
+    }
+  };
+$("source").addEventListener("input", () => {
+  environmentSelection = null;
+  $("environmentSelection").replaceChildren();
+  $("environmentSelection").hidden = true;
+});
+$("reviewEnvironment").onclick = async () => {
+  try {
+    const source = $("source").value;
+    const result = await execute({
+      action: "environment",
+      source,
+      toolDirectories: $("toolDirectories").value,
+    });
+    if (source !== $("source").value) return;
+    environmentSelection = new Set();
+    const panel = $("environmentSelection");
+    panel.replaceChildren();
+    panel.hidden = false;
+    const note = document.createElement("p");
+    note.textContent =
+      "Select the .env files to include. Variable values stay hidden. Selected files may contain credentials and will travel in the encrypted snapshot.";
+    panel.append(note);
+    if (!result.files.length)
+      panel.append(document.createTextNode("No environment files found."));
+    for (const file of result.files) {
+      const label = document.createElement("label"),
+        checkbox = document.createElement("input"),
+        text = document.createElement("span");
+      label.className = "component selectable";
+      checkbox.type = "checkbox";
+      checkbox.dataset.envPath = file.path;
+      text.textContent =
+        file.path + " · " + (file.keys.join(", ") || "No variable names found");
+      checkbox.onchange = () => {
+        if (checkbox.checked) environmentSelection.add(file.path);
+        else environmentSelection.delete(file.path);
+        syncReviewActions();
+      };
+      label.append(checkbox, text);
+      panel.append(label);
+    }
+    syncReviewActions();
+  } catch (error) {
+    showError(error);
+  }
+};
+function detailList(parent, title, values) {
+  const details = document.createElement("details"),
+    summary = document.createElement("summary"),
+    list = document.createElement("ul");
+  summary.textContent = title + " (" + values.length + ")";
+  for (const value of values.slice(0, 300)) {
+    const item = document.createElement("li");
+    item.textContent = value;
+    list.append(item);
+  }
+  if (values.length > 300) {
+    const item = document.createElement("li");
+    item.textContent = "Showing 300 entries. Complete counts are shown above.";
+    list.append(item);
+  }
+  details.append(summary, list);
+  parent.append(details);
+}
+function renderInventory(parent, result) {
+  if (result.files)
+    detailList(
+      parent,
+      "Saved files",
+      result.files.map((file) => file.path),
+    );
+  detailList(parent, "Excluded entries", result.omitted || []);
+  const git = result.git || result.report?.git;
+  const summary = document.createElement("p");
+  summary.textContent =
+    "Git · " +
+    (git
+      ? (git.branch || "Detached HEAD") + " · " + (git.commit || "No commit")
+      : "No repository") +
+    " · Databases · " +
+    ((result.databases || result.report?.databases || [])
+      .map((item) => (typeof item === "string" ? item : item.name))
+      .join(", ") || "None") +
+    " · Volumes · " +
+    ((result.volumes || result.report?.volumes || [])
+      .map((item) => (typeof item === "string" ? item : item.name))
+      .join(", ") || "None");
+  parent.append(summary);
+  if (git?.status)
+    detailList(
+      parent,
+      "Git changes",
+      git.status.split(/\0|\n/).filter(Boolean),
+    );
+  if (result.incremental) {
+    const note = document.createElement("p");
+    note.textContent =
+      "Incremental snapshot · requires base SHA-256 " +
+      result.incremental.baseSha256;
+    parent.append(note);
+  }
+}
+function renderReadiness(parent, result) {
+  parent = $("restoreReadinessPanel");
+  parent.replaceChildren();
+  parent.hidden = !result.readiness;
+  if (!result.readiness) return;
+  const section = document.createElement("section"),
+    heading = document.createElement("h3");
+  heading.textContent = "Restore readiness";
+  section.append(heading);
+  const checks = document.createElement("div");
+  checks.className = "readiness-checks";
+  section.append(checks);
+  for (const check of result.readiness.checks)
+    checks.append(
+      row(
+        check.name,
+        check.state +
+          (check.version ? " · " + check.version : "") +
+          (check.fix ? " · " + check.fix : ""),
+      ),
+    );
+  for (const [name, space] of Object.entries(result.readiness.storage)) {
+    if (typeof space === "object")
+      section.append(
+        row(
+          name + " storage",
+          size(space.available) +
+            " available · " +
+            size(space.required) +
+            " required",
+        ),
+      );
+  }
+  section.append(
+    row(
+      "Dependency installation space",
+      result.readiness.storage.installationBytes,
+    ),
+  );
+  for (const env of result.readiness.environment)
+    section.append(
+      row(
+        env.directory + " environment",
+        env.missing.length
+          ? "Supply values for " + env.missing.join(", ")
+          : "Expected variable names are present",
+      ),
+    );
+  for (const file of result.environment || [])
+    section.append(
+      row(
+        file.path,
+        file.note || file.keys.join(", ") || "No variable names detected",
+      ),
+    );
+  const note = document.createElement("p");
+  note.textContent = result.readiness.environmentNote;
+  section.append(note);
+  parent.append(section);
+}
+$("compareWorkspace").onclick = () =>
+  execute({
+    action: "diff",
+    source: $("compareSnapshot").value,
+    directory: $("compareDirectory").value || $("source").value,
+    password: $("comparePassword").value,
+    base: $("compareBase").value || undefined,
+    toolDirectories: $("toolDirectories").value,
+  }).catch(() => {});
+function renderComparison(result) {
+  const panel = $("comparisonResult");
+  panel.replaceChildren();
+  panel.append(
+    row(
+      result.identical ? "Workspace matches snapshot" : "Workspace changes",
+      Object.entries(result.summary)
+        .map(([name, count]) => count + " " + name)
+        .join(" · "),
+    ),
+  );
+  detailList(panel, "Added", result.added);
+  detailList(panel, "Removed", result.removed);
+  detailList(
+    panel,
+    "Modified",
+    result.modified.map(
+      (change) => change.path + " · " + change.reasons.join(", "),
+    ),
+  );
+  panel.append(row("Git internal changes", String(result.git.changedEntries)));
+  if (result.context) renderInventory(panel, result.context);
+}
+$("reviewStartup").onclick = async () => {
+  try {
+    const root = lastData.lastRestore?.target;
+    startupPreview = await execute({
+      action: "run-project",
+      source: root,
+      dryRun: true,
+      toolDirectories: $("toolDirectories").value,
+    });
+    $("approveStartup").checked = false;
+    const panel = $("startupCommands");
+    panel.replaceChildren();
+    for (const [index, command] of startupPreview.commands.entries()) {
+      const label = document.createElement("label"),
+        radio = document.createElement("input"),
+        text = document.createElement("span");
+      radio.type = "radio";
+      radio.name = "startupCommand";
+      radio.value = String(index);
+      radio.checked = index === 0;
+      text.textContent =
+        command.directory +
+        " · " +
+        command.command.join(" ") +
+        " · " +
+        command.definition;
+      label.className = "component selectable";
+      label.append(radio, text);
+      panel.append(label);
+    }
+    if (!startupPreview.commands.length)
+      panel.textContent =
+        "No supported startup scripts detected. Follow the project's README.";
+    syncStartup();
+  } catch (error) {
+    startupPreview = null;
+    showError(error);
+  }
+};
+function syncStartup() {
+  $("runStartup").disabled =
+    busy || !startupPreview?.commands.length || !$("approveStartup").checked;
+}
+$("approveStartup").onchange = syncStartup;
+$("runStartup").onclick = async () => {
+  const radio = document.querySelector('input[name="startupCommand"]:checked');
+  const selected = startupPreview?.commands[Number(radio?.value)];
+  if (!selected || !$("approveStartup").checked) return;
+  const preview = startupPreview;
+  startupPreview = null;
+  $("approveStartup").checked = false;
+  startupUrls.clear();
+  $("startupUrls").replaceChildren();
+  try {
+    await execute({
+      action: "run-project",
+      source: preview.root,
+      planId: preview.id,
+      packageDirectory: selected.directory,
+      script: selected.script,
+      approveExecution: true,
+      toolDirectories: $("toolDirectories").value,
+    });
+  } catch {
+  } finally {
+    syncStartup();
+  }
+};
+function showStartupUrls(text) {
+  for (const match of String(text).matchAll(
+    /https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?(?:\/[^\s<>"']*)?/g,
+  )) {
+    try {
+      const url = new URL(match[0]);
+      if (
+        !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash
+      )
+        continue;
+      if (!startupUrls.has(url.href)) {
+        startupUrls.add(url.href);
+        const item = document.createElement("p");
+        item.textContent = "Local project URL · " + url.href;
+        $("startupUrls").append(item);
+      }
+    } catch {}
+  }
 }

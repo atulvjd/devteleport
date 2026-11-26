@@ -247,6 +247,9 @@ ipcMain.handle("operation", async (event, input) => {
   if (
     !input ||
     ![
+      "environment",
+      "run-project",
+      "diff",
       "inspect",
       "capture",
       "restore",
@@ -269,6 +272,20 @@ ipcMain.handle("operation", async (event, input) => {
   )
     throw new Error("Choose an absolute workspace or snapshot path");
   if (running) throw new Error("An operation is already running.");
+  if (input.action === "run-project") {
+    const stat = await fs.lstat(input.source);
+    const data = await localData();
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      !data.lastRestore?.verified ||
+      (await fs.realpath(input.source)) !==
+        (await fs.realpath(data.lastRestore.target))
+    )
+      throw new Error("Choose the last verified restored project for startup.");
+    if (!input.dryRun && input.approveExecution !== true)
+      throw new Error("Approve project script execution first.");
+  }
   let setupIdentity;
   if (input.action === "setup") {
     const stat = await fs.lstat(input.source);
@@ -323,6 +340,11 @@ ipcMain.handle("operation", async (event, input) => {
   const safe = (value) =>
     redactActivityText(value, [...secrets, ...consoleSecrets]);
   const args = [input.action];
+  if (input.base) {
+    if (typeof input.base !== "string" || !path.isAbsolute(input.base))
+      throw new Error("Choose an absolute base archive path");
+    args.push("--base", input.base);
+  }
   if (input.action === "capture") args.push("--format", "2");
   if (input.action === "capture") {
     args.push(
@@ -334,6 +356,18 @@ ipcMain.handle("operation", async (event, input) => {
       input.output,
     );
     if (input.dryRun) args.push("--dry-run");
+    if (input.envFiles !== undefined) {
+      if (
+        !Array.isArray(input.envFiles) ||
+        input.envFiles.length > 500 ||
+        input.envFiles.some(
+          (file) => typeof file !== "string" || file.length > 4096,
+        )
+      )
+        throw new Error("Invalid environment selection");
+      if (!input.envFiles.length) args.push("--env-file", "none");
+      else for (const file of input.envFiles) args.push("--env-file", file);
+    }
     if (input.includeDb) args.push("--include-db");
     if (input.includeVolumes) args.push("--include-volumes");
     if (input.includeIgnored) args.push("--include-ignored");
@@ -361,6 +395,31 @@ ipcMain.handle("operation", async (event, input) => {
     args.push("--pairing", input.pairing);
   } else {
     args.push(input.source);
+    if (input.action === "run-project") {
+      if (input.dryRun) args.push("--dry-run");
+      else {
+        for (const key of ["packageDirectory", "script", "planId"])
+          if (typeof input[key] !== "string" || input[key].length > 4096)
+            throw new Error("Choose a reviewed startup command");
+        args.push(
+          "--package-directory",
+          input.packageDirectory,
+          "--script",
+          input.script,
+          "--plan-id",
+          input.planId,
+          "--approve-execution",
+        );
+      }
+    }
+    if (input.action === "diff") {
+      if (
+        typeof input.directory !== "string" ||
+        !path.isAbsolute(input.directory)
+      )
+        throw new Error("Choose an absolute comparison folder");
+      args.push(input.directory);
+    }
     if (input.action === "send") {
       if (!input.approvePeer)
         throw new Error(
@@ -547,12 +606,22 @@ ipcMain.handle("operation", async (event, input) => {
       phase: "Running",
       action: input.action,
     });
-    const timer = setTimeout(
-      () => child.cancel(),
-      ["send", "receive", "capture", "restore", "setup"].includes(input.action)
-        ? 3600000
-        : 180000,
-    );
+    const timer =
+      input.action === "run-project" && !input.dryRun
+        ? undefined
+        : setTimeout(
+            () => child.cancel(),
+            [
+              "send",
+              "receive",
+              "capture",
+              "restore",
+              "setup",
+              "run-project",
+            ].includes(input.action)
+              ? 3600000
+              : 180000,
+          );
     const stdoutDecoder = new (require("node:string_decoder").StringDecoder)(
       "utf8",
     );
@@ -636,7 +705,7 @@ ipcMain.handle("operation", async (event, input) => {
             "Operation cancelled. Review any incomplete new output before retrying; existing data was not overwritten.",
           ),
         );
-      if (code !== 0)
+      if (code !== 0 && !(input.action === "diff" && code === 2))
         return reject(
           new Error(
             safe(

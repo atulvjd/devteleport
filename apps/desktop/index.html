@@ -125,6 +125,9 @@
         ><button data-view="restore">
           <svg class="icon" aria-hidden="true"><use href="#i-restore" /></svg
           ><span>Restore</span></button
+        ><button data-view="comparison">
+          <svg class="icon" aria-hidden="true"><use href="#i-layers" /></svg
+          ><span>Compare workspace</span></button
         ><button data-view="library">
           <svg class="icon" aria-hidden="true"><use href="#i-layers" /></svg
           ><span>Snapshot library</span></button
@@ -465,6 +468,21 @@ Choose a project above, then select Inspect.</pre>
                 </p>
               </div>
             </div>
+            <label for="captureBase"
+              >Incremental base snapshot (optional)</label
+            >
+            <div class="row">
+              <input
+                id="captureBase"
+                placeholder="Full .dtp snapshot, same passphrase"
+              /><button id="chooseCaptureBase">Browse…</button>
+            </div>
+            <p class="field-help">
+              Keep the base with your incremental snapshot. Unchanged file
+              content is stored in the base.
+            </p>
+            <button id="reviewEnvironment">Choose environment files…</button>
+            <div id="environmentSelection" class="review-summary" hidden></div>
             <div class="review-summary" id="captureReview" hidden></div>
             <div class="action-panel">
               <div class="review-state">
@@ -492,6 +510,33 @@ Choose a project above, then select Inspect.</pre>
             </div>
           </article>
         </div>
+      </section>
+      <section data-pane="comparison" hidden>
+        <article class="card">
+          <h2>Compare a snapshot with your workspace</h2>
+          <label for="compareSnapshot">Snapshot</label>
+          <div class="row">
+            <input id="compareSnapshot" /><button id="chooseCompareSnapshot">
+              Browse…
+            </button>
+          </div>
+          <label for="compareDirectory">Workspace folder</label>
+          <div class="row">
+            <input id="compareDirectory" /><button id="chooseCompareDirectory">
+              Browse…
+            </button>
+          </div>
+          <label for="compareBase">Incremental base (optional)</label>
+          <div class="row">
+            <input id="compareBase" /><button id="chooseCompareBase">
+              Browse…
+            </button>
+          </div>
+          <label for="comparePassword">Passphrase</label
+          ><input type="password" id="comparePassword" autocomplete="off" />
+          <button id="compareWorkspace">Compare</button>
+          <div id="comparisonResult" aria-live="polite"></div>
+        </article>
       </section>
       <section data-pane="restore" hidden>
         <div class="steps" aria-label="Restore steps">
@@ -616,6 +661,15 @@ Choose a project above, then select Inspect.</pre>
                 ></span
               ><input id="install" type="checkbox"
             /></label>
+            <label for="restoreBase"
+              >Base snapshot for an incremental restore</label
+            >
+            <div class="row">
+              <input
+                id="restoreBase"
+                placeholder="Only needed for incremental snapshots"
+              /><button id="chooseRestoreBase">Browse…</button>
+            </div>
             <div class="review-summary" id="restoreReview" hidden></div>
             <div class="action-panel">
               <div class="review-state">
@@ -642,6 +696,12 @@ Choose a project above, then select Inspect.</pre>
           </article>
         </div>
         <article
+          class="card"
+          id="restoreReadinessPanel"
+          hidden
+          aria-live="polite"
+        ></article>
+        <article
           class="card setup-guide"
           id="restoreSetup"
           hidden
@@ -656,11 +716,25 @@ Choose a project above, then select Inspect.</pre>
             hidden
           ></div>
           <div id="setupPackages"></div>
+
           <p class="hint">
-            Credentials and system tools are configured separately. Startup
-            commands run in your terminal; DevTeleport does not start a server
-            automatically.
+            Configure credentials and system tools, then review a startup
+            command in the Run project section.
           </p>
+        </article>
+        <article class="card" id="startupPanel" hidden>
+          <h3>Run your restored project</h3>
+          <button id="reviewStartup">Review startup commands</button>
+          <div id="startupCommands"></div>
+          <label class="check"
+            ><input type="checkbox" id="approveStartup" />Approve running the
+            selected project script with my user permissions</label
+          >
+          <button id="runStartup" disabled>Run project</button>
+          <p>
+            Use Cancel operation to stop the project and its child processes.
+          </p>
+          <div id="startupUrls" aria-live="polite"></div>
         </article>
         <article
           class="card setup-recovery"
