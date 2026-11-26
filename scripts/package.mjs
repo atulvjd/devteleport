@@ -43,11 +43,12 @@ const userDocs = [
   "SECURITY.md",
   "TROUBLESHOOTING.md",
   "INCLUDE-IGNORED.md",
+  "WORKSPACE-READINESS.md",
 ];
 for (const name of userDocs)
   await fs.copyFile(path.join("docs", name), path.join(root, "docs", name));
 const readme = (await fs.readFile("docs/CLI.md", "utf8")).replace(
-  /\]\((FORMAT-2|NETWORK-TRANSFER|SECURITY|TROUBLESHOOTING)\.md\)/g,
+  /\]\((FORMAT-2|NETWORK-TRANSFER|SECURITY|TROUBLESHOOTING|WORKSPACE-READINESS)\.md\)/g,
   "](docs/$1.md)",
 );
 await fs.writeFile(path.join(root, "README.md"), readme);

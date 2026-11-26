@@ -72,6 +72,12 @@ if (checks[0].status === "PASS") {
   await stage("tls-transfer", "npm", ["run", "test:transfer"]);
   await stage("signed-update-https", "npm", ["run", "test:updates"]);
   await stage("desktop-tls-workflow", "npm", ["run", "test:desktop:transfer"]);
+  await stage(
+    "desktop-workspace-readiness",
+    "npm",
+    ["run", "test:desktop:workspace"],
+    { DEVTELEPORT_APP_BINARY: path.join(bundle, "Contents/MacOS/DevTeleport") },
+  );
   await stage("postgres", "npm", ["run", "test:postgres"]);
   await stage("postgres-versions", "npm", ["run", "test:pg-versions"]);
   await stage("docker-live", "npm", ["run", "test:docker:live"]);
@@ -125,7 +131,7 @@ if (checks[0].status === "PASS") {
 const report = {
   createdAt: new Date().toISOString(),
   checks,
-  ok: checks.length === 21 && checks.every((check) => check.status === "PASS"),
+  ok: checks.length === 22 && checks.every((check) => check.status === "PASS"),
   releaseGates: [
     {
       name: "Developer ID signing and notarization",

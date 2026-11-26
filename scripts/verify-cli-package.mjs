@@ -17,6 +17,7 @@ const allowed = new Set([
   "package/docs/SECURITY.md",
   "package/docs/TROUBLESHOOTING.md",
   "package/docs/INCLUDE-IGNORED.md",
+  "package/docs/WORKSPACE-READINESS.md",
 ]);
 for (const file of files) {
   assert(

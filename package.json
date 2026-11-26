@@ -12,7 +12,7 @@
   "scripts": {
     "dev:website": "node scripts/serve-website.mjs",
     "build:website": "node scripts/build-website.mjs",
-    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts tests/wait-for-port.test.ts tests/setup.test.ts tests/activity.test.ts tests/include-ignored.test.ts tests/release-failures.test.ts tests/dependency-collection.test.ts tests/ecosystems.test.ts tests/python-setup.test.ts tests/polyglot-setup.test.ts",
+    "test": "node --test tests/core.test.ts tests/security.test.ts tests/stream-v2.test.ts tests/updates.test.ts tests/processes.test.ts tests/recovery.test.ts tests/diff.test.ts tests/wait-for-port.test.ts tests/setup.test.ts tests/activity.test.ts tests/include-ignored.test.ts tests/release-failures.test.ts tests/dependency-collection.test.ts tests/ecosystems.test.ts tests/python-setup.test.ts tests/polyglot-setup.test.ts tests/workspace-next.test.ts",
     "check": "tsc --noEmit && node --check apps/desktop/main.cjs && node --check apps/vscode-extension/extension.cjs",
     "desktop": "npm run build:backend && node scripts/launch-desktop.mjs",
     "package:cli": "node scripts/package.mjs",
@@ -45,7 +45,8 @@
     "benchmark:desktop": "npm run build:backend && node scripts/desktop-benchmark.mjs",
     "verify:distribution": "node scripts/verify-distribution.mjs",
     "test:desktop:visual": "npm run build:backend && node scripts/desktop-visual.mjs",
-    "verify:cli-package": "node scripts/verify-cli-package.mjs"
+    "verify:cli-package": "node scripts/verify-cli-package.mjs",
+    "test:desktop:workspace": "npm run build:backend && node scripts/desktop-workspace-next.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

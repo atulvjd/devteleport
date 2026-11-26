@@ -63,6 +63,7 @@ jobs:
       - run: node node_modules/electron/install.js
       - run: test "$(uname -m)" = arm64
       - run: npm run test:desktop
+      - run: npm run test:desktop:workspace
       - run: npm run test:desktop:setup
       - run: npm run test:desktop:dependencies
       - run: npm run test:desktop:transfer
