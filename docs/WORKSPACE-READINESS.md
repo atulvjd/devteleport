@@ -1,6 +1,6 @@
 # Workspace readiness and restore follow-up
 
-This unreleased development update adds readiness review, approved project startup, environment-file selection, incremental archives and a desktop comparison view. Existing full format 1 and format 2 archives remain supported. The published npm 0.2.2 package and earlier installers do not contain these changes.
+Version 0.2.3 adds readiness review, approved project startup, environment-file selection, incremental archives and a desktop comparison view. Existing full format 1 and format 2 archives remain supported. Earlier 0.2.2 installers predate these changes.
 
 ## Restore readiness
 
@@ -68,4 +68,4 @@ CLI diff returns exit code 2 when changes are found. The desktop treats that as 
 
 Run `npm run check`, `npm test`, `npm run test:desktop` and `npm run test:desktop:workspace`. The new desktop test uses disposable fixtures and an isolated profile, restores after source removal, runs and cancels an approved project process, checks log filtering and local URL display, and exercises dark/light compact layouts. It can target a packaged app with `DEVTELEPORT_APP_BINARY`. The consolidated Apple Silicon gate includes this packaged check.
 
-Saved current-session evidence lives in `dist/workspace-next/evidence/`. Read STATUS.md for the final result and external prerequisites. The preview retains bundle version 0.2.2 and ad-hoc signing. Assign a new release version and complete release acceptance before public publication.
+Saved current-session evidence lives in `dist/workspace-next/evidence/`. Read STATUS.md for the final result and external prerequisites. The v0.2.3 GitHub prerelease uses ad-hoc signing. Developer ID/notarization and manual acceptance remain separate release gates.

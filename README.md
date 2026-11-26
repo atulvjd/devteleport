@@ -1,4 +1,4 @@
-# DevTeleport 0.2.2 — Apple Silicon release candidate
+# DevTeleport 0.2.3 — Apple Silicon release candidate
 
 **Your development environment. Anywhere. Exactly where you left off.**
 
@@ -7,6 +7,8 @@ Capture saved development state on one Mac, transfer an encrypted snapshot, and 
 **Development release candidate, not production-certified.** Signing/notarization and physical two-Mac acceptance remain release gates. [Current status](docs/STATUS.md) · [Apple Silicon release report](docs/APPLE-SILICON-RELEASE.md).
 
 Version 0.2.2 adds multi-language dependency collection, approved installation and in-place desktop retry with per-project status. It includes the earlier live console, optional ignored-file/secrets capture and generated-folder exclusions. See [0.2.2 release notes](docs/RELEASE-NOTES-0.2.2.md) and [dependency collection](docs/DEPENDENCY-COLLECTION.md). The CLI is public on npm as **devteleport@0.2.2**, tagged latest; desktop and VS Code downloads are separate distributions.
+
+Version 0.2.3 adds restore readiness, selective environment files, approved startup with live logs, incremental format 3 snapshots, and desktop workspace comparison. Read [the feature guide](docs/WORKSPACE-READINESS.md) for usage and current limits. Read the [v0.2.3 release notes](docs/RELEASE-NOTES-0.2.3.md) for distribution details.
 
 ## Install and begin
 

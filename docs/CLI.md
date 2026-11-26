@@ -99,3 +99,7 @@ Format 2 is the CLI default; format 1 remains readable and writable. Format 2 li
 Read the [format](FORMAT-2.md), [network protocol](NETWORK-TRANSFER.md), [security model](SECURITY.md) and [troubleshooting](TROUBLESHOOTING.md) before relying on a restored workspace.
 
 MIT licensed. Source and issues: https://github.com/atulvjd/devteleport
+
+## Version 0.2.3 workspace tools
+
+Version 0.2.3 adds `environment DIR`, `run-project DIR --dry-run`, approved `run-project` execution, selective `capture --env-file PATH`, and incremental capture/restore/verification using `--base FULL.dtp`. The earlier npm 0.2.2 release predates these features. Read [Workspace readiness and restore follow-up](WORKSPACE-READINESS.md) for approval steps, compatibility and limits.
